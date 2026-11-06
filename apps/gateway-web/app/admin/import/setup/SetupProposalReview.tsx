@@ -1,16 +1,31 @@
-'use client';
+"use client";
 
-import { useState, type FormEvent } from 'react';
-import type { OutlineKindWrite } from '../../../../lib/api';
-import type { SetupProposal } from '../../../../lib/ingestion-api';
-import { displayKinds, setupKinds, setupOutline } from '../../../../lib/setup-review';
-import { ui } from '../../../../lib/messages';
-import { useTranslation } from '../../../components/TranslationProvider';
-import { Alert, Button, Card, Input, Select } from '../../../components/ui';
-import { OutlineReaderPreview } from '../../constitutions/OutlineReaderPreview';
-import { previewRoots } from '../ImportPreview';
-import { reviewSetupAction } from './actions';
-import styles from './SetupProposalReview.module.css';
+import { useState, useRef, type FormEvent, type ReactNode } from "react";
+import type { OutlineKindWrite } from "../../../../lib/api";
+import type { SetupProposal } from "../../../../lib/ingestion-api";
+import {
+  displayKinds,
+  setupKinds,
+  setupOutline,
+} from "../../../../lib/setup-review";
+import { ui } from "../../../../lib/messages";
+import { useTranslation } from "../../../components/TranslationProvider";
+import { Stack } from "../../../components/layout/Layout";
+import { Alert, Button, Card } from "../../../components/ui";
+import {
+  StructureWorkspaceTemplate,
+  OutlineWorkspace,
+  StructurePreview,
+} from "../../constitutions/StructureWorkspaceTemplate";
+import {
+  explicitLayers,
+  withoutExisting,
+} from "../../constitutions/outline-editor-model";
+import { structureUi as copy } from "../../../../lib/structure-workspace";
+import { OutlineReaderPreview } from "../../constitutions/OutlineReaderPreview";
+import { previewRoots } from "../ImportPreview";
+import { reviewSetupAction } from "./actions";
+import styles from "./SetupProposalReview.module.css";
 
 function Hierarchy({ kinds }: { kinds: OutlineKindWrite[] }) {
   const t = useTranslation();
@@ -19,12 +34,16 @@ function Hierarchy({ kinds }: { kinds: OutlineKindWrite[] }) {
       {setupOutline(kinds).kinds.map((kind) => (
         <li key={kind.kindCode}>
           <strong>{kind.displayLabel}</strong>
-          {kind.root ? ` · ${t(ui.setupReview.root)}` : ''}
-          {' → '}
+          {kind.root ? ` · ${t(ui.setupReview.root)}` : ""}
+          {" → "}
           {kind.allowedChildKinds?.length
             ? kind.allowedChildKinds
-                .map((code) => kinds.find((child) => child.kindCode === code)?.displayLabel ?? code)
-                .join(', ')
+                .map(
+                  (code) =>
+                    kinds.find((child) => child.kindCode === code)
+                      ?.displayLabel ?? code,
+                )
+                .join(", ")
             : t(ui.setupReview.text)}
         </li>
       ))}
@@ -32,23 +51,42 @@ function Hierarchy({ kinds }: { kinds: OutlineKindWrite[] }) {
   );
 }
 
-export function SetupProposalReview({ proposal, error }: { proposal: SetupProposal; error?: string }) {
+export function SetupProposalReview({
+  proposal,
+  error,
+  identity,
+}: {
+  proposal: SetupProposal;
+  error?: string;
+  identity?: ReactNode;
+}) {
   const t = useTranslation();
   const [kinds, setKinds] = useState(() => setupKinds(proposal.payload));
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
+  const [view, setView] = useState(
+    proposal.status === "confirming" || proposal.status === "confirmed"
+      ? "review"
+      : "structure",
+  );
+  const feedback = useRef<HTMLDetailsElement>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const editable = proposal.status === 'proposed';
-  const recoverable = proposal.status === 'confirming';
-  function update(index: number, patch: Partial<OutlineKindWrite>) {
-    setKinds((current) => current.map((kind, i) => (i === index ? { ...kind, ...patch } : kind)));
+  const editable = proposal.status === "proposed";
+  const recoverable = proposal.status === "confirming";
+  function requestChanges() {
+    setView("review");
+    if (feedback.current) feedback.current.open = true;
+    requestAnimationFrame(() =>
+      feedback.current?.querySelector("textarea")?.focus(),
+    );
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
     const data = new FormData(event.currentTarget);
-    data.set('intent', submitter?.value ?? 'display');
+    data.set("intent", submitter?.value ?? "display");
     setBusy(true);
     setFailed(false);
     try {
@@ -58,98 +96,150 @@ export function SetupProposalReview({ proposal, error }: { proposal: SetupPropos
       setFailed(true);
     }
   }
+  const layers = explicitLayers(kinds, true),
+    sample = previewRoots(proposal.payload.sampleRoots);
+  const tabs = [
+    { id: "structure", label: copy.structure },
+    { id: "preview", label: copy.preview },
+    { id: "proposal", label: copy.proposal },
+    { id: "changes", label: copy.changes },
+    { id: "review", label: copy.review },
+  ];
   return (
-    <form onSubmit={submit}>
-      <input type="hidden" name="proposalId" value={proposal.id} />
-      <input type="hidden" name="revision" value={proposal.revision} />
-      <input type="hidden" name="display" value={JSON.stringify(displayKinds(kinds))} />
+    <>
       {proposalStatusCard(proposal, error, failed, t)}
-      <div className={styles.grid}>
-        <Card className={styles.hierarchyCard}>
-          <h2>{t(ui.setupReview.hierarchy)}</h2>
-          <Hierarchy kinds={kinds} />
-          <p>{t(ui.setupReview.hierarchyHelp)}</p>
-        </Card>
-
-        <Card className={styles.sample}>
-          <h2>{t(ui.setupReview.sample)}</h2>
-          <p>{t(ui.setupReview.sampleHelp)}</p>
-          <OutlineReaderPreview
-            roots={previewRoots(proposal.payload.sampleRoots)}
-            outline={setupOutline(kinds)}
-            label={t(ui.setupReview.current)}
-          />
-        </Card>
-        <div className={styles.controls}>
-          {proposalChanges(proposal, t)}
-          {proposal.requestedChanges ? (
-            <Card>
-              <h2>{t(ui.setupReview.recorded)}</h2>
-              <p className={styles.feedback}>{proposal.requestedChanges}</p>
-            </Card>
-          ) : null}
-          {editable ? proposalDisplay(kinds, busy, update, t) : null}
-        </div>
-      </div>
-      {recoverable ? (
-        <Card>
-          <Button variant="primary" name="intent" value="confirm" disabled={busy}>
-            {t(busy ? ui.setupReview.saving : ui.setupReview.resumeConfirmation)}
+      <StructureWorkspaceTemplate
+        tabs={tabs}
+        active={view}
+        onSelect={setView}
+        primary={
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => setView("review")}
+          >
+            {t(ui.setupReview.title)}
           </Button>
-        </Card>
-      ) : null}
-      {editable ? (
-        <Card id="setup-final-review">
-          <h2>{t(ui.admin.import.setup.proposalid.page.finalReview)}</h2>
-          <div className={styles.actions}>
-            <Button
-              variant="primary"
-              name="intent"
-              value="confirm"
-              disabled={busy || proposal.changesRequested}
-            >
-              {t(busy ? ui.setupReview.saving : ui.setupReview.confirm)}
-            </Button>
+        }
+      >
+        <form onSubmit={submit}>
+          <input type="hidden" name="proposalId" value={proposal.id} />
+          <input type="hidden" name="revision" value={proposal.revision} />
+          <input
+            type="hidden"
+            name="display"
+            value={JSON.stringify(displayKinds(kinds))}
+          />
+          <div hidden={view !== "structure"}>
+            <Stack>
+              <OutlineWorkspace
+                layers={layers}
+                onChange={(next) => setKinds(withoutExisting(next))}
+                structural={false}
+                display={editable && !busy}
+                sampleRoots={sample}
+                onRequestChanges={editable ? requestChanges : undefined}
+              />
+              {editable ? (
+                <Button name="intent" value="display" disabled={busy}>
+                  {t(ui.setupReview.save)}
+                </Button>
+              ) : null}
+            </Stack>
           </div>
-          <details>
-            <summary>{t(ui.setupReview.feedback)}</summary>
-            <p>{t(ui.setupReview.feedbackHelp)}</p>
-            <label htmlFor="setup-requested-changes">{t(ui.setupReview.feedbackLabel)}</label>
-            <textarea
-              id="setup-requested-changes"
-              name="message"
-              value={message}
-              maxLength={4000}
-              rows={4}
-              onChange={(event) => setMessage(event.target.value)}
-            />
-            <div className={styles.actions}>
-              <Button name="intent" value="request-changes" disabled={busy || message.trim().length < 10}>
-                {t(ui.setupReview.feedbackButton)}
-              </Button>
-            </div>
-          </details>
-          <div className={styles.actions}>
-            <Button name="intent" value="withdraw" formNoValidate disabled={busy}>
-              {t(ui.admin.import.setup.proposalid.page.withdrawProposal)}
-            </Button>
+          {view === "preview" ? (
+            <StructurePreview layers={layers} sampleRoots={sample} />
+          ) : null}
+          <div hidden={view !== "proposal"}>{identity}</div>
+          <div hidden={view !== "changes"}>{proposalChanges(proposal, t)}</div>
+          <div hidden={view !== "review"}>
+            {proposal.requestedChanges ? (
+              <Card>
+                <h2>{t(ui.setupReview.recorded)}</h2>
+                <p className={styles.feedback}>{proposal.requestedChanges}</p>
+              </Card>
+            ) : null}
+            {recoverable ? (
+              <Card>
+                <Button
+                  variant="primary"
+                  name="intent"
+                  value="confirm"
+                  disabled={busy}
+                >
+                  {t(
+                    busy
+                      ? ui.setupReview.saving
+                      : ui.setupReview.resumeConfirmation,
+                  )}
+                </Button>
+              </Card>
+            ) : null}
+            {editable ? (
+              <Card id="setup-final-review">
+                <h2>{t(ui.admin.import.setup.proposalid.page.finalReview)}</h2>
+                <div className={styles.actions}>
+                  <Button
+                    variant="primary"
+                    name="intent"
+                    value="confirm"
+                    disabled={busy || proposal.changesRequested}
+                  >
+                    {t(busy ? ui.setupReview.saving : ui.setupReview.confirm)}
+                  </Button>
+                </div>
+                <details ref={feedback}>
+                  <summary>{t(ui.setupReview.feedback)}</summary>
+                  <p>{t(ui.setupReview.feedbackHelp)}</p>
+                  <label htmlFor="setup-requested-changes">
+                    {t(ui.setupReview.feedbackLabel)}
+                  </label>
+                  <textarea
+                    id="setup-requested-changes"
+                    name="message"
+                    value={message}
+                    maxLength={4000}
+                    rows={4}
+                    onChange={(event) => setMessage(event.target.value)}
+                  />
+                  <div className={styles.actions}>
+                    <Button
+                      name="intent"
+                      value="request-changes"
+                      disabled={busy || message.trim().length < 10}
+                    >
+                      {t(ui.setupReview.feedbackButton)}
+                    </Button>
+                  </div>
+                </details>
+                <div className={styles.actions}>
+                  <Button
+                    name="intent"
+                    value="withdraw"
+                    formNoValidate
+                    disabled={busy}
+                  >
+                    {t(ui.admin.import.setup.proposalid.page.withdrawProposal)}
+                  </Button>
+                </div>
+              </Card>
+            ) : null}
           </div>
-        </Card>
-      ) : null}
-    </form>
+        </form>
+      </StructureWorkspaceTemplate>
+    </>
   );
 }
 
 type SetupTranslation = ReturnType<typeof useTranslation>;
-type UpdateKind = (index: number, patch: Partial<OutlineKindWrite>) => void;
 
 /** Preserves confirmation/closed/feedback/revision status precedence. */
 function proposalStatus(proposal: SetupProposal) {
-  const editable = proposal.status === 'proposed';
+  const editable = proposal.status === "proposed";
   const previous = proposal.previousPayload;
-  return proposal.status === 'confirmed'
+  return proposal.status === "confirmed"
     ? ui.setupReview.confirmed
-    : proposal.status === 'confirming'
+    : proposal.status === "confirming"
       ? ui.setupReview.confirming
       : !editable
         ? ui.setupReview.closed
@@ -164,16 +254,16 @@ function proposalStatus(proposal: SetupProposal) {
 function proposalDifferences(proposal: SetupProposal) {
   const previous = proposal.previousPayload;
   const metadata = [
-    'constitutionTitle',
-    'countryName',
-    'isoCode',
-    'languageCode',
-    'sourceUrl',
-    'gazetteReference',
-    'constitutionSlug',
-    'jurisdictionId',
-    'predecessorConstitutionId',
-    'interim',
+    "constitutionTitle",
+    "countryName",
+    "isoCode",
+    "languageCode",
+    "sourceUrl",
+    "gazetteReference",
+    "constitutionSlug",
+    "jurisdictionId",
+    "predecessorConstitutionId",
+    "interim",
   ] as const;
   const changedMetadata = previous
     ? metadata.filter((field) => previous[field] !== proposal.payload[field])
@@ -193,7 +283,9 @@ function proposalDifferences(proposal: SetupProposal) {
     JSON.stringify(structure(setupKinds(previous))) !==
       JSON.stringify(structure(setupKinds(proposal.payload)));
   const sampleChanged =
-    previous && JSON.stringify(previous.sampleRoots) !== JSON.stringify(proposal.payload.sampleRoots);
+    previous &&
+    JSON.stringify(previous.sampleRoots) !==
+      JSON.stringify(proposal.payload.sampleRoots);
   const displayChanged =
     previous &&
     JSON.stringify(displayKinds(setupKinds(previous))) !==
@@ -208,8 +300,8 @@ function proposalStatusCard(
   failed: boolean,
   t: SetupTranslation,
 ) {
-  const editable = proposal.status === 'proposed';
-  const recoverable = proposal.status === 'confirming';
+  const editable = proposal.status === "proposed";
+  const recoverable = proposal.status === "confirming";
   return (
     <Card className="import-workflow">
       <h2>{t(proposalStatus(proposal))}</h2>
@@ -218,7 +310,7 @@ function proposalStatusCard(
       </p>
       {editable ? (
         <p>{t(ui.setupReview.waitHelp)}</p>
-      ) : proposal.status === 'confirmed' ? (
+      ) : proposal.status === "confirmed" ? (
         <p>{t(ui.setupReview.resume)}</p>
       ) : recoverable ? (
         <p>{t(ui.setupReview.recoveryHelp)}</p>
@@ -226,22 +318,19 @@ function proposalStatusCard(
       {error || failed ? (
         <Alert tone="error">
           {t(
-            error === 'creation_rejected'
+            error === "creation_rejected"
               ? ui.setupReview.creationRejected
-              : error === 'running'
+              : error === "running"
                 ? ui.setupReview.confirmationRunning
-                : error === 'stale'
+                : error === "stale"
                   ? ui.setupReview.stale
                   : ui.setupReview.error,
           )}
         </Alert>
       ) : null}
-      <a href={`/admin/import/setup/${proposal.id}`}>{t(ui.setupReview.reload)}</a>
-      {editable ? (
-        <p>
-          <a href="#setup-final-review">{t(ui.admin.import.setup.proposalid.page.finalReview)}</a>
-        </p>
-      ) : null}
+      <a href={`/admin/import/setup/${proposal.id}`}>
+        {t(ui.setupReview.reload)}
+      </a>
     </Card>
   );
 }
@@ -249,7 +338,8 @@ function proposalStatusCard(
 /** Renders exact prior/current comparisons, including the historical display-only unchanged note. */
 function proposalChanges(proposal: SetupProposal, t: SetupTranslation) {
   const previous = proposal.previousPayload;
-  const { changedMetadata, hierarchyChanged, sampleChanged, displayChanged } = proposalDifferences(proposal);
+  const { changedMetadata, hierarchyChanged, sampleChanged, displayChanged } =
+    proposalDifferences(proposal);
   return previous ? (
     <Card>
       <h2>{t(ui.setupReview.changes)}</h2>
@@ -262,20 +352,22 @@ function proposalChanges(proposal: SetupProposal, t: SetupTranslation) {
             <div key={field}>
               <dt>
                 {t(
-                  field === 'sourceUrl' || field === 'gazetteReference'
+                  field === "sourceUrl" || field === "gazetteReference"
                     ? ui.admin.import.setup.proposalid.page.source
-                    : field === 'languageCode'
+                    : field === "languageCode"
                       ? ui.admin.import.setup.proposalid.page.language
-                      : field === 'constitutionSlug'
+                      : field === "constitutionSlug"
                         ? ui.admin.import.setup.proposalid.page.slug
-                        : ui.admin.import.setup.proposalid.page.sourceAndIdentity,
+                        : ui.admin.import.setup.proposalid.page
+                            .sourceAndIdentity,
                 )}
               </dt>
               <dd>
-                {t(ui.setupReview.previous)}: {String(previous[field] ?? '—')}
+                {t(ui.setupReview.previous)}: {String(previous[field] ?? "—")}
               </dd>
               <dd>
-                {t(ui.setupReview.current)}: {String(proposal.payload[field] ?? '—')}
+                {t(ui.setupReview.current)}:{" "}
+                {String(proposal.payload[field] ?? "—")}
               </dd>
             </div>
           ))}
@@ -295,113 +387,4 @@ function proposalChanges(proposal: SetupProposal, t: SetupTranslation) {
       </details>
     </Card>
   ) : null;
-}
-
-/** Keeps optional display tuning and its submit button inside the existing details element. */
-function proposalDisplay(kinds: OutlineKindWrite[], busy: boolean, update: UpdateKind, t: SetupTranslation) {
-  return (
-    <Card>
-      <details>
-        <summary>{t(ui.setupReview.display)}</summary>
-        {kinds.map((kind, index) => kindDisplayFields(kinds, kind, index, update, t))}
-        <div className={styles.actions}>
-          <Button name="intent" value="display" disabled={busy}>
-            {t(ui.setupReview.save)}
-          </Button>
-        </div>
-      </details>
-    </Card>
-  );
-}
-
-/** Applies the original running-text, title/label and placement enablement rules per kind. */
-function kindDisplayFields(
-  kinds: OutlineKindWrite[],
-  kind: OutlineKindWrite,
-  index: number,
-  update: UpdateKind,
-  t: SetupTranslation,
-) {
-  return (
-    <fieldset className={styles.controls} key={kind.kindCode}>
-      <legend>{kind.displayLabel}</legend>
-      <Input
-        label={t(ui.setupReview.name)}
-        value={kind.displayLabel}
-        required
-        onChange={(event) => update(index, { displayLabel: event.target.value })}
-      />
-      <Select
-        label={t(ui.setupReview.layout)}
-        value={kind.presentation ?? 'section'}
-        onChange={(event) =>
-          update(index, { presentation: event.target.value as OutlineKindWrite['presentation'] })
-        }
-      >
-        <option value="section">{t(ui.setupReview.block)}</option>
-        <option value="concatenated">{t(ui.setupReview.running)}</option>
-      </Select>
-      <label>
-        <input
-          type="checkbox"
-          checked={Boolean(kind.showKind)}
-          disabled={kind.presentation === 'concatenated'}
-          onChange={(event) => update(index, { showKind: event.target.checked })}
-        />{' '}
-        {t(ui.setupReview.kind)}
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={kind.showLabel !== false}
-          disabled={
-            kind.labelPolicy === 'none' ||
-            (kind.presentation === 'concatenated' &&
-              !['inline', 'superscript'].includes(kind.labelPlacement ?? 'before_title'))
-          }
-          onChange={(event) => update(index, { showLabel: event.target.checked })}
-        />{' '}
-        {t(ui.setupReview.label)}
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={kind.showTitle !== false}
-          disabled={kind.titlePolicy === 'none' || kind.presentation === 'concatenated'}
-          onChange={(event) => update(index, { showTitle: event.target.checked })}
-        />{' '}
-        {t(ui.setupReview.titleLabel)}
-      </label>
-      {kind.presentation === 'concatenated' ? (
-        <p>{t(ui.admin.constitutions.outlineeditor.runningTextHidesKindNamesAndEditorial)}</p>
-      ) : null}
-      <Select
-        label={t(ui.setupReview.placement)}
-        value={kind.labelPlacement ?? 'before_title'}
-        disabled={kind.labelPolicy === 'none' || (!kind.showLabel && kind.presentation !== 'concatenated')}
-        onChange={(event) =>
-          update(index, { labelPlacement: event.target.value as OutlineKindWrite['labelPlacement'] })
-        }
-      >
-        <option value="before_title" disabled={kind.presentation === 'concatenated'}>
-          {t(ui.setupReview.before)}
-        </option>
-        <option
-          value="after_title"
-          disabled={kind.presentation === 'concatenated' || !kind.showTitle || kind.titlePolicy === 'none'}
-        >
-          {t(ui.setupReview.after)}
-        </option>
-        <option value="inline" disabled={!setupOutline(kinds).kinds[index].mayHoldText}>
-          {t(ui.setupReview.inline)}
-        </option>
-        <option
-          value="superscript"
-          disabled={Boolean(setupOutline(kinds).kinds[index].allowedChildKinds?.length)}
-        >
-          {t(ui.setupReview.superscript)}
-        </option>
-      </Select>
-    </fieldset>
-  );
 }

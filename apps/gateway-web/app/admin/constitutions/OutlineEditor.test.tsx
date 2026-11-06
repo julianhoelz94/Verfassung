@@ -49,9 +49,21 @@ describe('automatic sentence settings', () => {
 
   it('turns off automatic creation when a leaf gains a child level', async () => {
     await mount();
-    await act(async () => fireEvent.click(getByText(host, 'Add deeper layer', { selector: 'button' })));
+    await act(async () => fireEvent.click(
+        getByRole(host, "button", { name: "Level actions Clause" }),
+      ),
+    );
+    await act(async () =>
+      fireEvent.click(
+        getByRole(host, "menuitem", { name: "Add child under Clause" }),
+      ),
+    );
+    await act(async () =>
+      fireEvent.click(getByRole(host, "button", { name: "Clause Top level" })));
     expect(payload()[0]).toMatchObject({ kindCode: 'clause', segmentation: 'plain', allowedChildKinds: ['layer-2'] });
-    expect(host.querySelectorAll('input[name^="segmentation-"]')).toHaveLength(1);
+    expect(host.querySelectorAll('input[name^="segmentation-"]')).toHaveLength(
+      0,
+    );
     expect(host.textContent).toContain('Automatic sentence creation is available only on a level without child units.');
   });
 
@@ -85,7 +97,20 @@ let view: Awaited<ReturnType<typeof mountView>>;
 afterEach(async () => { if (view) await view.close(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 const settings = () => JSON.parse((view.host.querySelector('[name="outline"]') as HTMLInputElement).value) as OutlineKindWrite[];
 const impact = (classification = 'reversible', revision = 'settings-r2'): SettingsImpact => ({ classification, currentRevisionId: revision, affectedVersionIds: ['published'], affectedDraftSessionIds: [], reasons: ['Published settings remain pinned.'], violations: [] });
-async function existing() { view = await mountView(<OutlineEditor constitutionId="charter" settingsRevisionId="settings-r2" initial={DEFAULT_NEW_OUTLINE} />); }
+  function level(host: HTMLElement, name: string) {
+    return [
+      ...host.querySelectorAll<HTMLButtonElement>("button[aria-current]"),
+    ].find((item) => item.querySelector("span")?.textContent === name)!;
+  }
+  async function levelMenu(name: string) {
+    await click(
+      view.host.querySelector(`[aria-label="Level actions ${name}"]`)!,
+    );
+  }
+  async function menuAction(name: string) {
+    await click(getByRole(document.body, "menuitem", { name }));
+  }
+  async function existing() { view = await mountView(<OutlineEditor constitutionId="charter" settingsRevisionId="settings-r2" initial={DEFAULT_NEW_OUTLINE} />); }
 
 describe('structure editing preserves stable identities', () => {
   it('changes a configured visible label without changing an existing technical kind identity', async () => {
@@ -95,20 +120,26 @@ describe('structure editing preserves stable identities', () => {
   });
   it('renames a new kind and its parent relationship together', async () => {
     view = await mountView(<OutlineEditor initial={DEFAULT_NEW_OUTLINE} />);
+    await click(level(view.host, "Paragraph"));
     await change(view.host.querySelector('[name="label-1"]')!, 'Sub Section');
     expect(settings()[1].kindCode).toBe('sub-section'); expect(settings()[0].allowedChildKinds).toEqual(['sub-section']);
   });
   it('inserts a deeper structural level before the terminal sentence kind', async () => {
-    await existing(); await click(button(view.host, 'Add deeper layer'));
-    const current = settings(); expect(current.map(item => item.kindCode)).toEqual(['article', 'paragraph', 'layer-4', 'sentence']);
-    expect(current[1].allowedChildKinds).toEqual(['layer-4']); expect(current[2].allowedChildKinds).toEqual(['sentence']);
+    await existing(); await levelMenu("Sentence");
+      await menuAction("Insert between Paragraph and Sentence");
+    const current = settings(); expect(current.map((item) => item.kindCode)).toEqual(['article', 'paragraph',
+        "sentence",
+        "layer-4",
+      ]);
+    expect(current[1].allowedChildKinds).toEqual(['layer-4']); expect(current[3].allowedChildKinds).toEqual(['sentence']);
   });
   it('removes references to a deleted kind and retains the first root', async () => {
-    await existing(); await click(button(view.host, 'Remove level'));
-    const current = settings(); expect(current.map(item => item.kindCode)).toEqual(['article', 'sentence']); expect(current[0].root).toBe(true); expect(current[0].allowedChildKinds).toEqual([]);
+    await existing(); await click(level(view.host, "Paragraph"));
+      await click(button(view.host, 'Remove level'));
+    const current = settings(); expect(current.map((item) => item.kindCode)).toEqual(['article', 'sentence']); expect(current[0].root).toBe(true); expect(current[0].allowedChildKinds).toEqual([]);
   });
   it('adds a separate top-level kind without making it a child of the last leaf', async () => {
-    await existing(); await click(button(view.host, 'Add top-level kind'));
+    await existing(); await click(button(view.host, "New level"));
     const current = settings(); expect(current.at(-1)).toMatchObject({ root: true, allowedChildKinds: [] }); expect(current.at(-2)?.allowedChildKinds).toEqual([]);
   });
   it('disables title display when titles are not permitted', async () => {
@@ -116,9 +147,12 @@ describe('structure editing preserves stable identities', () => {
     expect(settings()[0]).toMatchObject({ titlePolicy: 'none', showTitle: false });
   });
   it('disables kind/title display for running text and offers inline labels', async () => {
-    await existing(); await change(view.host.querySelector('[name="presentation-2"]')!, 'concatenated');
-    const kind = view.host.querySelectorAll('li.card')[2];
-    expect([...kind.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].filter(input => input.disabled).length).toBeGreaterThanOrEqual(2);
+    await existing(); await click(level(view.host, "Sentence"));
+      await change(view.host.querySelector('[name="presentation-2"]')!, 'concatenated');
+    const kind = view.host.querySelector(
+        '[aria-label="Sentence Structure"]',
+      )!;
+    expect([...kind.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].filter((input) => input.disabled).length).toBeGreaterThanOrEqual(2);
     await change(view.host.querySelector('[name="label-placement-2"]')!, 'superscript'); expect(settings()[2].labelPlacement).toBe('superscript');
   });
 });
@@ -145,8 +179,8 @@ describe('guided creation requires explicit review and creation', () => {
     const action = vi.fn().mockRejectedValue(new Error('save unavailable'));
     view = await mountView(<OutlineEditor initial={DEFAULT_NEW_OUTLINE} guidedCreation action={action}><input name="title" defaultValue="New Charter" required /><input name="isoCode" defaultValue="XA" /></OutlineEditor>);
     await click(button(view.host, 'Continue to structure')); expect(action).not.toHaveBeenCalled();
-    await click([...view.host.querySelectorAll<HTMLButtonElement>('.creation-template')][0]);
-    expect(settings().map(item => item.kindCode)).toEqual(['article']);
+    await click(button(view.host, "Use this template"));
+    expect(settings().map((item) => item.kindCode)).toContain("appendix");
     await click(button(view.host, 'Continue to review')); expect(view.host.textContent).toContain('New Charter · XA'); expect(action).not.toHaveBeenCalled();
     const create = button(view.host, 'Create constitution');
     await click(create);
@@ -154,7 +188,8 @@ describe('guided creation requires explicit review and creation', () => {
   });
   it('does not advance a structure with duplicate kind codes to creation', async () => {
     view = await mountView(<OutlineEditor initial={DEFAULT_NEW_OUTLINE} guidedCreation><input name="title" defaultValue="Charter" /></OutlineEditor>);
-    await click(button(view.host, 'Continue to structure')); await change(view.host.querySelector('[name="code-1"]')!, 'article');
+    await click(button(view.host, 'Continue to structure')); await click(button(view.host, "Structure"));
+      await click(level(view.host, "Paragraph")); await change(view.host.querySelector('[name="code-1"]')!, 'article');
     await click(button(view.host, 'Continue to review')); expect(view.host.querySelector('[role="alert"]')).not.toBeNull(); expect(view.host.querySelector('[data-create="true"]')).toBeNull();
   });
 });

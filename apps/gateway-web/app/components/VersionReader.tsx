@@ -23,7 +23,9 @@ import { WikiPanel } from './WikiPanel';
 import { PageBreadcrumbs, PageChromeSurface, PageContentsBody, PageContentsLayout, PageContentsNavigation, PageMenuBar, PageMenuFrame } from './layout/PageChrome';
 import { useKeepContentsVisible, usePageChromeMetrics } from './layout/usePageChromeMetrics';
 import { ReaderActions, ReaderDocument } from './ReaderActions';
-import { readerActionIndex, type ReaderActionIndex } from '../../lib/reader-actions';
+import { HierarchyViewOptions } from "./DocumentViewOptions";
+import {
+  readerActionIndex, type ReaderActionIndex } from '../../lib/reader-actions';
 
 export type ReaderContext = {
   constitutionId: string; title: string; jurisdictionName: string; versionLabel: string;
@@ -40,11 +42,11 @@ export type VersionReaderProps = {
 };
 
 export function VersionReader(props: VersionReaderProps) {
-  const entries = useMemo(() => props.articles.flatMap(article => article.content ?? []), [props.articles]);
+  const entries = useMemo(() => props.articles.flatMap((article) => article.content ?? []), [props.articles]);
   const endnotes = useMemo(() => footnoteEntries(entries), [entries]);
   const backlinks = useMemo(() => footnoteBacklinks(entries), [entries]);
   const actionIndex = useMemo(() => readerActionIndex(props.articles, props.jurisdictionId ? `/jurisdictions/${props.jurisdictionId}/versions/${props.versionId}` : `/countries/${props.code}/versions/${props.versionId}`, props.context?.title ?? '', props.outline), [props.articles, props.code, props.jurisdictionId, props.versionId, props.context?.title, props.outline]);
-  const notes = useMemo(() => footnoteItems(entries).map(note => ({ ...note, references: (backlinks.get(note.logicalId) ?? []).map(id => ({ id, label: actionIndex.references.get(id) ?? '' })) })), [entries, backlinks, actionIndex]);
+  const notes = useMemo(() => footnoteItems(entries).map((note) => ({ ...note, references: (backlinks.get(note.logicalId) ?? []).map((id) => ({ id, label: actionIndex.references.get(id) ?? '' })) })), [entries, backlinks, actionIndex]);
   return <FootnoteProvider notes={notes}><ReaderSurface {...props} notes={notes} endnotes={endnotes} backlinks={backlinks} actionIndex={actionIndex} /></FootnoteProvider>;
 }
 
@@ -71,9 +73,11 @@ function useReaderSurface({ code, jurisdictionId, versionId, articles, outline, 
   const readingArea = usePageChromeMetrics(viewer, sticky, navigation);
   useKeepContentsVisible(navigation, current, preferences.navigation);
   const unitsByLogicalId = useMemo(() => orderedTargets(articles), [articles]);
-  const articlesByNumber = useMemo(() => Object.fromEntries(articles.map(article => [article.articleNumber, article.id])), [articles]);
-  const sentenceKinds = useMemo(() => new Set(outline?.kinds.filter(kind => kind.segmentation === 'sentence' && !kind.mayHoldChildren).map(kind => kind.kindCode)), [outline]);
-  const flowing = preferences.presentation === 'flowing' || (preferences.presentation === 'source' && outline?.kinds.some(kind => sentenceKinds.has(kind.kindCode) && kind.presentation === 'concatenated'));
+  const articlesByNumber = useMemo(() => Object.fromEntries(articles.map((article) => [article.articleNumber, article.id])), [articles]);
+  const sentenceKinds = useMemo(() => new Set(outline?.kinds.filter(
+            (kind) => kind.segmentation === 'sentence' && !kind.mayHoldChildren).map((kind) => kind.kindCode)), [outline]);
+  const flowing = preferences.presentation === 'flowing' || (preferences.presentation === 'source' && outline?.kinds.some(
+        (kind) => sentenceKinds.has(kind.kindCode) && kind.presentation === 'concatenated'));
   function readerHref(id: string) { return jurisdictionId ? `/jurisdictions/${jurisdictionId}/versions/${id}` : `/countries/${code}/versions/${id}`; }
 
   useLayoutEffect(() => {
@@ -83,11 +87,12 @@ function useReaderSurface({ code, jurisdictionId, versionId, articles, outline, 
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
     const visible = new Set<Element>();
-    const observer = new IntersectionObserver(entries => {
+    const observer = new IntersectionObserver(
+      (entries) => {
       for (const entry of entries) { if (entry.isIntersecting) visible.add(entry.target); else visible.delete(entry.target); }
       const first = [...visible].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
       if (first) setCurrent(first.id);
-    }, { rootMargin: `-${readingArea.top}px 0px -${readingArea.bottom}px 0px`, threshold: [0, .1, .5] });
+    }, { rootMargin: `-${readingArea.top}px 0px -${readingArea.bottom}px 0px`, threshold: [0, 0.1, 0.5] });
     for (const article of articles) { const node = document.getElementById(article.id); if (node) observer.observe(node); }
     return () => observer.disconnect();
   }, [articles, readingArea]);
@@ -97,8 +102,9 @@ function useReaderSurface({ code, jurisdictionId, versionId, articles, outline, 
       try { target = decodeURIComponent(location.hash.slice(1)); } catch { return; }
       if (!target || target === initialPassage?.legacyId) target = initialPassage?.id ?? target;
       if (!target) return;
-      const article = articles.find(article => target === article.id || target === 'unit-' + article.id || containsOccurrence(article.content ?? [], target));
-      if (article) { setCurrent(article.id); setExpanded(old => old.has(article.id) ? old : new Set([...old, article.id])); }
+      const article = articles.find(
+        (article) => target === article.id || target === 'unit-' + article.id || containsOccurrence(article.content ?? [], target));
+      if (article) { setCurrent(article.id); setExpanded((old) => old.has(article.id) ? old : new Set([...old, article.id])); }
       requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView?.({ block: 'start' }));
     }
     reveal(); window.addEventListener('hashchange', reveal);
@@ -128,7 +134,7 @@ function useReaderSurface({ code, jurisdictionId, versionId, articles, outline, 
 
   function updatePreferences(update: Partial<ReaderPreferences>) {
     const boundary = sticky.current?.getBoundingClientRect().bottom ?? 0;
-    const element = [...(documentRef.current?.querySelectorAll<HTMLElement>('p, [id]') ?? [])].find(node => node.getBoundingClientRect().top >= boundary);
+    const element = [...(documentRef.current?.querySelectorAll<HTMLElement>('p, [id]') ?? [])].find((node) => node.getBoundingClientRect().top >= boundary);
     if (element) anchor.current = { element, top: element.getBoundingClientRect().top };
     saveReaderPreferences({ ...preferences, ...update });
   }
@@ -161,29 +167,33 @@ function renderReaderSurface(model: ReaderSurfaceModel) {
     {breadcrumbs ? <PageBreadcrumbs>{breadcrumbs}</PageBreadcrumbs> : null}
     <PageMenuFrame ref={sticky}>
       {readerToolbar(model)}
-      {panel === 'search' ? <div className={styles.search} id="reader-search"><input type="search" ref={searchInput} aria-label={t(copy.findLabel)} placeholder={t(copy.findPlaceholder)} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); goMatch(event.shiftKey ? -1 : 1); } }} /><output aria-live="polite">{query ? matchCount ? `${matchIndex + 1} ${t(copy.of)} ${matchCount} ${t(copy.matches)}` : t(copy.noMatches) : t(copy.enterQuery)}</output><button type="button" className={styles.tool} aria-label={t(copy.previousMatch)} disabled={!matchCount} onClick={() => goMatch(-1)}><ReaderIcon name="up" /></button><button type="button" className={styles.tool} aria-label={t(copy.nextMatch)} disabled={!matchCount} onClick={() => goMatch(1)}><ReaderIcon name="down" /></button><button type="button" className={styles.tool} aria-label={t(copy.closeSearch)} onClick={() => { setPanel(null); setQuery(''); }}><ReaderIcon name="close" /></button></div> : null}
+      {panel === 'search' ? <div className={styles.search} id="reader-search"><input type="search" ref={searchInput} aria-label={t(copy.findLabel)} placeholder={t(copy.findPlaceholder)} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); goMatch(event.shiftKey ? -1 : 1); } }} /><output aria-live="polite">{query ? matchCount ? `${matchIndex + 1} ${t(copy.of)} ${matchCount} ${t(copy.matches)}` : t(copy.noMatches) : t(copy.enterQuery)}</output><button type="button" className={styles.tool} aria-label={t(copy.previousMatch)} disabled={!matchCount} onClick={() => goMatch(-1)}><ReaderIcon name="up" /></button><button type="button" className={styles.tool} aria-label={t(copy.nextMatch)} disabled={!matchCount} onClick={() => goMatch(1)}><ReaderIcon name="down" /></button><button type="button" className={styles.tool} aria-label={t(copy.closeSearch)} onClick={() => { setPanel(null); setQuery(''); }}><ReaderIcon name="close" /></button></div> : null}
       {context ? <section id="reader-compare" hidden={panel !== 'compare'} aria-label={t(copy.compareVersions)}><ReaderComparison constitutionId={context.constitutionId} publications={context.publications} viewedVersionId={versionId} readerHref={readerHref} comparisonHref={context.comparisonHref} active={panel === 'compare'} /></section> : null}
       {panel === 'edit' ? <section className={styles.editorial} id="reader-edit">{editorial}</section> : null}
     </PageMenuFrame>
     {readerWiki(model)}
     <PageContentsLayout expanded={preferences.navigation} navigationId="reader-contents" navigationRef={navigation} navigation={
       <PageContentsNavigation label={t(copy.contents)} title={t(copy.inConstitution)} currentId={current} onSelect={setCurrent}
-        items={articles.map(article => ({ id: article.id, href: '#unit-' + article.id, label: articleHeading(outline, { ...article, title: '' }) || articleHeading(outline, article), description: article.title }))}>
+        items={articles.map((article) => ({ id: article.id, href: '#unit-' + article.id, label: articleHeading(outline, { ...article, title: '' }) || articleHeading(outline, article), description: article.title }))}>
         {notes.length ? <><hr /><a href="#reader-footnotes">{t(copy.footnotes)}<span>{notes.length}</span></a></> : null}
       </PageContentsNavigation>
     }>
-      <PageContentsBody><ReaderDocument className={styles.document} ref={documentRef} data-boundaries={flowing && preferences.boundaries}>
+      <PageContentsBody><ReaderDocument
+              indentation={preferences.indentation}
+              guides={preferences.guides}
+              className={styles.document} ref={documentRef} data-boundaries={flowing && preferences.boundaries}>
         <header className={styles.title} data-reader-chrome>{context ? <><div className={styles.eyebrow}>{context.jurisdictionName}</div><h1>{context.title}</h1><p>{context.versionLabel}{language ? ' · ' + language : ''}</p><span className={styles.status}><ReaderIcon name="check" />{t(copy.published)} · {t(copy.readingView)}</span></> : null}{notices}</header>
-        <ol className={[styles.articles, 'version-articles'].join(' ')} lang={language}>{articles.map(article => {
+        <ol className={[styles.articles, 'version-articles'].join(' ')} lang={language}>{articles.map((article) => {
           const shown = expanded.has(article.id) ? max : depth, includeText = shown >= max;
           const nodes = clipNodes(article.children ?? [], outline, shown), open = nodes.length > 0 || includeText;
-          return <ReaderArticle id={article.id} key={article.id} heading={articleHeading(outline, article)} headingContent={<ConstitutionArticleHeading article={article} outline={outline} />} expanded={open} onToggle={depth < max ? () => setExpanded(old => { const next = new Set(old); if (next.has(article.id)) next.delete(article.id); else next.add(article.id); return next; }) : undefined}
-            metadata={<>{code && article.kind === 'article' ? <a href={`/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`}><T value={ui.components.versionreader.historyOf} /> {articleHeading(outline, { ...article, title: '' })}</a> : null}{changeByArticle[article.articleNumber] ? <Badge tone={changeTypeTone(changeByArticle[article.articleNumber])}><T value={changeTypeMessage(changeByArticle[article.articleNumber])} /></Badge> : <span>{unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}</span>}</>}>
+          return <ReaderArticle id={article.id} key={article.id} heading={articleHeading(outline, article)} headingContent={<ConstitutionArticleHeading article={article} outline={outline} />} expanded={open} onToggle={depth < max ? () => setExpanded((old) => { const next = new Set(old); if (next.has(article.id)) next.delete(article.id); else next.add(article.id); return next; }) : undefined}
+            metadata={<>{code && article.kind === 'article' ? <a href={`/countries/${code}/articles/${encodeURIComponent(article.articleNumber)}`}><T value={ui.components.versionreader.historyOf} /> {" "}
+                              {articleHeading(outline, { ...article, title: '' })}</a> : null}{changeByArticle[article.articleNumber] ? <Badge tone={changeTypeTone(changeByArticle[article.articleNumber])}><T value={changeTypeMessage(changeByArticle[article.articleNumber])} /></Badge> : <span>{unchangedSinceLabel ? `${t(ui.readerDynamic.unchangedSince)} ${unchangedSinceLabel}` : t(ui.readerDynamic.unchanged)}</span>}</>}>
             {open ? <ConstitutionText article={article} entries={article.content == null ? undefined : clipOrderedEntries(article.content, shownOutline, shown)} nodes={nodes} body={includeText && !nodes.length ? article.body : null} showHeading={false} rootAnchor={false} outline={shownOutline} lang={language} canEditTitles={canEditTitles} returnTo={readerHref(versionId)} crossRefs={{ code, versionId, articlesByNumber, unitsByLogicalId, footnotes: notes }} hideFootnotes renderNode={renderNode} /> : null}
           </ReaderArticle>;
         })}</ol>
         {endnotes.length ? <section id="reader-footnotes" aria-label={t(copy.footnotes)}><ConstitutionFootnotes entries={endnotes} outline={outline} indexedBacklinks={backlinks} /></section> : null}
-        <footer className={styles.footer} data-reader-chrome>{footer ?? <span>{articles.length} <T value={articles.length === 1 ? ui.remainingStatus.unitSingular : ui.remainingStatus.unitPlural} /></span>}<a className={styles.textAction} href={articles[0] ? '#unit-' + articles[0].id : '#main-content'}><ReaderIcon name="up" />{t(copy.backBeginning)}</a></footer>
+        <footer className={styles.footer} data-reader-chrome>{footer ?? <span>{articles.length}{" "} <T value={articles.length === 1 ? ui.remainingStatus.unitSingular : ui.remainingStatus.unitPlural} /></span>}<a className={styles.textAction} href={articles[0] ? '#unit-' + articles[0].id : '#main-content'}><ReaderIcon name="up" />{t(copy.backBeginning)}</a></footer>
       </ReaderDocument></PageContentsBody>
     </PageContentsLayout>
   </PageChromeSurface></ReaderActions>;
@@ -200,12 +210,16 @@ function readerToolbar(model: ReaderSurfaceModel) {
         {context ? tool('wiki', 'wiki', t(copy.wiki)) : null}
         <span className={styles.spacer} />
         {editorial ? <button type="button" className={styles.tool} aria-label={t(ui.countries.code.versions.versionid.page.editThisConstitution)} aria-expanded={panel === 'edit'} data-reader-trigger="edit" aria-controls={panel === 'edit' ? 'reader-edit' : undefined} onClick={() => togglePanel('edit')}><ReaderIcon name="edit" /><span className={styles.toolName}>{t(copy.edit)}</span></button> : null}
-        {details ? <details className={styles.menuWrap} data-reader-menu open={menu === 'details'}><summary role="button" className={styles.tool} aria-label={t(copy.details)} aria-expanded={menu === 'details'} data-reader-trigger="details" onClick={event => { event.preventDefault(); setMenu(menu === 'details' ? null : 'details'); }}><ReaderIcon name="details" /><span className={styles.toolName}>{t(copy.details)}</span></summary><div className={styles.menu}>{details}</div></details> : null}
-        <details className={styles.menuWrap} data-reader-menu open={menu === 'preferences'}><summary role="button" className={styles.tool} aria-label={t(copy.preferences)} aria-expanded={menu === 'preferences'} data-reader-trigger="preferences" onClick={event => { event.preventDefault(); setMenu(menu === 'preferences' ? null : 'preferences'); }}><ReaderIcon name="settings" /></summary>
+        {details ? <details className={styles.menuWrap} data-reader-menu open={menu === 'details'}><summary role="button" className={styles.tool} aria-label={t(copy.details)} aria-expanded={menu === 'details'} data-reader-trigger="details" onClick={(event) => { event.preventDefault(); setMenu(menu === 'details' ? null : 'details'); }}><ReaderIcon name="details" /><span className={styles.toolName}>{t(copy.details)}</span></summary><div className={styles.menu}>{details}</div></details> : null}
+        <details className={styles.menuWrap} data-reader-menu open={menu === 'preferences'}><summary role="button" className={styles.tool} aria-label={t(copy.preferences)} aria-expanded={menu === 'preferences'} data-reader-trigger="preferences" onClick={(event) => { event.preventDefault(); setMenu(menu === 'preferences' ? null : 'preferences'); }}><ReaderIcon name="settings" /></summary>
           <div className={styles.menu}><h2>{t(copy.preferences)}</h2>
-            <label>{t(copy.textSize)}<select value={preferences.size} onChange={event => updatePreferences({ size: event.target.value as ReaderPreferences['size'] })}><option value="16">{t(copy.small)}</option><option value="17">{t(copy.standard)}</option><option value="20">{t(copy.large)}</option></select></label>
-            {sentenceKinds.size ? <><label>{t(copy.presentation)}<select value={preferences.presentation} onChange={event => updatePreferences({ presentation: event.target.value as ReaderPreferences['presentation'] })}><option value="source">{t(copy.originalLayout)}</option><option value="flowing">{t(copy.flowing)}</option><option value="lines">{t(copy.lines)}</option></select></label>{flowing ? <label className={styles.check}><input type="checkbox" checked={preferences.boundaries} onChange={event => updatePreferences({ boundaries: event.target.checked })} />{t(copy.boundaries)}</label> : null}</> : null}
-            <label>{t(copy.detailLevel)}<select aria-label={t(copy.detailLevel)} value={depth} onChange={event => { setDepth(Number(event.target.value)); setExpanded(new Set()); }}>{labels.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}</select></label>
+            <HierarchyViewOptions
+            value={preferences}
+            onChange={updatePreferences}
+          />
+          <label>{t(copy.textSize)}<select value={preferences.size} onChange={(event) => updatePreferences({ size: event.target.value as ReaderPreferences['size'] })}><option value="16">{t(copy.small)}</option><option value="17">{t(copy.standard)}</option><option value="20">{t(copy.large)}</option></select></label>
+            {sentenceKinds.size ? <><label>{t(copy.presentation)}<select value={preferences.presentation} onChange={(event) => updatePreferences({ presentation: event.target.value as ReaderPreferences['presentation'] })}><option value="source">{t(copy.originalLayout)}</option><option value="flowing">{t(copy.flowing)}</option><option value="lines">{t(copy.lines)}</option></select></label>{flowing ? <label className={styles.check}><input type="checkbox" checked={preferences.boundaries} onChange={(event) => updatePreferences({ boundaries: event.target.checked })} />{t(copy.boundaries)}</label> : null}</> : null}
+            <label>{t(copy.detailLevel)}<select aria-label={t(copy.detailLevel)} value={depth} onChange={(event) => { setDepth(Number(event.target.value)); setExpanded(new Set()); }}>{labels.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}</select></label>
           </div>
         </details>
       </PageMenuBar>;
@@ -217,6 +231,8 @@ function readerWiki({ context, panel, t, setPanel, viewer, wiki }: ReaderSurface
 }
 
 function containsOccurrence(entries: import('../../lib/api').OrderedEntry[], target: string): boolean {
-  return entries.some(entry => entry.occurrenceId === target || 'fn-' + entry.occurrenceId === target ||
-    entry.references?.some(reference => 'ref-' + reference.logicalId === target) || Boolean(entry.node && (entry.node.occurrenceId === target || containsOccurrence(entry.node.content, target))));
+  return entries.some(
+    (entry) => entry.occurrenceId === target || 'fn-' + entry.occurrenceId === target ||
+    entry.references?.some(
+        (reference) => 'ref-' + reference.logicalId === target) || Boolean(entry.node && (entry.node.occurrenceId === target || containsOccurrence(entry.node.content, target))));
 }

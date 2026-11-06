@@ -1,26 +1,28 @@
 "use client";
 
-import { T, useTranslation } from "../../components/TranslationProvider";
+import { useTranslation } from "../../components/TranslationProvider";
 import { ui, type UiMessage } from "../../../lib/messages";
 import type { FormEvent, ReactNode } from "react";
 import { useRef, useState } from "react";
 import { Button } from "../../components/ui";
-import { SettingInfo } from "../../components/SettingInfo";
+import { structureUi as copy } from "../../../lib/structure-workspace";
+import {
+  StructureWorkspaceTemplate,
+  OutlineWorkspace,
+  StructureTemplates,
+  StructurePreview,
+} from "./StructureWorkspaceTemplate";
 import type {
   OutlineKindWrite,
   SettingsImpact,
   OrderedNode,
 } from "../../../lib/api";
-import { outlineExample } from "../../../lib/outline-preview";
-import { OutlineReaderPreview } from "./OutlineReaderPreview";
 import {
   outlineFromTemplate,
   type ConstitutionTemplate,
 } from "../../../lib/constitution-templates";
 import { saveOutlineAction, previewOutlineImpactAction } from "./actions";
-import { Stack, Inline } from "../../components/layout/Layout";
-import surfaceStyles from "../../components/surfaces.module.css";
-import { OutlineLayerEditor } from "./OutlineLayerEditor";
+import { Stack } from "../../components/layout/Layout";
 import {
   OutlineCreationHeader,
   OutlineReviewCard,
@@ -28,13 +30,9 @@ import {
   OutlineSubmitActions,
 } from "./OutlineCreationStages";
 import {
-  appendOutlineLayer,
-  appendOutlineRoot,
   exampleOutlineFor,
   explicitLayers,
   outlineValidationError,
-  removeOutlineLayer,
-  updateOutlineLayers,
   withoutExisting,
   type OutlineLayer as Layer,
 } from "./outline-editor-model";
@@ -48,6 +46,9 @@ type OutlineEditorProps = {
   children?: ReactNode;
   guidedCreation?: boolean;
   sampleRoots?: OrderedNode[];
+  documents?: ReactNode;
+  history?: ReactNode;
+  previous?: { id: string; kinds: OutlineKindWrite[] };
 };
 
 /** Controlled outline editing and guided creation retain their existing form, review and impact gates. */
@@ -60,10 +61,14 @@ export function OutlineEditor({
   children,
   guidedCreation = false,
   sampleRoots = [],
+  documents,
+  history,
+  previous,
 }: OutlineEditorProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(1);
-  const [template, setTemplate] = useState<ConstitutionTemplate>("sentences");
+  const [view, setView] = useState("structure");
+  const [template, setTemplate] = useState<ConstitutionTemplate>("articles");
   const t = useTranslation();
   const [showErrors, setShowErrors] = useState(false);
   const [basicsSummary, setBasicsSummary] = useState("");
@@ -102,39 +107,12 @@ export function OutlineEditor({
     }
   }
 
-  /** Any settings edit invalidates its previous impact result. */
-  function update(index: number, patch: Partial<Layer>) {
+  function changeLayers(next: Layer[]) {
     setImpact(null);
-    setLayers((current) => updateOutlineLayers(current, index, patch));
-  }
-
-  /** Adding a deeper level preserves the terminal sentence convention. */
-  function addLayer() {
-    setImpact(null);
-    setLayers((current) =>
-      appendOutlineLayer(current, t(ui.remainingStatus.newLayer)),
-    );
-  }
-
-  /** Adds an independently rooted unsaved level. */
-  function addRootKind() {
-    setImpact(null);
-    setLayers((current) =>
-      appendOutlineRoot(current, t(ui.remainingStatus.newSection)),
-    );
-  }
-
-  /** The last remaining level cannot be removed. */
-  function removeLayer(index: number) {
-    if (layers.length === 1) {
-      return;
-    }
-    setImpact(null);
-    setLayers((current) => removeOutlineLayer(current, index));
+    setLayers(next);
   }
 
   const exampleOutline = exampleOutlineFor(layers);
-  const example = outlineExample(exampleOutline, t);
   const validationError = outlineValidationError(layers);
   const outlineError = validationError ? t(validationError) : null;
 
@@ -143,11 +121,13 @@ export function OutlineEditor({
     setTemplate(id);
     setLayers(explicitLayers(outlineFromTemplate(id), false));
     setShowErrors(false);
+    setView("structure");
   }
 
   /** Back navigation preserves edited levels while clearing visible validation feedback. */
   function back() {
     setStep(step === 3 ? 2 : 1);
+    setView("structure");
     setShowErrors(false);
   }
 
@@ -160,6 +140,7 @@ export function OutlineEditor({
         `${data.get("title") || t(ui.remainingStatus.untitledConstitution)} · ${data.get("isoCode") || ""}`,
       );
       setStep(2);
+      setView("templates");
       return;
     }
     if (outlineError) {
@@ -167,6 +148,7 @@ export function OutlineEditor({
       return;
     }
     setStep(3);
+    setView("review");
   }
 
   /** Creation requires the explicit reviewed submitter; native fields retain their order and values. */
@@ -195,155 +177,190 @@ export function OutlineEditor({
       setSubmitError(true);
     }
   }
+  const tabs = structureTasks(
+    guidedCreation,
+    Boolean(constitutionId),
+    Boolean(documents) || guidedCreation,
+    Boolean(history || previous),
+  );
+  function selectTask(next: string) {
+    if (guidedCreation && next === "review" && step !== 3) {
+      advance();
+      return;
+    }
+    if (guidedCreation && step === 3 && next !== "review") setStep(2);
+    setView(next);
+  }
+  const visible = !guidedCreation || step !== 1;
   return (
-    <Stack as="form" elementRef={formRef} onSubmit={onSubmit}>
-      {constitutionId ? (
-        <input type="hidden" name="constitutionId" value={constitutionId} />
-      ) : null}
-      {settingsRevisionId ? (
-        <input
-          type="hidden"
-          name="settingsRevisionId"
-          value={settingsRevisionId}
-        />
-      ) : null}
-      <OutlineCreationHeader
+    <StructureWorkspaceTemplate
+      tabs={visible ? tabs : []}
+      active={view}
+      onSelect={selectTask}
+      primary={
+        constitutionId && view !== "review" ? (
+          <Button
+            type="button"
+            variant="primary"
+            disabled={checking}
+            onClick={() => {
+              setView("review");
+              void checkImpact();
+            }}
+          >
+            {t(ui.outlineDynamic.previewImpact)}
+          </Button>
+        ) : null
+      }
+    >
+      <Stack
+        as="form"
+        elementRef={formRef}
+        onSubmit={onSubmit}
+        hidden={view === "documents" || view === "history"}
+      >
+        {constitutionId ? (
+          <input type="hidden" name="constitutionId" value={constitutionId} />
+        ) : null}
+        {settingsRevisionId ? (
+          <input
+            type="hidden"
+            name="settingsRevisionId"
+            value={settingsRevisionId}
+          />
+        ) : null}
+        <OutlineCreationHeader
+          guidedCreation={guidedCreation}
+          step={step}
+          basicsSummary={basicsSummary}
+          layers={layers}
+          serializedOutline={JSON.stringify(withoutExisting(layers))}
+          advance={advance}
+        >
+          {children}
+        </OutlineCreationHeader>
+        {visible ? (
+          <>
+            {guidedCreation && view === "templates" ? (
+              <StructureTemplates value={template} onChoose={chooseTemplate} />
+            ) : null}
+            <div hidden={view !== "structure"}>
+              <OutlineWorkspace
+                layers={layers}
+                onChange={changeLayers}
+                sampleRoots={sampleRoots}
+              />
+            </div>
+            {view === "preview" ? (
+              <StructurePreview layers={layers} sampleRoots={sampleRoots} />
+            ) : null}
+            <div hidden={view !== "review"}>
+              {guidedCreation && step === 3 ? (
+                <Stack aria-label={t(ui.accessibility.finalStructureSettings)}>
+                  {layers.map((layer, index) => (
+                    <OutlineReviewCard
+                      key={index}
+                      layer={layer}
+                      index={index}
+                      displayKind={exampleOutline.kinds[index]}
+                    />
+                  ))}
+                </Stack>
+              ) : null}
+              <OutlineFeedback
+                showErrors={showErrors}
+                outlineError={outlineError}
+                impactError={impactError}
+                submitError={submitError}
+                impact={impact}
+              />
+            </div>
+            {showErrors && outlineError && view !== "review" ? (
+              <p role="alert">{outlineError}</p>
+            ) : null}
+          </>
+        ) : null}
+        <div hidden={!visible || (!guidedCreation && view !== "review")}>
+          <OutlineSubmitActions
+            constitutionId={constitutionId}
+            settingsRevisionId={settingsRevisionId}
+            guidedCreation={guidedCreation}
+            step={step}
+            submitting={submitting}
+            checking={checking}
+            impact={impact}
+            submitLabel={submitLabel}
+            checkImpact={checkImpact}
+            advance={advance}
+            back={back}
+          />
+        </div>
+      </Stack>
+      <ExtraTasks
+        view={view}
+        documents={documents}
+        history={history}
+        previous={previous}
         guidedCreation={guidedCreation}
-        step={step}
-        template={template}
-        basicsSummary={basicsSummary}
-        layers={layers}
-        serializedOutline={JSON.stringify(withoutExisting(layers))}
-        advance={advance}
-        chooseTemplate={chooseTemplate}
-      >
-        {children}
-      </OutlineCreationHeader>
-      <div
-        className="outline-config-layout"
-        hidden={guidedCreation && step === 1}
-      >
-        <Stack>
-          {guidedCreation && step === 3 ? (
-            <Stack aria-label={t(ui.accessibility.finalStructureSettings)}>
-              {layers.map((layer, index) => (
-                <OutlineReviewCard
-                  key={`${layer.kindCode}-${index}`}
-                  layer={layer}
-                  index={index}
-                  displayKind={exampleOutline.kinds[index]!}
-                />
-              ))}
+        onRestore={(kinds) => {
+          changeLayers(explicitLayers(kinds, true));
+          setView("review");
+        }}
+      />
+    </StructureWorkspaceTemplate>
+  );
+}
+
+function structureTasks(
+  creation: boolean,
+  existing: boolean,
+  documents: boolean,
+  history: boolean,
+) {
+  return [
+    ...(creation ? [{ id: "templates", label: copy.templates }] : []),
+    { id: "structure", label: copy.structure },
+    { id: "preview", label: copy.preview },
+    { id: "review", label: existing ? copy.impact : copy.review },
+    ...(documents ? [{ id: "documents", label: copy.documents }] : []),
+    ...(history ? [{ id: "history", label: copy.history }] : []),
+  ];
+}
+function ExtraTasks({
+  view,
+  documents,
+  history,
+  previous,
+  guidedCreation,
+  onRestore,
+}: Pick<
+  OutlineEditorProps,
+  "documents" | "history" | "previous" | "guidedCreation"
+> & { view: string; onRestore: (kinds: OutlineKindWrite[]) => void }) {
+  const t = useTranslation();
+  return (
+    <>
+      {documents || guidedCreation ? (
+        <div hidden={view !== "documents"}>
+          {documents ?? <p>{t(copy.documentsAfterCreate)}</p>}
+        </div>
+      ) : null}
+      {history || previous ? (
+        <div hidden={view !== "history"}>
+          {previous ? (
+            <Stack>
+              <h2>{t(copy.previous)}</h2>
+              <p>{t(copy.restoreHelp)}</p>
+              <Button type="button" onClick={() => onRestore(previous.kinds)}>
+                {t(copy.restoreDraft)}
+              </Button>
+              <StructurePreview layers={explicitLayers(previous.kinds, true)} />
             </Stack>
           ) : (
-            <Stack as="ol" className="outline-layer-list" role="list">
-              {layers.map((layer, index) => (
-                <OutlineLayerEditor
-                  key={`${layer.kindCode}-${index}`}
-                  layer={layer}
-                  index={index}
-                  layers={layers}
-                  update={update}
-                  removeLayer={removeLayer}
-                />
-              ))}
-            </Stack>
+            history
           )}
-          {!guidedCreation || step === 2 ? (
-            <Stack gap="related" className="outline-structure-actions">
-              <Inline>
-                <Inline as="span" gap="related">
-                  <Button type="button" onClick={addLayer}>
-                    <T
-                      value={
-                        ui.admin.constitutions.outlineeditor.addDeeperLayer
-                      }
-                    />
-                  </Button>
-                  <SettingInfo
-                    label={
-                      <T
-                        value={
-                          ui.admin.constitutions.outlineeditor.addDeeperLayer
-                        }
-                      />
-                    }
-                    description={<T value={ui.help.addDeeperLevelHelp} />}
-                    changeability="review"
-                  />
-                </Inline>
-                <Button type="button" onClick={addRootKind}>
-                  <T
-                    value={ui.admin.constitutions.outlineeditor.addTopLevelKind}
-                  />
-                </Button>
-              </Inline>
-              {layers[layers.length - 1]?.kindCode === "sentence" ? (
-                <p className="muted">
-                  <T
-                    value={
-                      ui.admin.constitutions.outlineeditor
-                        .newLevelsAreAddedBeforeTheFinal
-                    }
-                  />
-                </p>
-              ) : null}
-            </Stack>
-          ) : null}
-        </Stack>
-        <aside
-          className={["card outline-live-preview", surfaceStyles.card].join(
-            " ",
-          )}
-          aria-label={t(ui.admin.constitutions.outlineeditor.readerPreview)}
-        >
-          <h2>
-            <T value={ui.admin.constitutions.outlineeditor.readerPreview} />
-          </h2>
-          <p className="muted">
-            <T value={ui.outlinePreview.inspectHelp} />
-          </p>
-          {sampleRoots.length ? (
-            <p className="muted">
-              <T value={ui.outlinePreview.sourceSample} />
-            </p>
-          ) : null}
-          <OutlineReaderPreview
-            roots={sampleRoots.length ? sampleRoots : example}
-            outline={exampleOutline}
-          />
-          {constitutionId ? (
-            <p>
-              <T
-                value={
-                  ui.admin.constitutions.outlineeditor
-                    .occupiedStructureAndStricterPermissionsAreChecked
-                }
-              />
-            </p>
-          ) : null}
-        </aside>
-      </div>
-      <OutlineFeedback
-        showErrors={showErrors}
-        outlineError={outlineError}
-        impactError={impactError}
-        submitError={submitError}
-        impact={impact}
-      />
-      <OutlineSubmitActions
-        constitutionId={constitutionId}
-        settingsRevisionId={settingsRevisionId}
-        guidedCreation={guidedCreation}
-        step={step}
-        submitting={submitting}
-        checking={checking}
-        impact={impact}
-        submitLabel={submitLabel}
-        checkImpact={checkImpact}
-        advance={advance}
-        back={back}
-      />
-    </Stack>
+        </div>
+      ) : null}
+    </>
   );
 }

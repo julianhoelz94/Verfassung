@@ -59,7 +59,7 @@ All host jobs use Ubuntu 24.04; the visual suite also pins its Playwright contai
 6. `full-stack-service-artifacts` builds the service jars; `full-stack-e2e` downloads them, starts Compose, uploads API fixtures, and runs real browser journeys
 7. `ci-status` requires every job to succeed; failed jobs upload short-lived diagnostics where available
 
-Dependabot: `.github/dependabot.yml`.
+Dependabot: `.github/dependabot.yml`; routine version checks run weekly on Monday at 03:00 Europe/Berlin for every configured ecosystem. Security updates are triggered separately by GitHub advisories.
 
 Full-stack CI also runs `scripts/operations/recovery_drill.py` against only its
 disposable seeded project, including checksum/SQL-failure recovery and Search

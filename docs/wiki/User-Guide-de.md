@@ -101,3 +101,5 @@ Artikel-, Satz- und andere Textstellenlinks öffnen denselben Verfassungsbetrach
 Mit der Tastatur öffnet Umschalt+F10 das Menü an einer fokussierten Textstelle. Pfeiltasten wechseln zwischen Einträgen; Eingabe oder Leertaste wählt sie, Escape schließt das Menü. Eine Trennlinie gliedert das kompakte Menü in dauerhafte Links und Originaltext. Falls die Zwischenablage nicht zugänglich ist, erscheint ein markierbares Kopierfeld. Zusätzliche Linksymbole im Text entfallen.
 
 Jede Fußnote hat genau einen **↑**-Rücksprung. Beim Darüberfahren oder Fokussieren erscheint seine Beschriftung. Bei einem einzelnen Verweis springt er direkt zurück; bei mehreren Verweisen öffnet er ein Menü mit den Verweisstellen.
+
+Unter **Leseeinstellungen** kannst du **Einrückung anzeigen** und **Hierarchielinien anzeigen** wählen. Der Linien-Schalter erscheint nur bei aktiver Einrückung und behält seine letzte Einstellung. Die Editor-Vorschau verwendet dieselben gespeicherten Leseeinstellungen; die Arbeitsansicht des Editors hat eigene Darstellungsoptionen. Der Wortlaut bleibt unverändert.

@@ -1,582 +1,383 @@
-import { T, useTranslation } from "../../components/TranslationProvider";
-import { ui } from "../../../lib/messages";
+"use client";
+
+import { useTranslation } from "../../components/TranslationProvider";
+import { ui, type UiMessage } from "../../../lib/messages";
+import { structureUi as copy } from "../../../lib/structure-workspace";
 import { Button, Input, Select } from "../../components/ui";
 import { SettingInfo } from "../../components/SettingInfo";
-import { asOutlinePresentation } from "../../../lib/outline";
 import { Stack } from "../../components/layout/Layout";
-import surfaceStyles from "../../components/surfaces.module.css";
-import fieldStyles from "../../components/fields.module.css";
 import {
   sentenceSettingsCopy,
   slugify,
-  type OutlineLayer as Layer,
+  type OutlineLayer,
 } from "./outline-editor-model";
 
-type LevelProps = {
-  layer: Layer;
+export type LayerSection = "structure" | "editing" | "display";
+type Props = {
+  layer: OutlineLayer;
   index: number;
-  layers: Layer[];
-  update: (index: number, patch: Partial<Layer>) => void;
-  removeLayer: (index: number) => void;
+  layers: OutlineLayer[];
+  section: LayerSection;
+  structural: boolean;
+  display: boolean;
+  update: (index: number, patch: Partial<OutlineLayer>) => void;
+  removeLayer?: (index: number) => void;
 };
 
-/** A stable level component preserves controlled fields and the original list-item boundary. */
-export function OutlineLayerEditor(props: LevelProps) {
-  const { layer, index, removeLayer } = props;
+function Check({
+  label,
+  help,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: UiMessage;
+  help: UiMessage;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (value: boolean) => void;
+}) {
   const t = useTranslation();
   return (
-    <Stack as="li" className={["card", surfaceStyles.card].join(" ")}>
-      <p>
-        <T value={ui.admin.constitutions.outlineeditor.layer} /> {index + 1}
-        {layer.root ? t(ui.remainingStatus.topLevelKind) : ""}
-        {t(
-          !layer.allowedChildKinds?.length
-            ? ui.remainingStatus.textLeaf
-            : ui.remainingStatus.structuralKind,
-        )}
-      </p>
-      <LayerIdentity {...props} />
-      <LayerStructure {...props} />
-      <LayerPermissions {...props} />
-      <LayerDisplay {...props} />
-      {index > 0 ? (
-        <span className="setting-inline">
-          <Button type="button" onClick={() => removeLayer(index)}>
-            <T value={ui.admin.constitutions.outlineeditor.removeLevel} />{" "}
-          </Button>
-          <SettingInfo
-            label={
-              <T value={ui.admin.constitutions.outlineeditor.removeLevel} />
-            }
-            description={<T value={ui.help.removeLevelHelp} />}
-            changeability="review"
-          />
-        </span>
-      ) : null}
-    </Stack>
-  );
-}
-
-/** Existing technical identities stay fixed; new labels can update generated codes. */
-function LayerIdentity({ layer, index, update }: LevelProps) {
-  return (
-    <>
-      <Input
-        label={
-          <T value={ui.attrs.adminConstitutionsOutlineeditorInputLabelLabel} />
-        }
-        info={{
-          description: <T value={ui.help.levelLabelHelp} />,
-          changeability: "review",
-        }}
-        name={`label-${index}`}
-        value={layer.displayLabel}
-        onChange={(event) => {
-          const displayLabel = event.target.value;
-          update(index, {
-            displayLabel,
-            kindCode: layer.existing ? layer.kindCode : slugify(displayLabel),
-          });
-        }}
-      />
-      <details className="creation-advanced">
-        <summary>
-          <T
-            value={ui.admin.constitutions.outlineeditor.advancedGeneratedCode}
-          />
-        </summary>
-        <Input
-          label={
-            <T value={ui.attrs.adminConstitutionsOutlineeditorInputLabelKind} />
-          }
-          info={{
-            description: <T value={ui.help.levelKindCodeHelp} />,
-            changeability: "once",
-            changeNote: <T value={ui.help.levelKindCodeChange} />,
-          }}
-          name={`code-${index}`}
-          value={layer.kindCode}
-          readOnly={layer.existing}
-          disabled={layer.existing}
-          onChange={(event) => {
-            if (!layer.existing) {
-              update(index, { kindCode: slugify(event.target.value) });
-            }
-          }}
+    <span className="setting-inline">
+      <label className="choice-row">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.checked)}
         />
-      </details>
-    </>
+        {t(label)}
+      </label>
+      <SettingInfo
+        label={t(label)}
+        description={t(help)}
+        changeability="review"
+      />
+    </span>
   );
 }
-
-/** Explicit root and child controls retain independently authored relationships. */
-function LayerStructure({ layer, index, layers, update }: LevelProps) {
+/** Stable, shared fields: native disclosure state survives help clicks and controlled edits. */
+export function OutlineLayerEditor(props: Props) {
+  const {
+      layer,
+      index,
+      layers,
+      section,
+      structural,
+      display,
+      update,
+      removeLayer,
+    } = props,
+    t = useTranslation();
+  const patch = (value: Partial<OutlineLayer>) => update(index, value);
+  const info = (help: UiMessage) => ({
+    description: t(help),
+    changeability: "review" as const,
+  });
+  const running = layer.presentation === "concatenated",
+    hasChildren = Boolean(layer.allowedChildKinds?.length),
+    mayHoldText = !hasChildren || Boolean(layer.allowTextAlongsideChildren);
   return (
-    <>
-      <Stack as="fieldset">
-        <legend>
-          <T value={ui.admin.constitutions.outlineeditor.structure} />
-        </legend>
-        <label className="choice-row">
-          <input
-            type="checkbox"
+    <Stack>
+      {!structural && section !== "display" ? (
+        <p className="muted">{t(copy.restricted)}</p>
+      ) : null}
+      <div hidden={section !== "structure"}>
+        <Stack>
+          <Check
+            label={copy.top}
+            help={copy.topHelp}
             checked={Boolean(layer.root)}
-            onChange={(event) => update(index, { root: event.target.checked })}
-          />{" "}
-          <T
-            value={ui.admin.constitutions.outlineeditor.mayAppearAtTheTopLevel}
+            disabled={!structural}
+            onChange={(root) => patch({ root })}
           />
-        </label>
-        <p className="muted">
-          <T value={ui.admin.constitutions.outlineeditor.allowedChildKinds} />
-        </p>
-        {layers
-          .filter((candidate) => candidate.kindCode !== layer.kindCode)
-          .map((candidate) => (
-            <label className="choice-row" key={candidate.kindCode}>
-              <input
-                type="checkbox"
-                checked={Boolean(
-                  layer.allowedChildKinds?.includes(candidate.kindCode),
-                )}
-                onChange={(event) =>
-                  update(index, {
-                    allowedChildKinds: event.target.checked
-                      ? [...(layer.allowedChildKinds ?? []), candidate.kindCode]
-                      : (layer.allowedChildKinds ?? []).filter(
-                          (code) => code !== candidate.kindCode,
-                        ),
-                  })
-                }
-              />{" "}
-              {candidate.displayLabel}
-            </label>
-          ))}
-      </Stack>
-    </>
-  );
-}
-
-/** Title and label policies share the same persisted values, order and translated labels. */
-function metadataPolicyOptions() {
-  return ([
-    ["none", ui.admin.constitutions.outlineeditor.notAllowed],
-    ["optional", ui.admin.constitutions.outlineeditor.optional],
-    ["required", ui.admin.constitutions.outlineeditor.required],
-  ] as const).map(([value, label]) => (
-    <option key={value} value={value}>
-      <T value={label} />
-    </option>
-  ));
-}
-
-/** Editorial metadata and sentence settings keep their current values and disabling rules. */
-function LayerPermissions({ layer, index, update }: LevelProps) {
-  return (
-    <>
-      <Stack as="fieldset">
-        <legend>
-          <T value={ui.admin.constitutions.outlineeditor.editorPermissions} />
-        </legend>
-        {Boolean(layer.allowedChildKinds?.length) ? (
-          <div className={["field", fieldStyles.field].join(" ")}>
-            <span className="setting-inline">
-              <label className="choice-row">
-                <input
-                  type="checkbox"
-                  checked={Boolean(layer.allowTextAlongsideChildren)}
-                  onChange={(event) =>
-                    update(index, {
-                      allowTextAlongsideChildren: event.target.checked,
-                    })
-                  }
-                />{" "}
-                <T
-                  value={
-                    ui.admin.constitutions.outlineeditor
-                      .allowTextAlongsideChildUnits
-                  }
-                />
-              </label>
+          <fieldset>
+            <legend className="setting-inline">
+              {t(ui.admin.constitutions.outlineeditor.allowedChildKinds)}
               <SettingInfo
-                label={
-                  <T
-                    value={
-                      ui.admin.constitutions.outlineeditor
-                        .allowTextAlongsideChildUnits
-                    }
-                  />
-                }
-                description={<T value={ui.help.unnumberedTextHelp} />}
+                label={t(copy.levels)}
+                description={t(copy.levelsHelp)}
                 changeability="review"
               />
-            </span>
-            <span className="muted">
-              <T
-                value={
-                  ui.admin.constitutions.outlineeditor
-                    .unnumberedParentTextCanAppearBeforeBetween
-                }
-              />
-            </span>
-          </div>
-        ) : (
-          <p>
-            <T
-              value={
+            </legend>
+            {layers.map((candidate, child) =>
+              child === index ? null : (
+                <label className="choice-row" key={child}>
+                  <input
+                    type="checkbox"
+                    disabled={!structural}
+                    checked={
+                      layer.allowedChildKinds?.includes(candidate.kindCode) ??
+                      false
+                    }
+                    onChange={(event) =>
+                      patch({
+                        allowedChildKinds: event.target.checked
+                          ? [
+                              ...(layer.allowedChildKinds ?? []),
+                              candidate.kindCode,
+                            ]
+                          : (layer.allowedChildKinds ?? []).filter(
+                              (code) => code !== candidate.kindCode,
+                            ),
+                      })
+                    }
+                  />
+                  {candidate.displayLabel}
+                </label>
+              ),
+            )}
+          </fieldset>
+          <details>
+            <summary>{t(copy.technical)}</summary>
+            <Input
+              label={t(copy.code)}
+              info={{
+                ...info(ui.help.levelKindCodeHelp),
+                changeability: "once",
+                changeNote: t(ui.help.levelKindCodeChange),
+              }}
+              name={`code-${index}`}
+              value={layer.kindCode}
+              readOnly={layer.existing}
+              disabled={!structural || layer.existing}
+              onChange={(event) =>
+                patch({ kindCode: slugify(event.target.value) })
+              }
+            />
+          </details>
+          {structural && removeLayer ? (
+            <Button
+              type="button"
+              disabled={layers.length === 1}
+              onClick={() => removeLayer(index)}
+            >
+              {t(ui.admin.constitutions.outlineeditor.removeLevel)}
+            </Button>
+          ) : null}
+        </Stack>
+      </div>
+      <div hidden={section !== "editing"}>
+        <Stack>
+          {hasChildren ? (
+            <Check
+              label={
                 ui.admin.constitutions.outlineeditor
-                  .thisFinalLevelHoldsTextAndHas
+                  .allowTextAlongsideChildUnits
+              }
+              help={ui.help.unnumberedTextHelp}
+              checked={Boolean(layer.allowTextAlongsideChildren)}
+              disabled={!structural}
+              onChange={(allowTextAlongsideChildren) =>
+                patch({ allowTextAlongsideChildren })
               }
             />
-          </p>
-        )}
-        <Select
-          label={
-            <T
-              value={
-                ui.attrs.adminConstitutionsOutlineeditorSelectLabelEditorial
+          ) : (
+            <p className="muted">
+              {t(
+                ui.admin.constitutions.outlineeditor
+                  .thisFinalLevelHoldsTextAndHas,
+              )}
+            </p>
+          )}
+          {(["titlePolicy", "labelPolicy"] as const).map((key) => (
+            <Select
+              key={key}
+              label={t(key === "titlePolicy" ? copy.titles : copy.labels)}
+              info={info(
+                key === "titlePolicy" ? copy.titleHelp : copy.labelHelp,
+              )}
+              name={`${key === "titlePolicy" ? "title" : "label"}-policy-${index}`}
+              value={layer[key] ?? "optional"}
+              disabled={!structural}
+              onChange={(event) =>
+                patch({
+                  [key]: event.target.value,
+                  ...(event.target.value === "none"
+                    ? {
+                        [key === "titlePolicy" ? "showTitle" : "showLabel"]:
+                          false,
+                      }
+                    : {}),
+                })
               }
-            />
-          }
-          info={{
-            description: <T value={ui.help.editorialTitlePolicyHelp} />,
-            changeability: "review",
-          }}
-          name={`title-policy-${index}`}
-          value={layer.titlePolicy ?? "optional"}
-          onChange={(event) =>
-            update(index, {
-              titlePolicy: event.target.value as Layer["titlePolicy"],
-              showTitle:
-                event.target.value === "none" ? false : layer.showTitle,
-            })
-          }
-        >
-          {metadataPolicyOptions()}
-        </Select>
-        <Select
-          label={
-            <T
-              value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelLiteral}
-            />
-          }
-          info={{
-            description: <T value={ui.help.legalLabelPolicyHelp} />,
-            changeability: "review",
-          }}
-          name={`label-policy-${index}`}
-          value={layer.labelPolicy ?? "optional"}
-          onChange={(event) =>
-            update(index, {
-              labelPolicy: event.target.value as Layer["labelPolicy"],
-              showLabel:
-                event.target.value === "none" ? false : layer.showLabel,
-            })
-          }
-        >
-          {metadataPolicyOptions()}
-        </Select>
-        <p className="muted">
-          <T
-            value={ui.admin.constitutions.outlineeditor.labelsSuchAs46aBisAnd2a}
-          />
-        </p>
-        {!layer.allowedChildKinds?.length ? (
-          <>
-            <label className="choice-row">
-              <input
-                type="checkbox"
-                name={`segmentation-${index}`}
+            >
+              {(["none", "optional", "required"] as const).map((value, i) => (
+                <option key={value} value={value}>
+                  {t(
+                    [
+                      ui.admin.constitutions.outlineeditor.notAllowed,
+                      ui.admin.constitutions.outlineeditor.optional,
+                      ui.admin.constitutions.outlineeditor.required,
+                    ][i],
+                  )}
+                </option>
+              ))}
+            </Select>
+          ))}
+          {!hasChildren ? (
+            <>
+              <Check
+                label={sentenceSettingsCopy.automatic}
+                help={ui.help.textEditingHelp}
                 checked={layer.segmentation === "sentence"}
                 disabled={
-                  (layer.labelPolicy === "required" ||
-                    layer.titlePolicy === "required") &&
-                  layer.segmentation !== "sentence"
+                  !structural ||
+                  layer.labelPolicy === "required" ||
+                  layer.titlePolicy === "required"
                 }
-                onChange={(event) =>
-                  update(index, {
-                    segmentation: event.target.checked ? "sentence" : "plain",
-                  })
+                onChange={(automatic) =>
+                  patch({ segmentation: automatic ? "sentence" : "plain" })
                 }
-              />{" "}
-              <T value={sentenceSettingsCopy.automatic} />
-            </label>
-            {layer.labelPolicy === "required" ||
-            layer.titlePolicy === "required" ? (
-              <p className="muted">
-                <T value={sentenceSettingsCopy.optionalMetadata} />
-              </p>
-            ) : null}
-            {layer.segmentation === "sentence" ? (
-              <Input
-                label={<T value={sentenceSettingsCopy.delimiters} />}
-                name={`sentence-delimiters-${index}`}
-                value={
-                  layer.delimiterInput ??
-                  (layer.sentenceDelimiters ?? [".", "!", "?"]).join(" ")
-                }
-                onChange={(event) =>
-                  update(index, {
-                    delimiterInput: event.target.value,
-                    sentenceDelimiters: event.target.value
-                      .trim()
-                      .split(/\s+/u)
-                      .filter(Boolean),
-                  })
-                }
-                info={{
-                  description: <T value={sentenceSettingsCopy.delimiterHelp} />,
-                  changeability: "review",
-                }}
               />
-            ) : null}
-          </>
-        ) : (
-          <p className="muted">
-            <T value={sentenceSettingsCopy.leafOnly} />
-          </p>
-        )}
-      </Stack>
-    </>
-  );
-}
-
-/** Reader preferences retain saved choices even when the effective display hides them. */
-function LayerDisplay({ layer, index, update }: LevelProps) {
-  return (
-    <>
-      <Stack as="fieldset">
-        <legend>
-          <T value={ui.admin.constitutions.outlineeditor.publicReaderDisplay} />
-        </legend>
-        <Select
-          label={
-            <T value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelHow} />
-          }
-          info={{
-            description: <T value={ui.help.levelPresentationHelp} />,
-            changeability: "review",
-          }}
-          name={`presentation-${index}`}
-          value={layer.presentation}
-          onChange={(event) =>
-            update(index, {
-              presentation: asOutlinePresentation(event.target.value),
-            })
-          }
-        >
-          <option value="section">
-            <T
-              value={
-                ui.admin.constitutions.outlineeditor.blockWithOptionalHeading
-              }
-            />
-          </option>
-          <option value="concatenated">
-            <T
-              value={
-                ui.admin.constitutions.outlineeditor
-                  .runningTextNoTitleJoinedWithSiblings
-              }
-            />
-          </option>
-        </Select>
-        {
-          <>
-            <div className={["field", fieldStyles.field].join(" ")}>
-              <span className="setting-inline">
-                <label className="field-label choice-row">
-                  <input
-                    type="checkbox"
-                    checked={layer.showKind}
-                    disabled={layer.presentation === "concatenated"}
-                    onChange={(event) =>
-                      update(index, { showKind: event.target.checked })
-                    }
-                  />{" "}
-                  <T
-                    value={ui.admin.constitutions.outlineeditor.showKindName}
-                  />
-                  {layer.displayLabel})
-                </label>
-                <SettingInfo
-                  label={
-                    <T
-                      value={ui.admin.constitutions.outlineeditor.showKindName}
-                    />
+              {layer.labelPolicy === "required" ||
+              layer.titlePolicy === "required" ? (
+                <p className="muted">
+                  {t(sentenceSettingsCopy.optionalMetadata)}
+                </p>
+              ) : null}
+              {layer.segmentation === "sentence" ? (
+                <Input
+                  label={t(sentenceSettingsCopy.delimiters)}
+                  info={info(sentenceSettingsCopy.delimiterHelp)}
+                  name={`sentence-delimiters-${index}`}
+                  value={
+                    layer.delimiterInput ??
+                    layer.sentenceDelimiters?.join(" ") ??
+                    ". ! ?"
                   }
-                  description={<T value={ui.help.kindNameHelp} />}
-                  changeability="review"
-                />
-              </span>
-            </div>
-            <div className={["field", fieldStyles.field].join(" ")}>
-              <span className="setting-inline">
-                <label className="field-label choice-row">
-                  <input
-                    type="checkbox"
-                    checked={layer.showLabel}
-                    disabled={
-                      layer.labelPolicy === "none" ||
-                      (layer.presentation === "concatenated" &&
-                        !["inline", "superscript"].includes(
-                          layer.labelPlacement ?? "before_title",
-                        ))
-                    }
-                    onChange={(event) =>
-                      update(index, { showLabel: event.target.checked })
-                    }
-                  />{" "}
-                  <T
-                    value={
-                      ui.admin.constitutions.outlineeditor.showLiteralLegalLabel
-                    }
-                  />{" "}
-                </label>
-                <SettingInfo
-                  label={
-                    <T
-                      value={
-                        ui.admin.constitutions.outlineeditor
-                          .showLiteralLegalLabel
-                      }
-                    />
+                  disabled={!structural}
+                  onChange={(event) =>
+                    patch({
+                      delimiterInput: event.target.value,
+                      sentenceDelimiters: event.target.value
+                        .trim()
+                        .split(/\s+/u)
+                        .filter(Boolean),
+                    })
                   }
-                  description={<T value={ui.help.literalLabelHelp} />}
-                  changeability="review"
                 />
-              </span>
-            </div>
-            <div className={["field", fieldStyles.field].join(" ")}>
-              <span className="setting-inline">
-                <label className="field-label choice-row">
-                  <input
-                    type="checkbox"
-                    checked={layer.showTitle}
-                    disabled={
-                      layer.titlePolicy === "none" ||
-                      layer.presentation === "concatenated"
-                    }
-                    onChange={(event) =>
-                      update(index, { showTitle: event.target.checked })
-                    }
-                  />{" "}
-                  <T
-                    value={
-                      ui.admin.constitutions.outlineeditor.showEditorialTitle
-                    }
-                  />{" "}
-                </label>
-                <SettingInfo
-                  label={
-                    <T
-                      value={
-                        ui.admin.constitutions.outlineeditor.showEditorialTitle
-                      }
-                    />
-                  }
-                  description={<T value={ui.help.editorialTitleHelp} />}
-                  changeability="review"
-                />
-              </span>
-            </div>
-          </>
-        }
-        {layer.presentation === "concatenated" ? (
-          <p className="muted">
-            <T
-              value={
-                ui.admin.constitutions.outlineeditor
-                  .runningTextHidesKindNamesAndEditorial
-              }
-            />
-          </p>
-        ) : null}
-        {layer.titlePolicy === "none" || layer.labelPolicy === "none" ? (
-          <p className="muted">
-            <T
-              value={ui.admin.constitutions.outlineeditor.aNameOrLabelSetToNot}
-            />
-          </p>
-        ) : null}
-        {layer.titlePolicy === "optional" &&
-        layer.showTitle &&
-        layer.presentation !== "concatenated" ? (
-          <p className="muted">
-            <T
-              value={
-                ui.admin.constitutions.outlineeditor
-                  .untitledUnitsPlaceAVisibleLabelBefore
-              }
-            />
-          </p>
-        ) : null}
-        <Select
-          label={
-            <T
-              value={ui.attrs.adminConstitutionsOutlineeditorSelectLabelLabel}
-            />
-          }
-          info={{
-            description: <T value={ui.help.labelPlacementHelp} />,
-            changeability: "review",
-          }}
-          name={`label-placement-${index}`}
-          value={layer.labelPlacement ?? "before_title"}
-          disabled={
-            layer.labelPolicy === "none" ||
-            (!layer.showLabel && layer.presentation !== "concatenated")
-          }
-          onChange={(event) =>
-            update(index, {
-              labelPlacement: event.target.value as Layer["labelPlacement"],
-            })
-          }
-        >
-          <option
-            value="before_title"
-            disabled={layer.presentation === "concatenated"}
-          >
-            <T value={ui.admin.constitutions.outlineeditor.beforeTitle} />
-          </option>
-          <option
-            value="after_title"
-            disabled={
-              layer.presentation === "concatenated" ||
-              !layer.showTitle ||
-              layer.titlePolicy === "none"
+              ) : null}
+            </>
+          ) : (
+            <p className="muted">{t(sentenceSettingsCopy.leafOnly)}</p>
+          )}
+        </Stack>
+      </div>
+      <div hidden={section !== "display"}>
+        <Stack>
+          <Input
+            label={t(copy.name)}
+            info={info(ui.help.levelLabelHelp)}
+            name={`label-${index}`}
+            value={layer.displayLabel}
+            disabled={!display}
+            onChange={(event) =>
+              patch({
+                displayLabel: event.target.value,
+                ...(!layer.existing
+                  ? { kindCode: slugify(event.target.value) }
+                  : {}),
+              })
+            }
+          />
+          <Select
+            label={t(ui.attrs.adminConstitutionsOutlineeditorSelectLabelHow)}
+            info={info(ui.help.levelPresentationHelp)}
+            name={`presentation-${index}`}
+            value={layer.presentation ?? "section"}
+            disabled={!display}
+            onChange={(event) =>
+              patch({
+                presentation: event.target
+                  .value as OutlineLayer["presentation"],
+              })
             }
           >
-            <T value={ui.admin.constitutions.outlineeditor.afterTitle} />
-          </option>
-          <option
-            value="inline"
-            disabled={
-              Boolean(layer.allowedChildKinds?.length) &&
-              !layer.allowTextAlongsideChildren
-            }
-          >
-            <T value={ui.admin.constitutions.outlineeditor.inlineWithText} />
-          </option>
-          {!layer.allowedChildKinds?.length ? (
-            <option value="superscript">
-              <T
-                value={ui.admin.constitutions.outlineeditor.superscriptInText}
-              />
+            <option value="section">
+              {t(ui.admin.constitutions.outlineeditor.blockWithOptionalHeading)}
             </option>
-          ) : null}
-        </Select>
-        {!layer.showLabel && layer.presentation !== "concatenated" ? (
-          <p className="muted">
-            <T
-              value={
+            <option value="concatenated">
+              {t(
                 ui.admin.constitutions.outlineeditor
-                  .showLiteralLegalLabelToChooseIts
+                  .runningTextNoTitleJoinedWithSiblings,
+              )}
+            </option>
+          </Select>
+          <Check
+            label={ui.admin.constitutions.outlineeditor.showKindName}
+            help={ui.help.kindNameHelp}
+            checked={Boolean(layer.showKind)}
+            disabled={!display || running}
+            onChange={(showKind) => patch({ showKind })}
+          />
+          <Check
+            label={copy.showLabel}
+            help={copy.labelHelp}
+            checked={layer.showLabel !== false}
+            disabled={
+              !display ||
+              layer.labelPolicy === "none" ||
+              (running &&
+                !["inline", "superscript"].includes(
+                  layer.labelPlacement ?? "before_title",
+                ))
+            }
+            onChange={(showLabel) => patch({ showLabel })}
+          />
+          <Check
+            label={copy.showTitle}
+            help={copy.titleHelp}
+            checked={layer.showTitle !== false}
+            disabled={!display || running || layer.titlePolicy === "none"}
+            onChange={(showTitle) => patch({ showTitle })}
+          />
+          {running ? (
+            <p className="muted">
+              {t(
+                ui.admin.constitutions.outlineeditor
+                  .runningTextHidesKindNamesAndEditorial,
+              )}
+            </p>
+          ) : null}
+          <Select
+            label={t(copy.placement)}
+            info={info(ui.help.labelPlacementHelp)}
+            name={`label-placement-${index}`}
+            value={layer.labelPlacement ?? "before_title"}
+            disabled={
+              !display ||
+              layer.labelPolicy === "none" ||
+              (!layer.showLabel && !running)
+            }
+            onChange={(event) =>
+              patch({
+                labelPlacement: event.target
+                  .value as OutlineLayer["labelPlacement"],
+              })
+            }
+          >
+            <option value="before_title" disabled={running}>
+              {t(ui.admin.constitutions.outlineeditor.beforeTitle)}
+            </option>
+            <option
+              value="after_title"
+              disabled={
+                running || !layer.showTitle || layer.titlePolicy === "none"
               }
-            />
-          </p>
-        ) : null}
-      </Stack>
-    </>
+            >
+              {t(ui.admin.constitutions.outlineeditor.afterTitle)}
+            </option>
+            <option value="inline" disabled={!mayHoldText}>
+              {t(ui.admin.constitutions.outlineeditor.inlineWithText)}
+            </option>
+            <option value="superscript" disabled={hasChildren}>
+              {t(ui.admin.constitutions.outlineeditor.superscriptInText)}
+            </option>
+          </Select>
+        </Stack>
+      </div>
+    </Stack>
   );
 }

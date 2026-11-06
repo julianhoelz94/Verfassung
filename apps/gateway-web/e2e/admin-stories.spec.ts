@@ -131,34 +131,30 @@ test('administrator creates a constitution and changes its outline settings', as
   await page.getByLabel('Country').selectOption('DE');
   await page.getByLabel('Constitution title').fill('Test Constitution');
   await page.getByRole('button', { name: 'Continue to structure' }).click();
-  await page.getByRole('button', { name: /Articles only/ }).click();
-  await expect(page.getByRole('textbox', { name: 'Label' })).toHaveCount(1);
-  await page.getByRole('button', { name: /Articles and sections/ }).click();
-  await expect(page.getByRole('textbox', { name: 'Label' })).toHaveCount(2);
-  await page.getByRole('textbox', { name: 'Label' }).nth(1).fill('Clause');
-  await page.getByLabel('Allow text alongside child units').check();
-  const preview = page.getByRole('complementary', { name: 'Reader preview' });
-  await expect(preview.getByText('The following rights are protected.', { exact: true }).first()).toBeVisible();
-  await expect(preview.getByText('These rights apply to everyone.', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Use this template', exact: true }).click();
+  await page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Paragraph Structural level', exact: true }).first().click();
+  await page.getByRole('textbox', { name: 'Reader-facing name', exact: true }).fill('Clause');
   await page.getByRole('button', { name: 'Continue to review' }).click();
   await expect(page.getByRole('heading', { name: 'Review before creating' })).toBeVisible();
-  await expect(page).toHaveURL(/\/admin\/constitutions$/);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(preview).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
-  await expect(page).toHaveURL(/\/admin\/constitutions$/);
   await page.getByRole('button', { name: 'Create constitution' }).click();
   await expect(page).toHaveURL(/\/admin\/constitutions\/[^/?]+$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Test Constitution' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Import the first version' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Label' }).nth(1)).toHaveValue('Clause');
-  await page.getByLabel('How this layer is shown').nth(1).selectOption('concatenated');
+  await page.getByRole('button', { name: /^Levels ·/ }).click();
+  await page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Clause Structural level', exact: true }).first().click();
+  await expect(page.getByRole('textbox', { name: 'Reader-facing name', exact: true })).toHaveValue('Clause');
+  await page.getByLabel('How this layer is shown').selectOption('concatenated');
+  await page.getByRole('navigation', { name: 'Structure', exact: true }).getByRole('button', { name: 'Review impact', exact: true }).first().click();
   await page.getByRole('button', { name: 'Preview change impact' }).click();
   await expect(page.getByRole('heading', { name: 'Safe to save' })).toBeVisible();
   await page.getByRole('button', { name: 'Save outline' }).click();
   await expect(page).toHaveURL(/saved=1/, { timeout: 30000 });
   await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
-  await expect(page.getByLabel('How this layer is shown').nth(1)).toHaveValue('concatenated');
+  await page.getByRole('button', { name: /^Levels ·/ }).click();
+  await page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Clause Structural level', exact: true }).first().click();
+  await expect(page.getByLabel('How this layer is shown')).toHaveValue('concatenated');
 });
 
 test('constitution preview explains units and shows running sentences throughout creation', async ({ page, browser }, testInfo) => {
@@ -169,9 +165,12 @@ test('constitution preview explains units and shows running sentences throughout
   await page.getByLabel('Constitution title').fill('Example Constitution');
   await page.screenshot({ path: testInfo.outputPath('01-basics.png') });
   await page.getByRole('button', { name: 'Continue to structure' }).click();
-  const preview = page.getByRole('complementary', { name: 'Reader preview' });
+  const preview = page.getByRole('region', { name: 'Reader preview', exact: true }).filter({ visible: true });
   await expect(preview.getByRole('heading', { name: 'Structure map' })).toHaveCount(0);
-  await page.getByLabel('Allow text alongside child units').nth(1).check();
+  await page.getByRole('button', { name: 'Use this template', exact: true }).click();
+  await page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Article Structural level', exact: true }).first().click();
+  await page.getByRole('region', { name: 'Article Structure', exact: true }).getByRole('button', { name: 'Editing', exact: true }).click();
+  await page.getByLabel('Allow text alongside child units').check();
   const sentences = preview.locator('.constitution-concat').first().locator('[data-preview-kind="sentence"]');
   await expect(sentences).toHaveCount(2);
   await expect(preview.locator('.constitution-concat').first()).toHaveText('Everyone has the right to equal protection. The law shall protect these rights.');
@@ -202,8 +201,17 @@ test('constitution preview explains units and shows running sentences throughout
     await phone.goto(`${new URL(page.url()).origin}/admin/constitutions`);
     await phone.getByLabel('Constitution title').fill('Mobile Constitution');
     await phone.getByRole('button', { name: 'Continue to structure' }).click();
-    const phonePreview = phone.getByRole('complementary', { name: 'Reader preview' });
-    await phonePreview.locator('[data-preview-kind="sentence"]').first().tap();
+    await phone.getByRole('button', { name: 'Use this template', exact: true }).click();
+    await phone.getByRole('navigation', { name: 'Structure', exact: true }).getByRole('button', { name: 'Preview', exact: true }).click();
+    const phonePreview = phone.getByRole('region', { name: 'Reader preview', exact: true }).filter({ visible: true });
+    // Tap actual text rather than the bounding box of a wrapped inline sentence.
+    await phonePreview.locator('[data-preview-kind="sentence"]').first().scrollIntoViewIfNeeded();
+    const point = await phonePreview.locator('[data-preview-kind="sentence"]').first().evaluate(element => {
+      const text = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode()!;
+      const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, Math.min(6, text.textContent!.length));
+      const rect = range.getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await phone.touchscreen.tap(point.x, point.y);
     await expect(phonePreview.getByRole('tooltip')).toContainText('Text leaf · No child units');
     const box = await phonePreview.getByRole('tooltip').boundingBox();
     expect(box?.x).toBeGreaterThanOrEqual(0);
@@ -220,9 +228,9 @@ test('guided creation exposes a manual catalog slug when a title cannot generate
   await expect(page.getByText('Enter a catalog slug using Latin letters and numbers to continue.')).toBeVisible();
   await page.getByRole('textbox', { name: 'Catalog slug' }).fill('japan-constitution');
   await page.getByRole('button', { name: 'Continue to structure' }).click();
-  await page.getByRole('button', { name: /Articles only/ }).focus();
+  await page.getByRole('button', { name: 'Use this template', exact: true }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('textbox', { name: 'Label' })).toHaveCount(1);
+  await expect(page.getByRole('textbox', { name: 'Reader-facing name', exact: true })).toHaveCount(1);
 });
 
 test('guided creation sends an expired administrator session to login', async ({ page }) => {
@@ -254,10 +262,11 @@ test('administrator can carry an editorial correction through every role action'
 test('outline mixed-content preview follows permissions on desktop and mobile', async ({ page }, testInfo) => {
   await signInAdmin(page);
   await page.goto('/admin/constitutions/01900000-0000-4000-8000-000000000002');
-  const preview = page.getByRole('complementary', { name: 'Reader preview' });
+  const preview = page.getByRole('region', { name: 'Reader preview', exact: true }).filter({ visible: true });
   await expect(preview.getByRole('heading', { name: 'Structure map' })).toHaveCount(0);
   await expect(preview.getByRole('heading', { name: 'Reader preview' })).toBeVisible();
-  const permission = page.getByLabel('Allow text alongside child units').first();
+  await page.getByRole('region', { name: 'Article Structure', exact: true }).getByRole('button', { name: 'Editing', exact: true }).click();
+  const permission = page.getByLabel('Allow text alongside child units');
   await permission.check();
   await expect(preview.locator('[data-preview-kind="article"] > .node-tree > p').first()).toHaveText('The following rights are protected.');
   await expect(preview.getByText('The following rights are protected.', { exact: true }).first()).toBeVisible();
@@ -267,6 +276,7 @@ test('outline mixed-content preview follows permissions on desktop and mobile', 
   await permission.uncheck();
   await expect(preview.locator('[data-preview-kind="article"] > .node-tree > p')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('navigation', { name: 'Structure', exact: true }).getByRole('button', { name: 'Preview', exact: true }).click();
   await expect(preview).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   await page.screenshot({ path: testInfo.outputPath('outline-mobile.png'), fullPage: true });
@@ -302,6 +312,7 @@ test('administrator previews a structure proposal uploaded as a JSON file', asyn
   });
   await page.getByRole('button', { name: 'Preview proposed structure' }).click();
   await expect(page).toHaveURL(/\/admin\/import\/setup\/[^/?]+$/);
+  await page.getByRole('navigation', { name: 'Structure', exact: true }).getByRole('button', { name: 'Proposal', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Source and identity' })).toBeVisible();
   await expect(page.getByText('Germany (DE) · Uploaded structure proposal')).toBeVisible();
 });

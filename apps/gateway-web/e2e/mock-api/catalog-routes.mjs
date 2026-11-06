@@ -321,6 +321,14 @@ async function handleCreateConstitutionResponse(context) {
 /** Match the settings gate before consuming request bytes or mutating state. */
 export function handleSettings(context) {
   const { pathname } = context;
+  const revision = pathname.match(
+    /^\/api\/catalog\/constitutions\/[^/]+\/settings\/([0-9a-f-]{36})$/,
+  );
+  if (context.method === "GET" && revision) {
+    const value = settingsRevisions.get(revision[1]);
+    json(context.res, value ? 200 : 404, value ?? { error: "Not found" });
+    return true;
+  }
   const settingsMatch = pathname.match(
     /^\/api\/catalog\/constitutions\/([^/]+)\/settings(\/preflight)?$/,
   );
@@ -348,6 +356,7 @@ async function handleSettingsResponse(context, settingsMatch) {
       outline: constitution.contentOutline,
     };
     settingsRevisions.set(constitution.id, current);
+    settingsRevisions.set(current.id, current);
   }
   if (method === "GET") {
     json(res, 200, current);
@@ -378,6 +387,7 @@ async function handleSettingsResponse(context, settingsMatch) {
   };
   constitution.contentOutline = next.outline;
   settingsRevisions.set(constitution.id, next);
+  settingsRevisions.set(next.id, next);
   json(res, 200, next);
   return true;
 }
@@ -385,6 +395,10 @@ async function handleSettingsResponse(context, settingsMatch) {
 /** Select continuous reader settings before the default country outline. */
 export function handleReaderSettings(context) {
   const { pathname, method, res } = context;
+  if (method === "GET" && mockState.continuousReader && /^\/api\/catalog\/versions\/[^/]+\/settings$/.test(pathname)) {
+    json(res, 200, { id: "01900000-0000-4000-8000-000000000901", predecessorId: null, outline: continuousReaderOutline });
+    return true;
+  }
   if (
     !(
       method === "GET" &&

@@ -8,7 +8,11 @@ export async function openStructureTask(page: Page, name: string) {
 }
 
 /** The same level picker serves desktop navigation and the mobile disclosure. */
-export async function selectStructureLevel(page: Page, name: string) {
+export async function selectStructureLevel(
+  page: Page,
+  name: string,
+  section?: "Structure" | "Editing" | "Display",
+) {
   const levels = page.getByRole("complementary", {
     name: "Levels",
     exact: true,
@@ -21,4 +25,9 @@ export async function selectStructureLevel(page: Page, name: string) {
     .filter({ has: page.getByText(name, { exact: true }) })
     .first()
     .click();
+  const fields = page.getByRole("region", { name: / Structure$/ });
+  if (section) {
+    await fields.getByRole("button", { name: section, exact: true }).click();
+  }
+  return fields;
 }

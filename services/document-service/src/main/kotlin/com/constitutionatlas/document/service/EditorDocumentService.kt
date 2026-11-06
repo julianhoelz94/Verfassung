@@ -1,11 +1,13 @@
 package com.constitutionatlas.document.service
 
+import com.constitutionatlas.document.api.BibliographyDto
 import com.constitutionatlas.document.api.DocumentConflictException
 import com.constitutionatlas.document.api.DocumentDto
 import com.constitutionatlas.document.api.LinkRequest
 import com.constitutionatlas.document.api.SaveDocumentRequest
 import com.constitutionatlas.document.repo.EditorDocumentRepository
 import com.constitutionatlas.platform.Actor
+import com.fasterxml.jackson.annotation.JsonInclude
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
@@ -18,6 +20,10 @@ data class CreateLinkedDocumentRequest(
     val description: String? = null,
     val sourceUrl: String? = null,
     val scopeRevisionId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val citationKey: String? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val bibliography: BibliographyDto? = null,
 )
 
 @Service
@@ -48,7 +54,10 @@ class EditorDocumentService(
             if (previous != hash) throw DocumentConflictException("Operation already used for another document")
             return documents.get(id, revision)
         }
-        val created = documents.create(SaveDocumentRequest(request.title, request.description, request.sourceUrl), actor)
+        val created = documents.create(
+            SaveDocumentRequest(request.title, request.description, request.sourceUrl, citationKey = request.citationKey, bibliography = request.bibliography),
+            actor,
+        )
         val stored = if (bytes == null) {
             created
         } else {

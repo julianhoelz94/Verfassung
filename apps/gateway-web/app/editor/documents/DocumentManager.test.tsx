@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { fireEvent, getByLabelText, getByRole, queryByRole } from '@testing-library/dom';
+import { fireEvent, getByLabelText, getByRole, getByText, queryByRole } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DocumentManager } from './DocumentManager';
 import type { DocumentRecord, DocumentRevision } from '../../../lib/document-api';
@@ -65,7 +65,7 @@ describe('shared document attachment contract', () => {
     send.mockResolvedValueOnce(response({ links: [linked] })).mockResolvedValueOnce(response({ links: [] }));
     await render({ documents: [current], revisions: { law: [revision, latest] } });
     await click('Choose existing document'); await fill('Search documents', 'Later');
-    await fill('Document', 'law'); await fill('Revision to cite', 'revision-1'); await click('Attach document');
+    await act(async () => { fireEvent.click(getByRole(host, 'option', { name: /^Later title/ })); }); await act(async () => { fireEvent.click(getByText(host, 'Citation options', { selector: 'summary' })); }); await fill('Revision to cite', 'revision-1'); await click('Attach document');
     expect(Object.fromEntries(submitted(0))).toMatchObject({ command: 'attach', documentId: 'law', revisionId: 'revision-1', scopeRevisionId: 'draft-revision' });
     expect(getByRole(host, 'link', { name: 'Enacting law' }).getAttribute('href')).toBe('/documents/law?revision=1');
     await click('Detach: Enacting law'); expect(queryByRole(host, 'link', { name: 'Enacting law' })).toBeNull();
@@ -85,7 +85,7 @@ describe('shared document attachment contract', () => {
 
   it('rejects an empty evidence record before sending a mutation', async () => {
     await render(); await click('Upload new document'); await fill('Title', 'Missing source');
-    await click('Create and attach'); expect(getByRole(host, 'alert').textContent).toContain('Choose a file or enter its source URL.');
+    await click('Create and attach'); expect(getByRole(host, 'alert').textContent).toContain('Choose a file or enter its source URL under Optional details.');
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -98,14 +98,14 @@ describe('shared document attachment contract', () => {
       .mockResolvedValueOnce(response({ links: [{ documentId: 'law', revisionId: revision.id, document: documentRecord }] }));
     await render({ remoteSearch: true, documentTotal: 0 });
     expect(send).not.toHaveBeenCalled();
-    await click('Choose existing document'); await fill('Search documents', 'Mueller2024'); await click('Search library');
+    await click('Choose existing document'); await fill('Search documents', 'Mueller2024'); await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)); });
     expect(send.mock.calls[0][0]).toBe('/editor/documents/command?command=search&q=Mueller2024&offset=0');
     expect(queryByRole(host, 'option', { name: 'Revision 1' })).toBeNull();
     await click('Next');
     expect(send.mock.calls[1][0]).toBe('/editor/documents/command?command=search&q=Mueller2024&offset=30');
-    await fill('Document', 'law');
+    await act(async () => { fireEvent.click(getByRole(host, 'option', { name: /^Later title/ })); });
     expect(send.mock.calls[2][0]).toBe('/editor/documents/command?command=revisions&documentId=law');
-    await fill('Revision to cite', 'revision-1'); await click('Attach document');
+    await act(async () => { fireEvent.click(getByText(host, 'Citation options', { selector: 'summary' })); }); await fill('Revision to cite', 'revision-1'); await click('Attach document');
     expect(Object.fromEntries(submitted(3))).toMatchObject({ command: 'attach', documentId: 'law', revisionId: 'revision-1' });
     expect(getByRole(host, 'link', { name: 'Enacting law' }).getAttribute('href')).toBe('/documents/law?revision=1');
   });

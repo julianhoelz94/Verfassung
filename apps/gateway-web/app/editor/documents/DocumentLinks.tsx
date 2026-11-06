@@ -1,7 +1,7 @@
 import { currentLocale } from '../../../lib/server-locale';
 import { T } from '../../components/TranslationProvider';
 import { ui } from '../../../lib/messages';
-import { listDocumentLinkEvents, listDocumentLinks, listLibraryDocuments } from '../../../lib/document-api';
+import { listDocumentLinkEvents, listDocumentLinks, listLibraryDocuments, listDocumentFolders } from '../../../lib/document-api';
 import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { canManageDocuments } from '../../../lib/nav';
 import { DocumentManager } from './DocumentManager';
@@ -20,10 +20,11 @@ export async function DocumentLinks(props: {
   const user = await currentUser();
   const canEdit = props.canEdit && !!user && canManageDocuments(user.roles);
   const authorization = await requireSessionBearer();
-  const [linksResult, documentsResult, eventsResult] = await Promise.allSettled([
+  const [linksResult, documentsResult, eventsResult, foldersResult] = await Promise.allSettled([
     listDocumentLinks(props.targetType, props.targetId, props.scopeRevisionId, authorization),
     canEdit ? listLibraryDocuments({ status: 'active', offset: 0, limit: 30, sort: 'title' }, authorization) : Promise.resolve({ items: [], total: 0, offset: 0, limit: 30 }),
     listDocumentLinkEvents(props.targetType, props.targetId, authorization, props.scopeRevisionId),
+    canEdit ? listDocumentFolders(authorization) : Promise.resolve([]),
   ]);
   const unavailable = linksResult.status === 'rejected' || documentsResult.status === 'rejected' || eventsResult.status === 'rejected';
   const links = linksResult.status === 'fulfilled' ? linksResult.value : [];
@@ -34,7 +35,7 @@ export async function DocumentLinks(props: {
   return <Stack as="section" className={surfaceStyles.card}>
     {unavailable ? <Alert tone="error"><T value={ui.editor.documents.documentlinks.documentServiceIsUnavailableLinksMayBe} /></Alert> : null}
     <DocumentManager key={`${props.targetType}:${props.targetId}:${props.scopeRevisionId ?? ''}`} links={links} documents={available}
-      revisions={{}} documentTotal={page.total} remoteSearch
+      revisions={{}} documentTotal={page.total} folders={foldersResult.status === 'fulfilled' ? foldersResult.value : []} remoteSearch
       targetType={props.targetType} targetId={props.targetId} scopeRevisionId={props.scopeRevisionId} canEdit={canEdit && !unavailable} />
     {events.length ? <details><summary><T value={ui.editor.documents.documentlinks.linkHistory} /></summary><ol>{events.map((event) => <li key={event.id}>
       <T value={event.action === 'attach' ? ui.editor.documents.documentlinks.attached : ui.editor.documents.documentlinks.detached} /> · <a href={`/documents?documentId=${encodeURIComponent(event.documentId)}`}>{event.documentId}</a> · {new Date(event.occurredAt).toLocaleString(locale)}

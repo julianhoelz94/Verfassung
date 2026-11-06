@@ -65,3 +65,18 @@ it('rejects invalid search pages and viewer library reads before contacting Docu
   expect(listLibraryDocuments).not.toHaveBeenCalled();
   expect(listDocumentRevisions).not.toHaveBeenCalled();
 });
+
+it('forwards optional bibliography and citation key in the same atomic upload', async () => {
+  vi.mocked(createLinkedDocument).mockResolvedValue({ id: 'document' } as never);
+  const bibliography = { type: 'book', authors: [{ family: 'Smith', given: 'Jane' }], editors: [], issued: '2026', extra: { jurisdiction: 'Germany' } };
+  expect((await POST(request({ citationKey: 'Smith2026', bibliography: JSON.stringify(bibliography) }))).status).toBe(200);
+  expect(createLinkedDocument).toHaveBeenCalledWith('amendment', 'law', expect.objectContaining({ citationKey: 'Smith2026', bibliography }), null, 'Bearer session');
+  expect((await POST(request({ bibliography: '{broken' }))).status).toBe(400);
+  expect((await POST(request({ bibliography: '[]' }))).status).toBe(400);
+  expect(createLinkedDocument).toHaveBeenCalledTimes(1);
+});
+it('keeps embedded browsing scoped to the selected project folder', async () => {
+  vi.mocked(listLibraryDocuments).mockResolvedValue({ items: [], total: 0, offset: 0, limit: 30 });
+  expect((await GET(new NextRequest('http://localhost/editor/documents/command?command=search&folderId=project&q=Law'))).status).toBe(200);
+  expect(listLibraryDocuments).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'project', q: 'Law', offset: 0 }), 'Bearer session');
+});

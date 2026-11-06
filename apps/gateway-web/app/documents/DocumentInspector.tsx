@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import type { DocumentAttachment, DocumentBibliography, DocumentCreator, DocumentFolder, DocumentLinkEvent, DocumentRecord, DocumentRevision, DocumentTag } from '../../lib/document-api';
+import { DocumentCreatorFields } from '../components/documents/DocumentCreatorFields';
 import { libraryCommand } from './BibtexImport';
 import { useLocale } from '../components/TranslationProvider';
 import { Alert, Badge, Button, Input, Select, TextArea } from '../components/ui';
@@ -285,33 +286,6 @@ function InspectorContent({ document: selected, writable, createMode = false, ta
     setBibliography(previous => ({ ...previous, [field]: creators }));
   }
 
-  function creatorFields(field: 'authors' | 'editors') {
-    const values = bibliography[field] ?? [];
-    return <Stack as="fieldset" gap="control" className={styles.creatorGroup}>
-      <legend>{text[field]}</legend>
-      {values.map((creator, index) => {
-        const institution = creator.literal !== undefined && creator.literal !== null;
-        const fieldId = `${idPrefix}-${field}-${index}`;
-        const change = (value: DocumentCreator) => updateCreators(field, values.map((item, i) => i === index ? value : item));
-        return <Stack key={index} gap="related" className={styles.creator}>
-          <Select id={`${fieldId}-kind`} label={`${text[field]} ${index + 1}`} value={institution ? 'institution' : 'person'} onChange={event => change(event.target.value === 'institution' ? { literal: creatorName(creator) } : { family: creator.literal ?? creator.family ?? '', given: creator.given ?? '' })}>
-            <option value="person">{text.person}</option><option value="institution">{text.institution}</option>
-          </Select>
-          {institution ? <Input id={`${fieldId}-literal`} label={text.literal} value={creator.literal ?? ''} onChange={event => change({ literal: event.target.value })} /> : <Grid columns={2} gap="control">
-            <Input id={`${fieldId}-family`} label={text.family} value={creator.family ?? ''} onChange={event => change({ ...creator, family: event.target.value })} />
-            <Input id={`${fieldId}-given`} label={text.given} value={creator.given ?? ''} onChange={event => change({ ...creator, given: event.target.value })} />
-          </Grid>}
-          <Inline gap="related">
-            <Button type="button" variant="ghost" disabled={index === 0} onClick={() => { const moved = [...values]; [moved[index - 1], moved[index]] = [moved[index], moved[index - 1]]; updateCreators(field, moved); }} aria-label={`${text.up}: ${creatorName(creator) || index + 1}`}>↑</Button>
-            <Button type="button" variant="ghost" disabled={index === values.length - 1} onClick={() => { const moved = [...values]; [moved[index + 1], moved[index]] = [moved[index], moved[index + 1]]; updateCreators(field, moved); }} aria-label={`${text.down}: ${creatorName(creator) || index + 1}`}>↓</Button>
-            <Button type="button" variant="ghost" onClick={() => updateCreators(field, values.filter((_, i) => i !== index))}>{text.remove}</Button>
-          </Inline>
-        </Stack>;
-      })}
-      <Button type="button" variant="ghost" onClick={() => updateCreators(field, [...values, { family: '', given: '' }])}>{field === 'authors' ? text.addAuthor : text.addEditor}</Button>
-    </Stack>;
-  }
-
   function fileList(files: DocumentAttachment[], revision: number, editable = false) {
     if (!selected) return null;
     return <ul className={styles.fileList}>{files.map(file => <li key={file.id}>
@@ -351,10 +325,10 @@ function InspectorContent({ document: selected, writable, createMode = false, ta
         <span className={styles.meta} role="status">{keyStatus === 'checking' ? text.checking : keyStatus === 'available' ? text.available : keyStatus === 'unavailable' ? text.unavailable : ''}</span>
       </Inline>
 
-      <Grid columns={2}>{creatorFields('authors')}{creatorFields('editors')}</Grid>
+      <Grid columns={2}><DocumentCreatorFields kind="authors" value={bibliography.authors ?? []} onChange={values => updateCreators('authors', values)} /><DocumentCreatorFields kind="editors" value={bibliography.editors ?? []} onChange={values => updateCreators('editors', values)} /></Grid>
       <Grid columns={2} variant="form" gap="field">{bibliographyFields.map(field => <Input key={field} id={`${idPrefix}-${field}`} label={text[field]} value={bibliography[field] ?? ''} onChange={event => setBibliography(previous => ({ ...previous, [field]: event.target.value }))} />)}</Grid>
-      <TextArea id={`${idPrefix}-abstract`} label={text.abstract} rows={4} value={bibliography.abstract ?? ''} onChange={event => setBibliography(previous => ({ ...previous, abstract: event.target.value }))} />
-      <TextArea id={`${idPrefix}-description`} label={text.description} rows={3} value={description} onChange={event => setDescription(event.target.value)} />
+      <TextArea id={`${idPrefix}-abstract`} label={text.abstract} help={locale === 'en' ? 'The source’s own published summary.' : 'Die eigene, veröffentlichte Zusammenfassung der Quelle.'} rows={4} value={bibliography.abstract ?? ''} onChange={event => setBibliography(previous => ({ ...previous, abstract: event.target.value }))} />
+      <TextArea id={`${idPrefix}-description`} label={text.description} help={locale === 'en' ? 'A catalog note about the document, separate from its abstract and attachment-specific commentary.' : 'Eine Katalognotiz zum Dokument, getrennt von Abstract und verknüpfungsbezogenen Kommentaren.'} rows={3} value={description} onChange={event => setDescription(event.target.value)} />
       <Input id={`${idPrefix}-source`} label={text.sourceUrl} type="url" value={sourceUrl} onChange={event => setSourceUrl(event.target.value)} />
       <details className={styles.details}><summary>{text.extra}</summary><Stack gap="field">
         {extra.map((field, index) => <Stack key={index} gap="related">

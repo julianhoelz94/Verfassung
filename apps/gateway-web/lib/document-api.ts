@@ -138,6 +138,7 @@ export function uploadDocument(id: string, expectedRevision: number, file: File,
 
 export function createLinkedDocument(targetType: 'constitution' | 'version' | 'amendment', targetId: string, metadata: {
   operationId: string; title: string; description: string; sourceUrl: string; scopeRevisionId: string | null;
+  citationKey?: string; bibliography?: DocumentBibliography;
 }, file: File | null, authorization: string): Promise<DocumentRecord> {
   const body = new FormData();
   body.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));

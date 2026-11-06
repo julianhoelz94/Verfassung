@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { currentUser, requireSessionBearer } from '../../../../lib/session';
-import { attachDocument, createLinkedDocument, detachDocument, listDocumentLinks, listDocumentRevisions, listLibraryDocuments } from '../../../../lib/document-api';
+import { attachDocument, createLinkedDocument, detachDocument, listDocumentLinks, listDocumentRevisions, listLibraryDocuments, type DocumentBibliography } from '../../../../lib/document-api';
 import { canManageDocuments, canReadDocuments } from '../../../../lib/nav';
 import { hasTrustedOrigin } from '../../../../lib/request-origin';
 import { revalidatePath } from 'next/cache';
@@ -14,7 +14,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const q = request.nextUrl.searchParams.get('q') ?? '';
     const offset = Number(request.nextUrl.searchParams.get('offset') ?? '0');
     if (q.length > 500 || !Number.isSafeInteger(offset) || offset < 0) return NextResponse.json({ error: 'search' }, { status: 400 });
-    try { return NextResponse.json(await listLibraryDocuments({ q, offset, limit: 30, status: 'active', sort: 'title' }, await requireSessionBearer()), { headers }); }
+    const folderId = request.nextUrl.searchParams.get('folderId');
+    if (folderId && folderId.length > 100) return NextResponse.json({ error: 'folder' }, { status: 400 });
+    try { return NextResponse.json(await listLibraryDocuments({ q, offset, limit: 30, status: 'active', sort: 'title', ...(folderId ? { folderId } : {}) }, await requireSessionBearer()), { headers }); }
     catch { return NextResponse.json({ error: 'document' }, { status: 502 }); }
   }
   if (command === 'revisions') {
@@ -28,6 +30,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (targetType !== 'amendment' || !targetId || !scope) return NextResponse.json({ error: 'target' }, { status: 400 });
   try { return NextResponse.json({ links: await listDocumentLinks('amendment', targetId, scope, await requireSessionBearer()) },{headers:{'Cache-Control':'private, no-store'}}); }
   catch { return NextResponse.json({ error: 'document' }, { status: 502 }); }
+}
+
+function optionalMetadata(form: FormData): { citationKey?: string; bibliography?: DocumentBibliography } {
+  const citationKey = String(form.get('citationKey') ?? '').trim();
+  const content = form.get('bibliography');
+  const bibliography: unknown = content ? JSON.parse(String(content)) : undefined;
+  if (bibliography !== undefined && (!bibliography || typeof bibliography !== 'object' || Array.isArray(bibliography))) throw new TypeError('bibliography');
+  return { ...(citationKey ? { citationKey } : {}), ...(bibliography ? { bibliography: bibliography as DocumentBibliography } : {}) };
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -50,18 +60,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const file = form.get('file');
       if (file instanceof File && (file.size === 0 || file.size > 20 * 1024 * 1024)) return NextResponse.json({ error: 'size' }, { status: 400 });
       result = { document: await createLinkedDocument(type, targetId, {
-        operationId: value('operationId'), title: value('title'), description: value('description'), sourceUrl: value('sourceUrl'), scopeRevisionId,
+        operationId: value('operationId'), title: value('title'), description: value('description'), sourceUrl: value('sourceUrl'), scopeRevisionId, ...optionalMetadata(form),
       }, file instanceof File ? file : null, authorization) };
     } else if (value('command') === 'attach') {
       result = { links: await attachDocument(type, targetId, value('documentId'), value('revisionId') || null, authorization, scopeRevisionId) };
     } else if (value('command') === 'detach') {
       result = { links: await detachDocument(type, targetId, value('documentId'), authorization, scopeRevisionId) };
     } else return NextResponse.json({ error: 'command' }, { status: 400 });
+    revalidatePath('/documents');
     revalidatePath('/editor/documents');
     if (type === 'amendment') revalidatePath(`/editor/amendments/${targetId}`);
     if (type === 'constitution') revalidatePath(`/admin/constitutions/${targetId}`);
     return NextResponse.json(result);
-  } catch {
+  } catch (error) {
+    if (error instanceof SyntaxError || error instanceof TypeError) return NextResponse.json({ error: 'metadata' }, { status: 400 });
     return NextResponse.json({ error: 'document' }, { status: 502 });
   }
 }

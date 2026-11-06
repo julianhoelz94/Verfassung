@@ -2,16 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DocumentLinks } from './DocumentLinks';
 import { DocumentManager } from './DocumentManager';
 import { currentUser } from '../../../lib/session';
-import { listDocumentLinkEvents, listDocumentLinks, listLibraryDocuments } from '../../../lib/document-api';
+import { listDocumentLinkEvents, listDocumentLinks, listLibraryDocuments, listDocumentFolders } from '../../../lib/document-api';
 
 vi.mock('../../../lib/server-locale', () => ({ currentLocale: async () => 'en' }));
 vi.mock('../../../lib/session', () => ({ currentUser: vi.fn(), requireSessionBearer: async () => 'Bearer session' }));
-vi.mock('../../../lib/document-api', () => ({ listDocumentLinkEvents: vi.fn(), listDocumentLinks: vi.fn(), listLibraryDocuments: vi.fn() }));
+vi.mock('../../../lib/document-api', () => ({ listDocumentLinkEvents: vi.fn(), listDocumentLinks: vi.fn(), listLibraryDocuments: vi.fn(), listDocumentFolders: vi.fn() }));
 vi.mock('./DocumentManager', () => ({ DocumentManager: vi.fn(() => null) }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(currentUser).mockResolvedValue({ id: 'editor', email: 'editor@example.test', roles: ['editor'] });
+  vi.mocked(listDocumentFolders).mockResolvedValue([]);
   vi.mocked(listDocumentLinkEvents).mockResolvedValue([]);
   vi.mocked(listDocumentLinks).mockResolvedValue([]);
   vi.mocked(listLibraryDocuments).mockResolvedValue({ items: [], total: 100, offset: 0, limit: 30 });

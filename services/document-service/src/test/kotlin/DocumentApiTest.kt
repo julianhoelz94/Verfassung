@@ -91,6 +91,43 @@ class DocumentApiTest {
     }
 
     @Test
+    fun linkedUploadPreservesBibliographyAndIncludesItInRetryIdentity() {
+        val target = UUID.randomUUID()
+        val operation = UUID.randomUUID()
+        val key = "source" + operation.toString().replace("-", "")
+        val metadata = """{"operationId":"$operation","title":"Full source","citationKey":"$key","bibliography":{"type":"book","authors":[{"family":"Smith","given":"Jane"}],"issued":"2026","extra":{"jurisdiction":"Germany"}}}"""
+        fun upload(body: String = metadata) = mvc.perform(
+            multipart("/links/constitution/$target/documents")
+                .file(MockMultipartFile("metadata", "metadata.json", "application/json", body.toByteArray()))
+                .file(MockMultipartFile("file", "source.txt", "text/plain", "Exact source bytes".toByteArray()))
+                .header("Authorization", EDITOR),
+        )
+        val created = mapper.readTree(
+            upload().andExpect(status().isCreated)
+                .andExpect(jsonPath("$.citationKey").value(key))
+                .andExpect(jsonPath("$.revision.bibliography.authors[0].family").value("Smith"))
+                .andExpect(jsonPath("$.revision.bibliography.issued").value("2026"))
+                .andExpect(jsonPath("$.revision.bibliography.extra.jurisdiction").value("Germany"))
+                .andReturn().response.contentAsString,
+        )
+        upload().andExpect(status().isCreated).andExpect(jsonPath("$.id").value(created["id"].asText()))
+        upload(metadata.replace("2026", "2025")).andExpect(status().isConflict)
+        val pin = created["revision"]["id"].asText()
+        mvc.get("/links/constitution/$target") { header("Authorization", EDITOR) }.andExpect {
+            jsonPath("$[0].revisionId") { value(pin) }
+            jsonPath("$[0].document.revision.bibliography.type") { value("book") }
+        }
+    }
+
+    @Test
+    fun defaultLinkedRequestSerializationRetainsExistingRetryHashes() {
+        val operation = UUID.randomUUID()
+        val request = com.constitutionatlas.document.service.CreateLinkedDocumentRequest(operation, "Legacy", sourceUrl = "https://example.org/law")
+        val legacy = linkedMapOf("operationId" to operation, "title" to "Legacy", "description" to null, "sourceUrl" to "https://example.org/law", "scopeRevisionId" to null)
+        org.junit.jupiter.api.Assertions.assertEquals(mapper.writeValueAsString(legacy), mapper.writeValueAsString(request))
+    }
+
+    @Test
     fun editorUploadRejectsInvalidFilesScopesAndRolesWithoutPartialRecords() {
         val target = UUID.randomUUID()
         val title = "Rejected editor upload ${UUID.randomUUID()}"

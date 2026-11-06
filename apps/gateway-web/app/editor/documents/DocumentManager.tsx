@@ -3,14 +3,14 @@
 import { fetchWithTimeout } from '../../../lib/fetch-with-timeout';
 
 import { useRef, useState } from 'react';
-import type { DocumentLink, DocumentRecord, DocumentRevision } from '../../../lib/document-api';
+import type { DocumentLink, DocumentRecord, DocumentRevision, DocumentFolder } from '../../../lib/document-api';
 import { useTranslation } from '../../components/TranslationProvider';
-import { DocumentManagerTemplate } from './DocumentManagerTemplate';
+import { DocumentAttachmentTemplate } from '../../components/documents/DocumentAttachmentTemplate';
 
 export function DocumentManager(props: {
   links: DocumentLink[]; documents: DocumentRecord[]; revisions: Record<string, DocumentRevision[]>;
   targetType: 'constitution' | 'version' | 'amendment'; targetId: string; scopeRevisionId?: string | null; canEdit: boolean;
-  documentTotal?: number; remoteSearch?: boolean;
+  documentTotal?: number; remoteSearch?: boolean; folders?: DocumentFolder[];
 }) {
   const t = useTranslation();
   const [links, setLinks] = useState(props.links), [documents, setDocuments] = useState(props.documents);
@@ -20,11 +20,12 @@ export function DocumentManager(props: {
   const [pending, setPending] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const operation = useRef({ key: '', id: '' }), busy = useRef(false);
   const searchRequest = useRef(0), revisionRequest = useRef(0);
-  async function search(query: string, pageOffset: number): Promise<boolean> {
+  async function search(query: string, pageOffset: number, folderId?: string): Promise<boolean> {
     const requestId = ++searchRequest.current;
     setSearchPending(true); setError('');
     try {
       const parameters = new URLSearchParams({ command: 'search', q: query, offset: String(pageOffset) });
+      if (folderId) parameters.set('folderId', folderId);
       const response = await fetchWithTimeout(`/editor/documents/command?${parameters}`);
       if (!response.ok) throw new Error('document');
       const page: { items: DocumentRecord[]; total: number; offset: number } = await response.json();
@@ -72,7 +73,7 @@ export function DocumentManager(props: {
       return false;
     } finally { busy.current = false; setPending(false); }
   }
-  return <DocumentManagerTemplate links={links} documents={documents} revisions={revisions} canEdit={props.canEdit} pending={pending} error={error} notice={notice}
+  return <DocumentAttachmentTemplate folders={props.folders} links={links} documents={documents} revisions={revisions} canEdit={props.canEdit} pending={pending} error={error} notice={notice}
     searchPending={searchPending} revisionPending={revisionPending} documentTotal={total} documentOffset={offset}
     onSearch={props.remoteSearch ? search : undefined} onSelect={props.remoteSearch ? select : undefined}
     onCreate={data => {

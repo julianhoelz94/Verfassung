@@ -27,6 +27,7 @@ export type ConsolidatedPassage = {
   after?: IndexedPassage;
   kind: "added" | "removed" | "changed" | "reversed";
   provenance: PassageProvenance[];
+  orderChanged?: boolean;
 };
 
 /** Drop snapshot-specific storage identities; authored order, marks, links and structure remain significant. */
@@ -149,6 +150,23 @@ export function indexPassages(
   return result;
 }
 
+/** Compare common roots only: inserting a new article does not move all later articles. */
+function reorderedRoots(
+  before: Map<string, IndexedPassage>,
+  after: Map<string, IndexedPassage>,
+): Set<string> {
+  const shared = (
+    source: Map<string, IndexedPassage>,
+    other: Map<string, IndexedPassage>,
+  ) =>
+    [...source.values()]
+      .filter((passage) => passage.article && other.get(passage.id)?.article)
+      .map((passage) => passage.id);
+  const left = shared(before, after),
+    right = shared(after, before);
+  return new Set(left.filter((id, index) => id !== right[index]));
+}
+
 /** Endpoint snapshots determine the net result. Amendment records supply provenance only. */
 export function consolidatePassages(
   beforeArticles: ArticleSummary[],
@@ -166,7 +184,8 @@ export function consolidatePassages(
       ),
     ),
   );
-  const candidates = new Set(recorded);
+  const rootMoves = reorderedRoots(before, after);
+  const candidates = new Set([...recorded, ...rootMoves]);
   // Capture endpoint changes even where an intermediate amendment record is missing.
   for (const [id, passage] of new Map([...before, ...after])) {
     const left = before.get(id),
@@ -214,13 +233,14 @@ export function consolidatePassages(
           )
           .map((change) => ({ amendment, change })),
       );
-      const kind: ConsolidatedPassage["kind"] = samePassage(left, right)
-        ? "reversed"
-        : !left
-          ? "added"
-          : !right
-            ? "removed"
-            : "changed";
+      const kind: ConsolidatedPassage["kind"] =
+        samePassage(left, right) && !rootMoves.has(id)
+          ? "reversed"
+          : !left
+            ? "added"
+            : !right
+              ? "removed"
+              : "changed";
       return {
         id,
         label:
@@ -233,6 +253,7 @@ export function consolidatePassages(
         after: right,
         kind,
         provenance,
+        orderChanged: rootMoves.has(id),
       };
     })
     .filter((row) => row.kind !== "reversed" || row.provenance.length > 0)

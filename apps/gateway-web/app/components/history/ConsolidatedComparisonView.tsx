@@ -360,6 +360,14 @@ export async function ConsolidatedComparisonView({
                     )}
               </p>
               <h2>{row.label}</h2>
+              {row.orderChanged ? (
+                <p>
+                  {t(
+                    "Position in the constitution changed.",
+                    "Die Position in der Verfassung hat sich geändert.",
+                  )}
+                </p>
+              ) : null}
               {row.kind === "reversed" ? (
                 <p>
                   {t(

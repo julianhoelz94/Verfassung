@@ -145,6 +145,29 @@ describe("consolidated legal comparison", () => {
     expect(rows[0].id).toBe("article-8");
     expect(rows[0].kind).toBe("changed");
   });
+  it("retains reordered articles but does not report insertion as moves of unchanged neighbors", () => {
+    const first = article([text("one", "First")]);
+    const second = {
+      ...article([text("two", "Second")]),
+      logicalId: "article-9",
+      articleNumber: "9",
+    };
+    const inserted = {
+      ...article([text("three", "New")]),
+      logicalId: "article-10",
+      articleNumber: "10",
+    };
+    const moved = consolidatePassages([first, second], [second, first], []);
+    expect(moved.map((row) => [row.id, row.kind, row.orderChanged])).toEqual([
+      ["article-9", "changed", true],
+      ["article-8", "changed", true],
+    ]);
+    expect(
+      consolidatePassages([first, second], [first, inserted, second], []).map(
+        (row) => row.id,
+      ),
+    ).toEqual(["article-10"]);
+  });
   it("preserves formatting-only changes", () => {
     const before = text("assembly", "Same words"),
       after = {

@@ -23,7 +23,7 @@ import { WikiPanel } from './WikiPanel';
 import { PageBreadcrumbs, PageChromeSurface, PageContentsBody, PageContentsLayout, PageContentsNavigation, PageMenuBar, PageMenuFrame } from './layout/PageChrome';
 import { useKeepContentsVisible, usePageChromeMetrics } from './layout/usePageChromeMetrics';
 import { ReaderActions, ReaderDocument } from './ReaderActions';
-import { HierarchyViewOptions } from "./DocumentViewOptions";
+import { ReadingPreferenceControls } from "./DocumentViewOptions";
 import { readerActionIndex, type ReaderActionIndex } from '../../lib/reader-actions';
 import { historyHref } from '../../lib/constitution-viewer';
 
@@ -216,15 +216,10 @@ function readerToolbar(model: ReaderSurfaceModel) {
         {editorial ? <button type="button" className={styles.tool} aria-label={t(ui.countries.code.versions.versionid.page.editThisConstitution)} aria-expanded={panel === 'edit'} data-reader-trigger="edit" aria-controls={panel === 'edit' ? 'reader-edit' : undefined} onClick={() => togglePanel('edit')}><ReaderIcon name="edit" /><span className={styles.contextToolName}>{t(copy.edit)}</span></button> : null}
         {details ? <details className={styles.menuWrap} data-reader-menu open={menu === 'details'}><summary role="button" className={styles.tool} aria-label={t(copy.details)} aria-expanded={menu === 'details'} data-reader-trigger="details" onClick={event => { event.preventDefault(); setMenu(menu === 'details' ? null : 'details'); }}><ReaderIcon name="details" /><span className={styles.toolName}>{t(copy.details)}</span></summary><div className={styles.menu}>{details}</div></details> : null}
         <details className={styles.menuWrap} data-reader-menu open={menu === 'preferences'}><summary role="button" className={styles.tool} aria-label={t(copy.preferences)} aria-expanded={menu === 'preferences'} data-reader-trigger="preferences" onClick={event => { event.preventDefault(); setMenu(menu === 'preferences' ? null : 'preferences'); }}><ReaderIcon name="settings" /></summary>
-          <div className={styles.menu}><h2>{t(copy.preferences)}</h2>
-            <HierarchyViewOptions
-            value={preferences}
-            onChange={updatePreferences}
-          />
-          <label>{t(copy.textSize)}<select value={preferences.size} onChange={(event) => updatePreferences({ size: event.target.value as ReaderPreferences['size'] })}><option value="16">{t(copy.small)}</option><option value="17">{t(copy.standard)}</option><option value="20">{t(copy.large)}</option></select></label>
+          <div className={styles.menu}><ReadingPreferenceControls value={preferences} onChange={updatePreferences}>
             {sentenceKinds.size ? <><label>{t(copy.presentation)}<select value={preferences.presentation} onChange={(event) => updatePreferences({ presentation: event.target.value as ReaderPreferences['presentation'] })}><option value="source">{t(copy.originalLayout)}</option><option value="flowing">{t(copy.flowing)}</option><option value="lines">{t(copy.lines)}</option></select></label>{flowing ? <label className={styles.check}><input type="checkbox" checked={preferences.boundaries} onChange={(event) => updatePreferences({ boundaries: event.target.checked })} />{t(copy.boundaries)}</label> : null}</> : null}
             <label>{t(copy.detailLevel)}<select aria-label={t(copy.detailLevel)} value={depth} onChange={(event) => { setDepth(Number(event.target.value)); setExpanded(new Set()); }}>{labels.map((label, i) => <option key={i} value={i + 1}>{label}</option>)}</select></label>
-          </div>
+          </ReadingPreferenceControls></div>
         </details>
       </PageMenuBar>;
 }

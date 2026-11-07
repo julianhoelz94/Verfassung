@@ -1,4 +1,4 @@
-import type { Amendment } from "../../../lib/api";
+import type { Amendment, VersionSummary } from "../../../lib/api";
 import {
   historySnapshotAliases,
   historyPassageScope,
@@ -13,6 +13,7 @@ import {
 } from "../../../lib/constitution-viewer";
 import {
   constitutionHistory,
+  historyYearGroups,
   passageMatches,
 } from "../../../lib/constitution-history";
 import { ui, message } from "../../../lib/messages";
@@ -27,6 +28,8 @@ import {
   type ViewerModel,
 } from "./load-viewer";
 import { PassageChange } from "./PassageChange";
+import { ReaderIcon } from "../ReaderIcon";
+import { loadPassageWording } from "./passage-wording";
 import styles from "./ConstitutionHistory.module.css";
 
 export async function ConstitutionHistoryPage({
@@ -81,7 +84,34 @@ async function historyPageState(model: ViewerModel, query: ViewerQuery) {
     events ?? [],
     scope,
   );
-  const visible = items.filter((item) => matchesHistoryFilters(item, query));
+  let visible = items.filter((item) => matchesHistoryFilters(item, query));
+  if (query.passage) {
+    const changes = visible.flatMap(
+      (item) =>
+        item.amendment?.changes.filter((change) =>
+          passageMatches(change, scope),
+        ) ?? [],
+    );
+    const wording = new Map(
+      (await loadPassageWording(changes, constitution.id)).map((change) => [
+        change.id,
+        change,
+      ]),
+    );
+    visible = visible.map((item) =>
+      item.amendment
+        ? {
+            ...item,
+            amendment: {
+              ...item.amendment,
+              changes: item.amendment.changes.map(
+                (change) => wording.get(change.id) ?? change,
+              ),
+            },
+          }
+        : item,
+    );
+  }
   const paramsString = new URLSearchParams(
     Object.entries(query).filter(
       (entry): entry is [string, string] => entry[1] !== undefined,
@@ -102,7 +132,7 @@ async function historyPageState(model: ViewerModel, query: ViewerQuery) {
   };
   const navigation = (
     <nav
-      className={styles.nav}
+      className={`${styles.nav} ${styles.historyFilters}`}
       aria-label={t("History filters", "Geschichtsfilter")}
     >
       <p className={styles.eyebrow}>
@@ -120,13 +150,23 @@ async function historyPageState(model: ViewerModel, query: ViewerQuery) {
           href={filterHref(kind)}
           aria-current={(query.kind ?? "") === kind ? "true" : undefined}
         >
-          {label}
+          <ReaderIcon
+            name={
+              kind === "amendment"
+                ? "edit"
+                : kind === "version"
+                  ? "book"
+                  : "history"
+            }
+          />
+          <span>{label}</span>
           <small>{items.filter((i) => !kind || i.kind === kind).length}</small>
         </a>
       ))}
       {model.latestHref ? (
-        <a href={model.latestHref}>
-          {t("Read the constitution", "Verfassung lesen")} →
+        <a className={styles.readMore} href={model.latestHref}>
+          <ReaderIcon name="book" />
+          <span>{t("Read the constitution", "Verfassung lesen")} →</span>
         </a>
       ) : null}
     </nav>
@@ -432,83 +472,28 @@ function historyControls({
   );
 }
 
-function historyEvents({
-  visible,
-  viewed,
-  aliases,
-  t,
-  labels,
-  locale,
-  query,
-  scope,
-  owner,
-  currentHref,
-}: HistoryState) {
+function historyEvents(state: HistoryState) {
+  const { visible, t } = state;
   return (
     <>
       <div className={styles.timeline}>
-        {visible.map((item) => {
-          const marker = historyItemMarker(viewed, item, aliases);
-          return (
-            <article
-              className={styles.event}
-              data-kind={item.kind}
-              key={`${item.kind}-${item.id}`}
-              aria-current={marker.isCurrent ? "true" : undefined}
-            >
-              <div className={styles.meta}>
-                <span className={styles.badge}>{labels[item.kind]}</span>
-                <FormattedDate value={item.date} />
-                {marker.isCurrent ? (
-                  <span className={styles.reading}>
-                    {t("Last viewed", "Zuletzt angesehen")}
-                  </span>
-                ) : null}
-                {marker.endpoint ? (
-                  <span className={styles.reading}>
-                    {marker.endpoint === "start"
-                      ? t("Comparison start", "Vergleichsbeginn")
-                      : t("Comparison end", "Vergleichsende")}
-                  </span>
-                ) : null}
-                {item.version?.latestPublished ? (
-                  <small>{t("Latest", "Neueste Fassung")}</small>
-                ) : null}
-              </div>
-              <h2>
-                {item.kind === "event"
-                  ? message(
-                      locale,
-                      ui.lifecycleEvents[
-                        item.title as keyof typeof ui.lifecycleEvents
-                      ],
-                    )
-                  : item.title}
+        {historyYearGroups(visible).map((group) => (
+          <section
+            className={styles.yearGroup}
+            key={group.year}
+            aria-labelledby={"history-year-" + (group.year || "unknown")}
+          >
+            <div className={styles.yearMarker}>
+              <h2 id={"history-year-" + (group.year || "unknown")}>
+                {group.year || t("Undated", "Ohne Datum")}
               </h2>
-              {item.summary ? <p>{item.summary}</p> : null}
-              {query.passage && item.amendment
-                ? item.amendment.changes
-                    .filter((c) => passageMatches(c, scope))
-                    .map((change) => (
-                      <PassageChange key={change.id} change={change} compact />
-                    ))
-                : null}
-              {amendmentVersionLinks(item.amendment, owner, t)}
-              <div className={styles.action}>
-                <a
-                  href={`${item.href}${item.kind !== "version" ? "?return=" + encodeURIComponent(currentHref) : ""}`}
-                >
-                  {item.kind === "version"
-                    ? t("Read this version", "Diese Fassung lesen")
-                    : item.kind === "amendment"
-                      ? t("Explore amendment", "Änderung ansehen")
-                      : t("View event", "Ereignis ansehen")}{" "}
-                  →
-                </a>
-              </div>
-            </article>
-          );
-        })}
+              <span aria-hidden="true" />
+            </div>
+            <div className={styles.yearEvents}>
+              {group.events.map((item) => historyEvent(item, state))}
+            </div>
+          </section>
+        ))}
       </div>
       {!visible.length ? (
         <p>
@@ -522,25 +507,124 @@ function historyEvents({
   );
 }
 
+function historyEvent(
+  item: HistoryState["items"][number],
+  {
+    viewed,
+    aliases,
+    t,
+    labels,
+    locale,
+    query,
+    scope,
+    owner,
+    versions,
+    currentHref,
+  }: HistoryState,
+) {
+  const marker = historyItemMarker(viewed, item, aliases);
+  return (
+    <article
+      className={styles.event}
+      data-kind={item.kind}
+      key={`${item.kind}-${item.id}`}
+      aria-current={marker.isCurrent ? "true" : undefined}
+    >
+      <div className={styles.meta}>
+        <span className={styles.badge}>
+          <ReaderIcon
+            name={
+              item.kind === "version"
+                ? "book"
+                : item.kind === "amendment"
+                  ? "edit"
+                  : "history"
+            }
+          />{" "}
+          {labels[item.kind]}
+        </span>
+        <FormattedDate value={item.date} />
+        {marker.isCurrent ? (
+          <span className={styles.reading}>
+            {t("Last viewed", "Zuletzt angesehen")}
+          </span>
+        ) : null}
+        {marker.endpoint ? (
+          <span className={styles.reading}>
+            {marker.endpoint === "start"
+              ? t("Comparison start", "Vergleichsbeginn")
+              : t("Comparison end", "Vergleichsende")}
+          </span>
+        ) : null}
+        {item.version?.latestPublished ? (
+          <small>{t("Latest", "Neueste Fassung")}</small>
+        ) : null}
+      </div>
+      <h3>
+        {item.kind === "event" ? (
+          message(
+            locale,
+            ui.lifecycleEvents[item.title as keyof typeof ui.lifecycleEvents],
+          )
+        ) : item.kind === "version" ? (
+          <>
+            {t("Constitution text", "Verfassungstext")} · {item.title}
+          </>
+        ) : (
+          item.title
+        )}
+      </h3>
+      {item.summary ? <p>{item.summary}</p> : null}
+      {query.passage && item.amendment
+        ? item.amendment.changes
+            .filter((c) => passageMatches(c, scope))
+            .map((change) => (
+              <PassageChange key={change.id} change={change} compact />
+            ))
+        : null}
+      {amendmentVersionLinks(item.amendment, owner, t, versions)}
+      <div className={styles.action}>
+        <a
+          href={`${item.href}${item.kind !== "version" ? "?return=" + encodeURIComponent(currentHref) : ""}`}
+        >
+          {item.kind === "version"
+            ? t("Read this version", "Diese Fassung lesen")
+            : item.kind === "amendment"
+              ? t("Explore amendment", "Änderung ansehen")
+              : t("View event", "Ereignis ansehen")}{" "}
+          →
+        </a>
+      </div>
+    </article>
+  );
+}
+
 function amendmentVersionLinks(
   amendment: Amendment | undefined,
   owner: string,
   t: HistoryState["t"],
+  versions: VersionSummary[],
 ) {
   const source = amendment?.sourceVersionId,
     target = amendment?.targetVersionId;
   if (!source && !target) return null;
+  const label = (id: string) =>
+    versions.find((version) =>
+      [version.id, version.legalVersionId, snapshotVersionId(version)].includes(
+        id,
+      ),
+    )?.versionLabel;
   return (
-    <p>
+    <p className={styles.versionLinks}>
       {source ? (
         <a href={`${owner}/versions/${source}`}>
-          {t("Before text", "Vorheriger Text")}
+          {label(source) ?? t("Before text", "Vorheriger Text")}
         </a>
       ) : null}
       {source && target ? " → " : null}
       {target ? (
         <a href={`${owner}/versions/${target}`}>
-          {t("After text", "Nachfolgender Text")}
+          {label(target) ?? t("After text", "Nachfolgender Text")}
         </a>
       ) : null}
     </p>

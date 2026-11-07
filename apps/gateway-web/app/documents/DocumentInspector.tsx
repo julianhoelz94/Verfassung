@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import type { DocumentAttachment, DocumentBibliography, DocumentCreator, DocumentFolder, DocumentLinkEvent, DocumentRecord, DocumentRevision, DocumentTag } from '../../lib/document-api';
+import { documentItemTypeLabels } from '../../lib/document-item-types';
 import { DocumentCreatorFields } from '../components/documents/DocumentCreatorFields';
 import { libraryCommand } from './BibtexImport';
 import { useLocale } from '../components/TranslationProvider';
@@ -21,7 +22,6 @@ const labels = {
     projectFolders: 'Project folders', newTag: 'New descriptive tag', createTag: 'Create and add tag', descriptiveTags: 'Descriptive tags',
     noTags: 'No tags assigned.', allDocuments: 'Tag changes keep this document in All documents and preserve its cited revision.', addTag: 'Add tag', availableTags: 'Available tags', noAvailableTags: 'Every available tag is already assigned.', folder: 'Project folder',
     loading: 'Loading…', loadFailed: 'Could not load this information. Try again.', retry: 'Try again', noUsage: 'This document is not linked to another record.', noHistory: 'No earlier revisions.', lifecycle: 'Activity', at: 'at', publicPage: 'Open citation page', privateHistory: 'Files from earlier revisions are available below.', referenceDetails: 'Reference details', recordId: 'Record identifier', openLegalChange: 'Open legal change',
-    types: { misc: 'Other', article: 'Journal article', book: 'Book', inbook: 'Book section', incollection: 'Chapter in collection', inproceedings: 'Conference paper', techreport: 'Report', online: 'Webpage', legislation: 'Legislation', treaty: 'Treaty', phdthesis: 'Doctoral thesis', mastersthesis: 'Master’s thesis', manual: 'Manual', unpublished: 'Unpublished' },
     targetTypes: { passage_citation: 'Passage citation', import_job: 'Import review', setup_proposal: 'Setup proposal', migration_run: 'Migration review', constitution: 'Constitution', version: 'Constitution version', amendment: 'Legal change', country_wiki: 'Country wiki', constitution_wiki: 'Constitution wiki', jurisdiction_wiki: 'Jurisdiction wiki', amendment_material: 'Amendment commentary', change_material: 'Changed-passage commentary', lifecycle_material: 'Lifecycle-event commentary' },
     renameTag: 'Rename tag', tagName: 'Tag name', saveTag: 'Save tag name',
     events: { created: 'Document created', revised: 'Metadata updated', file_uploaded: 'Primary file replaced', attachment_added: 'File added', attachment_removed: 'File removed', primary_attachment_changed: 'Primary file changed', tag_added: 'Tag added', tag_removed: 'Tag removed', archived: 'Document archived' },
@@ -38,7 +38,6 @@ const labels = {
     projectFolders: 'Projektordner', newTag: 'Neues beschreibendes Schlagwort', createTag: 'Schlagwort erstellen und hinzufügen', descriptiveTags: 'Beschreibende Schlagwörter',
     noTags: 'Keine Schlagwörter zugewiesen.', allDocuments: 'Schlagwortänderungen behalten das Dokument unter Alle Dokumente und ändern seine zitierte Revision nicht.', addTag: 'Schlagwort hinzufügen', availableTags: 'Verfügbare Schlagwörter', noAvailableTags: 'Alle verfügbaren Schlagwörter sind bereits zugewiesen.', folder: 'Projektordner',
     loading: 'Wird geladen…', loadFailed: 'Diese Informationen konnten nicht geladen werden. Versuchen Sie es erneut.', retry: 'Erneut versuchen', noUsage: 'Dieses Dokument ist noch nicht mit einem anderen Datensatz verknüpft.', noHistory: 'Keine früheren Revisionen.', lifecycle: 'Aktivitäten', at: 'um', publicPage: 'Zitierseite öffnen', privateHistory: 'Dateien früherer Revisionen sind unten verfügbar.', referenceDetails: 'Verweisdetails', recordId: 'Datensatzkennung', openLegalChange: 'Rechtsänderung öffnen',
-    types: { misc: 'Sonstiges', article: 'Zeitschriftenartikel', book: 'Buch', inbook: 'Buchabschnitt', incollection: 'Sammelbandbeitrag', inproceedings: 'Konferenzbeitrag', techreport: 'Bericht', online: 'Webseite', legislation: 'Rechtsvorschrift', treaty: 'Vertrag', phdthesis: 'Dissertation', mastersthesis: 'Masterarbeit', manual: 'Handbuch', unpublished: 'Unveröffentlicht' },
     targetTypes: { passage_citation: 'Passagenbeleg', import_job: 'Importprüfung', setup_proposal: 'Einrichtungsvorschlag', migration_run: 'Migrationsprüfung', constitution: 'Verfassung', version: 'Verfassungsfassung', amendment: 'Rechtsänderung', country_wiki: 'Länderwiki', constitution_wiki: 'Verfassungswiki', jurisdiction_wiki: 'Gebietswiki', amendment_material: 'Änderungskommentar', change_material: 'Kommentar zu einer Änderungspassage', lifecycle_material: 'Ereigniskommentar' },
     renameTag: 'Schlagwort umbenennen', tagName: 'Schlagwortname', saveTag: 'Schlagwortnamen speichern',
     events: { created: 'Dokument erstellt', revised: 'Literaturangaben aktualisiert', file_uploaded: 'Hauptdatei ersetzt', attachment_added: 'Datei hinzugefügt', attachment_removed: 'Datei entfernt', primary_attachment_changed: 'Hauptdatei geändert', tag_added: 'Schlagwort hinzugefügt', tag_removed: 'Schlagwort entfernt', archived: 'Dokument archiviert' },
@@ -132,6 +131,7 @@ function initialMetadata(selected: DocumentRecord | null | undefined) {
 function InspectorContent({ document: selected, writable, createMode = false, tags = [], folders = [], onChanged, onClose, onDirtyChange, embedded }: Props) {
   const locale = useLocale();
   const text = labels[locale];
+  const itemTypes = documentItemTypeLabels(locale);
   const idPrefix = useId();
   const canEdit = writable && (!selected || selected.status === 'active');
   const [tab, setTab] = useState<Tab>('bibliography');
@@ -319,8 +319,8 @@ function InspectorContent({ document: selected, writable, createMode = false, ta
       <Input id={`${idPrefix}-title`} label={text.title} required maxLength={500} value={title} onChange={event => setTitle(event.target.value)} />
       <Input id={`${idPrefix}-key`} label={text.key} help={text.keyHelp} error={keyStatus === 'taken' ? text.taken : keyStatus === 'invalid' ? text.invalid : undefined} maxLength={128} pattern="[A-Za-z][A-Za-z0-9_:\-]{0,127}" value={citationKey} onChange={event => { const value = event.target.value; setCitationKey(value); setKeyStatus(!value ? '' : keyPattern.test(value) ? 'checking' : 'invalid'); }} />
       <Select id={`${idPrefix}-type`} label={text.type} value={bibliography.type ?? 'misc'} onChange={event => setBibliography(previous => ({ ...previous, type: event.target.value }))}>
-        {!Object.hasOwn(text.types, bibliography.type ?? 'misc') ? <option value={bibliography.type}>{bibliography.type}</option> : null}
-        {Object.entries(text.types).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        {!Object.hasOwn(itemTypes, bibliography.type ?? 'misc') ? <option value={bibliography.type}>{bibliography.type}</option> : null}
+        {Object.entries(itemTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </Select>
       </Grid>
       <Inline gap="related">
@@ -350,7 +350,7 @@ function InspectorContent({ document: selected, writable, createMode = false, ta
     return <Stack gap="field">
       <dl className={styles.metadata}>
         <dt>{text.key}</dt><dd>{selected?.citationKey || text.noValue}</dd>
-        <dt>{text.type}</dt><dd>{text.types[bibliography.type as keyof typeof text.types] ?? bibliography.type}</dd>
+        <dt>{text.type}</dt><dd>{itemTypes[bibliography.type as keyof typeof itemTypes] ?? bibliography.type}</dd>
         {(['authors', 'editors'] as const).map(field => <div key={field}><dt>{text[field]}</dt><dd>{bibliography[field]?.map(creatorName).join('; ') || text.noValue}</dd></div>)}
         {bibliographyFields.filter(field => bibliography[field]).map(field => <div key={field}><dt>{text[field]}</dt><dd>{bibliography[field]}</dd></div>)}
       </dl>

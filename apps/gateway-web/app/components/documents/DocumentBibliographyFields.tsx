@@ -1,20 +1,13 @@
 'use client';
 
 import type { DocumentBibliography } from '../../../lib/document-api';
+import { documentItemTypes } from '../../../lib/document-item-types';
 import { useTranslation } from '../TranslationProvider';
 import { Input, Select, TextArea } from '../ui';
 import { Grid, Stack } from '../layout/Layout';
 import { DocumentCreatorFields } from './DocumentCreatorFields';
 import styles from './DocumentAttachmentTemplate.module.css';
 
-const types = {
-  misc: ['Other', 'Sonstiges'], article: ['Journal article', 'Zeitschriftenartikel'], book: ['Book', 'Buch'],
-  inbook: ['Book section', 'Buchabschnitt'], incollection: ['Chapter in collection', 'Sammelbandbeitrag'],
-  inproceedings: ['Conference paper', 'Konferenzbeitrag'], techreport: ['Report', 'Bericht'],
-  online: ['Webpage', 'Webseite'], legislation: ['Legislation', 'Rechtsvorschrift'], treaty: ['Treaty', 'Vertrag'],
-  phdthesis: ['Doctoral thesis', 'Dissertation'], mastersthesis: ['Master’s thesis', 'Masterarbeit'],
-  manual: ['Manual', 'Handbuch'], unpublished: ['Unpublished', 'Unveröffentlicht'],
-};
 const fields = [
   ['issued', 'Year or publication date', 'Jahr oder Veröffentlichungsdatum'],
   ['containerTitle', 'Publication or container title', 'Publikation oder Sammelwerk'], ['publisher', 'Publisher', 'Verlag'],
@@ -26,7 +19,7 @@ export function DocumentBibliographyFields({ value, onChange, form }: { form?: s
   const t = useTranslation(), copy = (en: string, de: string) => t({ en, de });
   return <Stack gap="control">
     <Select form={form} label={copy('Item type', 'Dokumenttyp')} value={value.type} onChange={event => onChange({ ...value, type: event.target.value })}>
-      {Object.entries(types).map(([type, [en, de]]) => <option key={type} value={type}>{copy(en, de)}</option>)}
+      {Object.entries(documentItemTypes).map(([type, label]) => <option key={type} value={type}>{t(label)}</option>)}
     </Select>
     <details className={styles.details}><summary>{copy('Creators', 'Urheber')}</summary><Grid columns={2}>
       <DocumentCreatorFields form={form} kind="authors" value={value.authors} onChange={authors => onChange({ ...value, authors })} />

@@ -34,6 +34,9 @@ for (const locale of ["en", "de"])
         await expect(recordPreferences).toBeVisible();
         expect((await recordPreferences.boundingBox())!.width).toBeLessThanOrEqual(310);
         await expect(recordPreferences.getByRole("combobox", {name: locale === "en" ? "Text size" : "Textgröße", exact: true})).toBeVisible();
+        await page.locator("h1").click();
+        await expect(recordPreferences).toBeHidden();
+        await menu.getByRole("button", {name: preferencesName, exact: true}).click();
         await page.keyboard.press("Escape");
         await expect(recordPreferences).toBeHidden();
         await expect(menu.getByRole("button", {name: preferencesName, exact: true})).toBeFocused();
@@ -48,6 +51,12 @@ for (const locale of ["en", "de"])
         await expect(indent.locator("..")).toHaveCSS("margin-top", "0px");
         await expect(page.getByRole("combobox", {name: locale === "en" ? "Text size" : "Textgröße", exact: true})).toBeVisible();
         await page.locator('[data-reader-menu][open] > div').screenshot({path: testInfo.outputPath(`preferences-${locale}-${width}.png`)});
+        await page.addScriptTag({path: path.join(process.cwd(), "node_modules/axe-core/axe.min.js")});
+        const violations = await page.evaluate(async () => {
+          // @ts-expect-error injected test audit
+          return (await window.axe.run(document)).violations.map((item) => item.id);
+        });
+        expect(violations).toEqual([]);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.keyboard.press("Escape");
         await expect(indent).toBeHidden();

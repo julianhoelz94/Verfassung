@@ -85,8 +85,20 @@ export function ConstitutionViewer({
           ?.focus();
       }
     }
+    function outside(event: PointerEvent) {
+      if (panel !== "preferences") return;
+      const root = surface.current;
+      const target = event.target as Node;
+      if (!root?.querySelector("#constitution-preferences")?.contains(target) &&
+          !root?.querySelector('[data-viewer-trigger="preferences"]')?.contains(target))
+        setPanel(null);
+    }
     document.addEventListener("keydown", escape);
-    return () => document.removeEventListener("keydown", escape);
+    document.addEventListener("pointerdown", outside);
+    return () => {
+      document.removeEventListener("keydown", escape);
+      document.removeEventListener("pointerdown", outside);
+    };
   }, [panel]);
   return (
     <PageChromeSurface

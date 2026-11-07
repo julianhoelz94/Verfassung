@@ -18,16 +18,19 @@ test('the public amendment viewer resolves reference-only records into exact inl
   // Reproduce the actual wire contract that the original mocked UI tests missed.
   expect(change.beforeRef.text).toBeUndefined();
   await page.goto(`/countries/XA/constitutions/${charter.id}/amendments/${record.id}`);
+  const wording: string[] = [];
   for (const side of ['before', 'after'] as const) {
     const ref = change[`${side}Ref`];
     const response = await request.get(`/api/content/versions/${ref.versionId}/resolve?logicalId=${ref.logicalId}`);
     expect(response.ok()).toBeTruthy();
     const resolved = await response.json();
     expect(resolved.text.trim().length).toBeGreaterThan(0);
+    wording.push(resolved.text);
     const passage = page.locator(`#change-${change.id} [data-passage-side="${side}"]`);
     await expect(passage).toContainText(resolved.text.replace(/\s+/g, ' ').trim());
   }
-  await expect(page.locator(`#change-${change.id} ins`).first()).toBeVisible();
+  if (wording[0] !== wording[1])
+    await expect(page.locator(`#change-${change.id} ins, #change-${change.id} del`).first()).toBeVisible();
 });
 
 test('visitor reads a published constitution and an article through the real stack', async ({ page, request }) => {

@@ -17,7 +17,7 @@ export type SaveDocumentMetadata = {
   bibliography?: DocumentBibliography; expectedRevision?: number;
 };
 export type LibraryDocumentQuery = {
-  q?: string; folderId?: string; tagId?: string; status?: 'active' | 'archived' | 'all';
+  kind?: 'image'; q?: string; folderId?: string; tagId?: string; status?: 'active' | 'archived' | 'all';
   offset?: number; limit?: number; sort?: 'title' | 'key' | 'year' | 'created';
 };
 export type DocumentLibraryPage = { items: DocumentRecord[]; total: number; offset: number; limit: number };
@@ -31,7 +31,8 @@ export type BibtexDecision = { index: number; action: 'create' | 'skip' | 'updat
 export type BibtexImportRequest = { operationId: string; content: string; folderId?: string; decisions: BibtexDecision[] };
 
 export type MaterialTarget = 'amendment_material' | 'change_material' | 'lifecycle_material';
-export type DocumentTarget = 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki' | MaterialTarget;
+export type IngestionDocumentTarget = 'import_job' | 'setup_proposal' | 'migration_run';
+export type DocumentTarget = 'passage_citation' | IngestionDocumentTarget | 'constitution' | 'version' | 'amendment' | 'country_wiki' | 'constitution_wiki' | 'jurisdiction_wiki' | MaterialTarget;
 
 export type DocumentRevision = {
   id: string;
@@ -60,6 +61,7 @@ export type DocumentRecord = {
 };
 
 export type DocumentLink = {
+  citationNote?: string | null;
   documentId: string;
   revisionId: string | null;
   document: DocumentRecord;
@@ -139,8 +141,10 @@ export function uploadDocument(id: string, expectedRevision: number, file: File,
   });
 }
 
-export function createLinkedDocument(targetType: 'constitution' | 'version' | 'amendment' | MaterialTarget, targetId: string, metadata: {
+export function createLinkedDocument(targetType: 'constitution' | 'version' | 'amendment' | MaterialTarget | IngestionDocumentTarget, targetId: string, metadata: {
   operationId: string; title: string; description: string; sourceUrl: string; scopeRevisionId: string | null;
+  citationKey?: string; bibliography?: DocumentBibliography;
+  citationNote?: string;
 }, file: File | null, authorization: string): Promise<DocumentRecord> {
   const body = new FormData();
   body.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -162,8 +166,8 @@ export function listDocumentLinkEvents(targetType: DocumentTarget, targetId: str
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}/events${scopeQuery(scopeRevisionId)}`, { headers: { Authorization: authorization } });
 }
 
-export function attachDocument(targetType: DocumentTarget, targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
-  return request(`/links/${targetType}/${encodeURIComponent(targetId)}`, json(authorization, 'POST', { documentId, revisionId, scopeRevisionId }));
+export function attachDocument(targetType: DocumentTarget, targetId: string, documentId: string, revisionId: string | null, authorization: string, scopeRevisionId?: string | null, citationNote?: string): Promise<DocumentLink[]> {
+  return request(`/links/${targetType}/${encodeURIComponent(targetId)}`, json(authorization, 'POST', { documentId, revisionId, scopeRevisionId, ...(citationNote ? { citationNote } : {}) }));
 }
 
 export function detachDocument(targetType: DocumentTarget, targetId: string, documentId: string, authorization: string, scopeRevisionId?: string | null): Promise<DocumentLink[]> {
@@ -248,4 +252,12 @@ export async function readDocumentDownload(options: { folderId?: string; documen
 
 export function reviseMaterial(targetType: MaterialTarget, targetId: string, documentId: string, body: { title: string; description: string; sourceUrl: string; expectedRevision: number; expectedLinkedRevisionId: string; scopeRevisionId: string | null }, authorization: string): Promise<DocumentLink[]> {
   return request(`/links/${targetType}/${encodeURIComponent(targetId)}/${encodeURIComponent(documentId)}/material`, json(authorization, 'PUT', body));
+}
+
+/** Upload once into the library; the host owns when the selected pin is committed. */
+export function stageDocument(metadata: Parameters<typeof createLinkedDocument>[2], file: File | null, authorization: string): Promise<DocumentRecord> {
+  const body = new FormData();
+  body.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  if (file) body.set('file', file);
+  return request('/library/documents', { method: 'POST', headers: { Authorization: authorization }, body });
 }

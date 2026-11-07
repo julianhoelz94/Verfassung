@@ -3,6 +3,7 @@ package com.constitutionatlas.catalog.client
 import com.constitutionatlas.catalog.ConflictException
 import com.constitutionatlas.platform.OrderedContentRules
 import com.constitutionatlas.platform.OrderedSnapshot
+import com.constitutionatlas.platform.documentCitations
 import com.constitutionatlas.platform.timedRestClient
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -12,7 +13,8 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Component
-class SuccessorReadinessClient(@Value("\${content.api.url}") contentUrl: String) {
+class SuccessorReadinessClient(@Value("\${content.api.url}") contentUrl: String, @Value("\${document.api.url:http://localhost/api/document}") documentUrl: String = "http://localhost/api/document") {
+    private val documents = timedRestClient(documentUrl)
     private val client = timedRestClient(contentUrl)
 
     /** Ordinary publication has no receipt, but its complete content must satisfy the same rules. */
@@ -26,6 +28,7 @@ class SuccessorReadinessClient(@Value("\${content.api.url}") contentUrl: String)
         }
         if (snapshot == null || snapshot.versionId != version) throw ConflictException("Publication content is unavailable", "content_not_ready")
         OrderedContentRules.requireValid(OrderedContentRules.contentErrors(snapshot.roots))
+        pinCitations(snapshot, authorization)
     }
 
     fun requireReady(version: UUID, attempt: UUID, settings: UUID, authorization: String? = null) {
@@ -34,5 +37,12 @@ class SuccessorReadinessClient(@Value("\${content.api.url}") contentUrl: String)
         val snapshot = request.retrieve().body(OrderedSnapshot::class.java)
         if (snapshot == null || snapshot.versionId != version || snapshot.settingsRevisionId != settings || snapshot.roots.isEmpty()) throw ConflictException("Successor content or settings are incomplete", "content_not_ready")
         OrderedContentRules.requireValid(OrderedContentRules.contentErrors(snapshot.roots))
+        pinCitations(snapshot, authorization)
+    }
+    private fun pinCitations(snapshot: OrderedSnapshot, authorization: String?) {
+        if (snapshot.documentCitations().isEmpty()) return
+        val request = documents.post().uri("/versions/${snapshot.versionId}/citations/synchronize")
+        authorization?.let { request.header("Authorization", it) }
+        request.contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(mapOf("generation" to snapshot.generation)).retrieve().toBodilessEntity()
     }
 }

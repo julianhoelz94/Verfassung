@@ -1,0 +1,37 @@
+.manager { min-width:0; }
+.manager h2 { margin:0;font-size:var(--text-xl); }
+.muted { color:var(--color-ink-2);font-size:var(--text-sm); }
+.links { list-style:none;margin:0;padding:0;display:grid;gap:var(--gap-field); }
+.links li { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--gap-control);padding-block:var(--space-3);border-bottom:1px solid var(--color-line); }
+.links li > div:first-child { min-width:0;overflow-wrap:anywhere; }
+.links li span { display:block;margin-top:var(--space-1); }
+.form { border-top:1px solid var(--color-line);padding-top:var(--space-5);max-width:48rem; }
+
+.fields { border: 0; min-width: 0; padding: 0; margin: 0; }
+.details { min-width: 0; }
+.details > summary { cursor: pointer; min-height: var(--control-min); display: flex; align-items: center; gap: var(--gap-related); color: var(--color-accent-strong); }
+.details > summary::before { content: '+'; font-size: var(--text-lg); }
+.details[open] > summary::before { content: '−'; }
+.details > summary::-webkit-details-marker { display: none; }
+.details[open] > summary { margin-bottom: var(--gap-field); }
+.creatorGroup { border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: var(--gap-field); min-width: 0; margin: 0; }
+.creatorGroup legend { padding-inline: var(--gap-related); font-size: var(--text-sm); }
+.creator { border-bottom: 1px solid var(--color-line); padding-bottom: var(--gap-control); }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+.picker { border-top: 1px solid var(--color-line); padding-top: var(--gap-field); width: 100%; min-width: 0; }
+.pickerResults { min-width: 0; }
+.matches { list-style: none; margin: 0; padding: 0; max-height: 18rem; overflow-y: auto; border: 1px solid var(--color-line); border-radius: var(--radius-sm); }
+.matches:empty { display: none; }
+.matches li { display: grid; gap: var(--space-1); padding: var(--gap-related) var(--gap-control); min-height: var(--control-min); cursor: pointer; overflow-wrap: anywhere; }
+.matches li[aria-selected="true"] { background: var(--color-accent-soft); box-shadow: inset 3px 0 var(--color-accent); }
+.matches strong { font-weight: var(--weight-ui-emphasis); }
+.matches span, .selectedSource span { font-size: var(--text-sm); color: var(--color-ink-2); }
+.selectedSource { display: grid; gap: var(--space-1); padding: var(--gap-control); background: var(--color-accent-soft); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.optionalFields { --gap-field: var(--gap-control); }
+.optionalFields :global(.field) { gap: var(--space-1); }
+.optionalFields :global(.field-label) { font-size: var(--text-sm); }
+.optionalFields :global(.field-control) { min-height: 36px; padding: 6px 10px; }
+.optionalFields .details > summary { min-height: 36px; }
+.optionalFields .creatorGroup { padding: var(--gap-control); }
+@media (pointer: coarse) { .optionalFields :global(.field-control), .optionalFields .details > summary { min-height: var(--control-min); } }

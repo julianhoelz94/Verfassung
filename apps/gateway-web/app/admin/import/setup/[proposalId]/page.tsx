@@ -1,3 +1,4 @@
+import { DocumentLinks } from "../../../../editor/documents/DocumentLinks";
 import { loginHref } from "../../../../../lib/return-to";
 import { T } from "../../../../components/TranslationProvider";
 import { ui } from "../../../../../lib/messages";
@@ -47,6 +48,7 @@ export default async function SetupProposalPage({
       width="content"
       header={<PageHeader title={<T value={ui.setupReview.title} />} />}
     >
+      <DocumentLinks targetType="setup_proposal" targetId={proposalId} returnTo={`/admin/import/setup/${proposalId}`} canEdit />
       <SetupProposalReview
         proposal={proposal}
         error={error}

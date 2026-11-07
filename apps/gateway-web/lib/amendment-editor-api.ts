@@ -19,6 +19,7 @@ export type AmendmentChangeWrite = {
 };
 
 export type AmendmentWriteBody = {
+  publishAttemptId?: string;
   title: string;
   summary?: string | null;
   enactedOn?: string | null;

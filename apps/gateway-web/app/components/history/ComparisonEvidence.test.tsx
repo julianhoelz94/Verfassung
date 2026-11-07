@@ -103,3 +103,23 @@ it("keeps available evidence visible and reports an unavailable supporting sourc
   expect(html).toContain("Some supporting materials could not be loaded.");
   expect(html).not.toContain("Commentary &amp; materials");
 });
+
+it("retains different passage notes when two changes cite the same document snapshot", async () => {
+  vi.mocked(listDocumentLinks).mockImplementation(async (type, _id, scope) =>
+    type === "change_material"
+      ? [{ ...link(), citationNote: scope === "first-change" ? "Chapter 3, pages 42–45" : "Appendix A" }]
+      : [],
+  );
+  const provenance: PassageProvenance[] = ["first-change", "second-change"].map(id => ({
+    amendment: instrument,
+    change: { ...instrument.changes[0], id },
+  }));
+  const dom = new DOMParser().parseFromString(
+    renderToStaticMarkup(await ComparisonEvidence({ provenance })),
+    "text/html",
+  );
+  expect(dom.querySelectorAll("article")).toHaveLength(2);
+  expect(dom.body.textContent).toContain("Chapter 3, pages 42–45");
+  expect(dom.body.textContent).toContain("Appendix A");
+  expect(dom.querySelectorAll('a[href="/documents/shared-source?revision=2"]')).toHaveLength(2);
+});

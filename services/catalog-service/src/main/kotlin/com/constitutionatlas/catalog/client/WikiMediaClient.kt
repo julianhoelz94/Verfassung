@@ -1,6 +1,7 @@
 package com.constitutionatlas.catalog.client
 
 import com.constitutionatlas.catalog.ConflictException
+import com.constitutionatlas.catalog.api.WikiCitation
 import com.constitutionatlas.catalog.api.WikiImage
 import com.constitutionatlas.platform.scalarText
 import com.constitutionatlas.platform.timedRestClient
@@ -10,6 +11,9 @@ import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 interface WikiMedia {
+    fun requirePinnedCitations(targetType: String, targetId: UUID, revisionId: UUID, citations: List<WikiCitation>, authorization: String?) {
+        require(citations.isEmpty()) { "Document citations are unavailable" }
+    }
     fun requirePinnedImages(targetType: String, targetId: UUID, revisionId: UUID, images: List<WikiImage>, authorization: String?)
 }
 
@@ -18,6 +22,19 @@ class WikiMediaClient(
     @Value("\${document.api.url:http://localhost/api/document}") documentUrl: String,
 ) : WikiMedia {
     private val documents = timedRestClient(documentUrl)
+
+    override fun requirePinnedCitations(targetType: String, targetId: UUID, revisionId: UUID, citations: List<WikiCitation>, authorization: String?) {
+        if (citations.isEmpty()) return
+        require(authorization != null) { "Authorization is required" }
+        val links = documents.get().uri("/links/${targetType}_wiki/$targetId?scopeRevisionId=$revisionId")
+            .header("Authorization", authorization).retrieve().body(JsonNode::class.java)
+            ?: throw ConflictException("Wiki citations could not be verified", "wiki_citation_missing")
+        citations.forEach { citation ->
+            if (!links.any { it.path("documentId").scalarText() == citation.documentId.toString() && it.path("document").path("revision").path("revision").asInt(0) == citation.revision }) {
+                throw ConflictException("Wiki citation is not pinned to this draft", "wiki_citation_missing")
+            }
+        }
+    }
 
     override fun requirePinnedImages(targetType: String, targetId: UUID, revisionId: UUID, images: List<WikiImage>, authorization: String?) {
         if (images.isEmpty()) return

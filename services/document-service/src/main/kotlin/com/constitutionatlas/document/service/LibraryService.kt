@@ -14,13 +14,14 @@ import java.util.UUID
 
 @Service
 class LibraryService(private val repository: LibraryRepository, private val documents: DocumentService, private val documentRepository: DocumentRepository) {
-    fun search(q: String? = null, folderId: UUID? = null, tagId: UUID? = null, status: String = "active", offset: Int = 0, limit: Int = 30, sort: String = "created"): DocumentPageDto {
+    fun search(q: String? = null, folderId: UUID? = null, tagId: UUID? = null, status: String = "active", offset: Int = 0, limit: Int = 30, sort: String = "created", kind: String? = null): DocumentPageDto {
+        require(kind == null || kind == "image") { "Invalid media kind" }
         require(status in setOf("active", "archived", "all")) { "Invalid document status" }
         require(offset >= 0 && limit in 1..200 && (q?.length ?: 0) <= 500) { "Invalid search range" }
         require(sort in setOf("title", "key", "year", "created")) { "Invalid sort order" }
         if (folderId != null) folder(folderId)
         if (tagId != null) tag(tagId)
-        return repository.search(q, folderId, tagId, status, offset, limit, sort)
+        return repository.search(q, folderId, tagId, status, offset, limit, sort, kind)
     }
 
     fun all(folderId: UUID? = null): List<DocumentDto> {

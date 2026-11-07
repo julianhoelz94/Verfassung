@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { publishWikiPage, saveWikiDraft, type WikiImage, type WikiTargetType } from '../../../lib/api';
-import { attachDocument, createDocument, getDocument, uploadDocument } from '../../../lib/document-api';
+import { attachDocument, getDocument, uploadDocument } from '../../../lib/document-api';
 import { requireSessionBearer } from '../../../lib/session';
+import { resolveDocumentReferences } from '../../../lib/document-reference-server';
 import { safeReturnTo } from '../../../lib/return-to';
 import { wikiEditPath, wikiPublicPath } from '../../../lib/wiki-routing';
 
@@ -34,7 +35,9 @@ export async function saveWikiAction(form: FormData): Promise<string> {
   const { targetType, targetId, code, jurisdictionId } = target(form);
   const authorization = await requireSessionBearer();
   try {
-    const images = (JSON.parse(String(form.get('images') ?? '[]')) as WikiImage[])
+    if (form.get('imageFile') instanceof File && (form.get('imageFile') as File).size) throw new TypeError('Use the staged image picker');
+    const citations = await resolveDocumentReferences(String(form.get('citations') ?? '[]'), authorization);
+    const images = ([...JSON.parse(String(form.get('images') ?? '[]')), ...JSON.parse(String(form.get('newImages') ?? '[]'))] as WikiImage[])
       .filter((image) => form.get(`remove-${image.documentId}`) !== 'on')
       .map((image, index) => ({
         image: {
@@ -58,38 +61,24 @@ export async function saveWikiAction(form: FormData): Promise<string> {
         image.revision = uploaded.currentRevision;
       }
     }
-    const file = form.get('imageFile');
-    if (file instanceof File && file.size > 0) {
-      const alt = String(form.get('imageAlt') ?? '').trim();
-      if (!alt) throw new Error('Image alt text is required');
-      const doc = await createDocument({ title: file.name }, authorization);
-      const uploaded = await uploadDocument(doc.id, doc.currentRevision, file, authorization);
-      const addedImage = {
-        documentId: uploaded.id,
-        revision: uploaded.currentRevision,
-        alt,
-        caption: String(form.get('imageCaption') ?? '').trim() || null,
-        credit: String(form.get('imageCredit') ?? '').trim() || null,
-        rights: String(form.get('imageRights') ?? '').trim() || null,
-        sourceUrl: String(form.get('imageSource') ?? '').trim() || null,
-        placement: form.get('imagePlacement') === 'before_body' ? 'before_body' as const : 'after_body' as const,
-      };
-      const position = Number(form.get('imageOrder') ?? images.length + 1);
-      images.splice(Math.max(0, Math.min(images.length, Number.isFinite(position) ? position - 1 : images.length)), 0, addedImage);
-    }
+    if (images.some(image => !image.alt)) throw new TypeError('Alternative text is required');
+    const resolvedImages = await resolveDocumentReferences(images.map(({ documentId, revision }) => ({ documentId, revision })), authorization);
+    if (resolvedImages.some(link => !['image/png','image/jpeg','image/gif','image/webp','image/avif'].includes(link.document.revision.contentType ?? '') || !link.document.revision.fileName)) throw new TypeError('image');
     const draft = await saveWikiDraft(targetType, targetId, {
       expectedRevisionId: String(form.get('expectedRevisionId') || '') || null,
+      operationId: String(form.get('operationId') || '') || undefined,
+      citations: citations.map(link => ({ documentId: link.documentId, revision: link.document.revision.revision, title: link.document.revision.title, ...(link.citationNote ? { citationNote: link.citationNote } : {}) })),
       summary: String(form.get('summary') ?? ''),
       body: String(form.get('body') ?? ''),
       images,
       sourceUrls: String(form.get('sourceUrls') ?? '').split(/\r?\n/).map((url) => url.trim()).filter(Boolean),
     }, authorization);
-    for (const image of images) {
-      const doc = await getDocument(image.documentId, image.revision, authorization);
+    for (const link of [...resolvedImages, ...citations]) {
+      const doc = link.document;
       await attachDocument(
         draft.targetType === 'country' ? 'country_wiki' : draft.targetType === 'jurisdiction' ? 'jurisdiction_wiki' : 'constitution_wiki',
         targetId,
-        image.documentId,
+        doc.id,
         doc.revision.id,
         authorization,
         draft.id,

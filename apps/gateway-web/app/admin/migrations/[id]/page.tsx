@@ -1,3 +1,4 @@
+import { DocumentLinks } from '../../../editor/documents/DocumentLinks';
 import { notFound, redirect } from 'next/navigation';
 import { currentUser, requireSessionBearer } from '../../../../lib/session';
 import {
@@ -80,6 +81,7 @@ export default async function MigrationReviewPage({
           <T value={migrationUi.filter} />
         </button>
       </form>
+      <DocumentLinks targetType="migration_run" targetId={id} returnTo={`/admin/migrations/${id}`} canEdit />
       {migrationItems(run, id, query, user.roles)}
       <details>
         <summary>

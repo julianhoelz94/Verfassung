@@ -75,7 +75,10 @@ class DocumentService(
 
     private fun publiclyLinked(documentId: UUID, revisionId: UUID): Boolean =
         repository.activeLinksForDocument(documentId).any { link ->
-            if (link.targetType == "amendment") {
+            if (link.targetType == "passage_citation") {
+                val revision = repository.revisionById(revisionId) ?: return@any false
+                link.revisionId == revisionId && targetClient.isPassageCitationPublic(link.targetId, documentId, revision.revision)
+            } else if (link.targetType == "amendment") {
                 val publishedScope = targetClient.publishedAmendmentRevision(link.targetId)
                 publishedScope != null &&
                     currentLinks("amendment", link.targetId, publishedScope).any { current ->
@@ -99,7 +102,9 @@ class DocumentService(
 
     fun publicLinks(targetType: String, targetId: UUID, scopeRevisionId: UUID?): List<DocumentLinkDto> =
         currentLinks(targetType, targetId, scopeRevisionId).filter { link ->
-            if (targetType in wikiLinkTypes) {
+            if (targetType == "passage_citation") {
+                targetClient.isPassageCitationPublic(targetId, link.documentId, link.document.revision.revision)
+            } else if (targetType in wikiLinkTypes) {
                 scopeRevisionId != null &&
                     targetClient.isWikiImagePublic(targetType, targetId, scopeRevisionId, link.documentId, link.document.revision.revision)
             } else {
@@ -174,14 +179,17 @@ class DocumentService(
     @Transactional
     fun attach(targetType: String, targetId: UUID, request: LinkRequest, actor: Actor, authorization: String?): List<DocumentLinkDto> {
         requireEditableTarget(targetType, targetId, request.scopeRevisionId, authorization)
+        require((request.citationNote?.length ?: 0) <= 4000) { "Citation note is too long" }
         val document = get(request.documentId)
         require(document.status == "active") { "Cannot attach an archived document" }
         require(request.revisionId != null) { "A pinned document revision is required" }
         require(repository.revisionById(request.revisionId)?.documentId == request.documentId) { "Revision does not belong to document" }
-        if (currentLinks(targetType, targetId, request.scopeRevisionId, authorization).any { it.documentId == request.documentId }) {
+        val links = currentLinks(targetType, targetId, request.scopeRevisionId, authorization)
+        if (links.any { it.documentId == request.documentId && it.revisionId == request.revisionId && it.citationNote.orEmpty() == request.citationNote?.trim().orEmpty() }) return links
+        if (links.any { it.documentId == request.documentId }) {
             throw DocumentConflictException("Document is already linked")
         }
-        repository.linkEvent(targetType, targetId, request.scopeRevisionId, request.documentId, request.revisionId, "attach", actor.id)
+        repository.linkEvent(targetType, targetId, request.scopeRevisionId, request.documentId, request.revisionId, "attach", actor.id, request.citationNote?.trim()?.takeIf { it.isNotEmpty() })
         return currentLinks(targetType, targetId, request.scopeRevisionId, authorization)
     }
 
@@ -203,6 +211,9 @@ class DocumentService(
         repository.lockDocument(documentId)
         val link = currentLinks(targetType, targetId, request.scopeRevisionId, authorization).find { it.documentId == documentId }
             ?: throw NotFoundException("Material not found")
+        if (actor.roles.none { it == "editor" || it == "admin" }) {
+            if (link.document.revision.fileName != null || link.document.revision.attachments.isNotEmpty() || (link.document.revision.bibliography.type != "commentary" && !link.document.revision.sourceUrl.isNullOrBlank())) throw ForbiddenException("Library metadata requires editor or admin")
+        }
         if (link.revisionId != request.expectedLinkedRevisionId) throw DocumentConflictException("Material changed; reload before saving")
         require((request.description?.length ?: 0) <= 10000) { "Commentary is too long" }
         if (link.document.revision.revision != request.expectedRevision) throw DocumentConflictException("Material revision changed; reload before saving")
@@ -211,7 +222,7 @@ class DocumentService(
         validate(edit)
         if (!repository.advance(documentId, current.currentRevision)) throw DocumentConflictException("Document is archived")
         val revision = appendMetadataRevision(documentId, current.currentRevision + 1, edit, link.document.revision, actor)
-        repository.linkEvent(targetType, targetId, request.scopeRevisionId, documentId, revision, "attach", actor.id)
+        repository.linkEvent(targetType, targetId, request.scopeRevisionId, documentId, revision, "attach", actor.id, link.citationNote)
         return currentLinks(targetType, targetId, request.scopeRevisionId, authorization)
     }
 
@@ -233,7 +244,7 @@ class DocumentService(
             .filter { it.action == "attach" }
             .map { event ->
                 val revision = event.revisionId?.let { repository.revisionById(it)?.revision }
-                DocumentLinkDto(event.documentId, event.revisionId, get(event.documentId, revision))
+                DocumentLinkDto(event.documentId, event.revisionId, get(event.documentId, revision), event.citationNote)
             }
     }
 
@@ -260,6 +271,7 @@ class DocumentService(
 
     fun requireEditableTarget(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String?) {
         validateTarget(targetType)
+        require(targetType != "passage_citation") { "Passage citations are synchronized from Content only" }
         if (targetType in materialLinkTypes) {
             val actor = identityClient.authenticate(authorization)
             val role = if (targetType == "lifecycle_material") "publisher" else "editor"
@@ -270,7 +282,7 @@ class DocumentService(
     }
 
     private fun validateTarget(targetType: String) {
-        require(targetType in setOf("constitution", "version", "amendment") || targetType in wikiLinkTypes || targetType in materialLinkTypes) { "Unsupported link target" }
+        require(targetType in setOf("constitution", "version", "amendment", "passage_citation") || targetType in wikiLinkTypes || targetType in ingestionLinkTypes || targetType in materialLinkTypes) { "Unsupported link target" }
     }
 
     private fun validateScope(targetType: String, targetId: UUID, scopeRevisionId: UUID?, authorization: String?) {

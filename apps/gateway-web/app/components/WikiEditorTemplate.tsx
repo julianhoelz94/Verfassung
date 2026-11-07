@@ -1,3 +1,4 @@
+import { WikiCitationFields, WikiImageFields } from '../editor/wiki/WikiDocumentFields';
 import type { ReactNode } from 'react';
 import type { WikiPageRevision } from '../../lib/api';
 import type { WikiOwner } from '../../lib/wiki-routing';
@@ -53,6 +54,7 @@ export function WikiEditorTemplate({ owner, title, publicHref, locale, draft, pu
           <label htmlFor="wiki-sources"><T value={ui.editor.wiki.targettype.targetid.page.sourceLinksOneUrlPerLine} /></label>
           <textarea id="wiki-sources" name="sourceUrls" rows={3} defaultValue={(current?.sourceUrls ?? []).join('\n')} />
           </div></details>
+          <WikiCitationFields citations={current?.citations ?? []} />
           <details className={styles.disclosure}><summary><T value={ui.editor.wiki.targettype.targetid.page.pictures} />{current?.images.length ? ` (${current.images.length})` : ''}</summary><div>
           {current?.images.map((image, index) => (
             <Stack as="fieldset" key={image.documentId}>
@@ -80,22 +82,7 @@ export function WikiEditorTemplate({ owner, title, publicHref, locale, draft, pu
               <label><input type="checkbox" name={`remove-${image.documentId}`} /> <T value={ui.editor.wiki.targettype.targetid.page.removePicture} /></label>
             </Stack>
           ))}
-          <label htmlFor="wiki-image"><T value={ui.editor.wiki.targettype.targetid.page.addAPicture} /></label>
-          <input id="wiki-image" type="file" name="imageFile" accept="image/jpeg,image/png,image/gif,image/webp,image/avif" />
-          <label htmlFor="wiki-image-order"><T value={ui.editor.wiki.targettype.targetid.page.positionForNewPicture} /></label>
-          <input id="wiki-image-order" type="number" min={1} max={30} name="imageOrder" defaultValue={(current?.images.length ?? 0) + 1} />
-          <label htmlFor="wiki-image-placement"><T value={ui.editor.wiki.targettype.targetid.page.placementForNewPicture} /></label>
-          <select id="wiki-image-placement" name="imagePlacement" defaultValue="after_body"><option value="before_body"><T value={ui.editor.wiki.targettype.targetid.page.beforePageText} /></option><option value="after_body"><T value={ui.editor.wiki.targettype.targetid.page.afterPageText} /></option></select>
-          <label htmlFor="wiki-image-alt"><T value={ui.editor.wiki.targettype.targetid.page.pictureDescriptionForScreenReaders} /></label>
-          <input id="wiki-image-alt" name="imageAlt" maxLength={500} />
-          <label htmlFor="wiki-image-caption"><T value={ui.editor.wiki.targettype.targetid.page.caption} /></label>
-          <input id="wiki-image-caption" name="imageCaption" maxLength={1000} />
-          <label htmlFor="wiki-image-credit"><T value={ui.editor.wiki.targettype.targetid.page.credit} /></label>
-          <input id="wiki-image-credit" name="imageCredit" maxLength={500} />
-          <label htmlFor="wiki-image-rights"><T value={ui.editor.wiki.targettype.targetid.page.rights} /></label>
-          <input id="wiki-image-rights" name="imageRights" maxLength={500} />
-          <label htmlFor="wiki-image-source"><T value={ui.editor.wiki.targettype.targetid.page.sourceUrl} /></label>
-          <input id="wiki-image-source" name="imageSource" type="url" />
+          <WikiImageFields existingIds={(current?.images ?? []).map(image => image.documentId)} />
           </div></details>
           <button className="btn" type="submit"><T value={{ en: 'Save Wiki draft', de: 'Wiki-Entwurf speichern' }} /></button>
         </WikiDraftForm>

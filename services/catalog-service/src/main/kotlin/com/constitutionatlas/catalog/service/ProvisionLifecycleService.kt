@@ -14,6 +14,7 @@ import java.util.UUID
 @Service
 class ProvisionLifecycleService(
     private val catalog: CatalogRepository,
+    private val creations: com.constitutionatlas.catalog.repo.EventCreationRepository,
     private val repo: ProvisionLifecycleRepository,
     private val scope: ProvisionScope,
 ) {
@@ -30,6 +31,7 @@ class ProvisionLifecycleService(
     @Transactional
     fun append(constitutionId: UUID, request: CreateProvisionLifecycleEvent, actorId: UUID): ProvisionLifecycleEvent {
         if (!catalog.lockConstitution(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
+        creations.find(actorId, request.operationId, "provision", constitutionId, request)?.let { id -> return repo.events(constitutionId).first { it.id == id } }
         val kind = request.eventType.trim().lowercase()
         require(kind in setOf("deferred", "commenced", "suspended", "restored")) { "Unsupported provision lifecycle event" }
         require(request.logicalUnitIds.isNotEmpty() && request.logicalUnitIds.size <= 100 && request.logicalUnitIds.distinct().size == request.logicalUnitIds.size) {
@@ -65,6 +67,8 @@ class ProvisionLifecycleService(
         if (request.sourceUrl != null && !request.sourceUrl.startsWith("https://") && !request.sourceUrl.startsWith("http://")) {
             throw IllegalArgumentException("sourceUrl must be an HTTP(S) URL")
         }
-        return repo.insert(constitutionId, request.copy(eventType = kind), actorId)
+        val event = repo.insert(constitutionId, request.copy(eventType = kind), actorId)
+        creations.save(actorId, request.operationId, "provision", constitutionId, request, event.id)
+        return event
     }
 }

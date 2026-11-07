@@ -35,9 +35,10 @@ test('both editors create and reuse central documents in place without losing un
   expect(amendmentResponse.ok(),await amendmentResponse.text()).toBe(true);const amendment=await amendmentResponse.json();
   await page.goto(`/editor/amendments/${amendment.id}`);await page.getByLabel('Public amendment comment').fill('Unsaved amendment rationale.');
   await amendmentTask(page,'Documents');await page.getByRole('button',{name:'Choose existing document',exact:true}).click();
-  await page.getByLabel('Search documents').fill(title);await page.getByRole('button',{name:'Search library',exact:true}).click();await page.getByLabel('Document',{exact:true}).selectOption(document.id);await page.getByRole('button',{name:'Attach document',exact:true}).click();
+  await page.getByLabel('Search documents').fill(title);await page.getByRole('option',{name:new RegExp('^'+title)}).click();await page.getByRole('button',{name:'Attach document',exact:true}).click();
   await expect(page.getByRole('link',{name:title,exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Upload new document',exact:true}).click();await page.getByRole('textbox',{name:'Title',exact:true}).fill(title+' explanatory memorandum');
+  await page.getByText('Optional details',{exact:true}).click();
   await page.getByLabel('Source URL',{exact:true}).fill('https://example.org/editorial/explanation');await page.getByRole('button',{name:'Create and attach',exact:true}).click();
   await expect(page.getByRole('link',{name:title+' explanatory memorandum',exact:true})).toBeVisible();
   await amendmentTask(page,'Affected passages');await expect(page.getByLabel('Public amendment comment')).toHaveValue('Unsaved amendment rationale.');

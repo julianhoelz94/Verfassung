@@ -38,8 +38,7 @@ test('document revisions link from both editors and appear on public readers wit
   await openStructureTask(page, 'Documents');
   await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
   await page.getByLabel('Search documents').fill(`${title} revised`);
-  await page.getByRole('button', { name: 'Search library', exact: true }).click();
-  await page.getByLabel('Document', { exact: true }).selectOption(documentId);
+  await page.getByRole('option', { name: new RegExp(`^${title} revised`) }).click();
   await expect(page.getByRole('button', { name: 'Attach document', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Attach document', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
@@ -58,7 +57,8 @@ test('document revisions link from both editors and appear on public readers wit
   }).toBe(false);
   await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
-  await page.getByLabel('Document', { exact: true }).selectOption(documentId);
+  await page.getByLabel('Search documents', { exact: true }).fill(`${title} revised`);
+  await page.getByRole('option', { name: new RegExp(`^${title} revised`) }).click();
   await expect(page.getByRole('button', { name: 'Attach document', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Attach document', exact: true }).click();
   await expect(page.getByRole('link', { name: `${title} revised`, exact: true })).toBeVisible({ timeout: 15_000 });
@@ -78,8 +78,7 @@ test('document revisions link from both editors and appear on public readers wit
   await page.goto(`/editor/amendments/${amendmentId}?view=documents`);
   await page.getByRole('button', { name: 'Choose existing document', exact: true }).click();
   await page.getByLabel('Search documents').fill(`${title} revised`);
-  await page.getByRole('button', { name: 'Search library', exact: true }).click();
-  await page.getByLabel('Document', { exact: true }).selectOption(documentId);
+  await page.getByRole('option', { name: new RegExp(`^${title} revised`) }).click();
   const attachment = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes('/editor/documents/command'));
   await expect(page.getByRole('button', { name: 'Attach document', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Attach document', exact: true }).click();

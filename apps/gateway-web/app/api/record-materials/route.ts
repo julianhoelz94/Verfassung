@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
           description: value("description"),
           sourceUrl: value("sourceUrl"),
           scopeRevisionId,
+          bibliography: { type: 'commentary', authors: [], editors: [], extra: {} },
         },
         file,
         authorization,

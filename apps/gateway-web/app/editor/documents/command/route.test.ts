@@ -2,10 +2,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from './route';
 import { currentUser } from '../../../../lib/session';
-import { attachDocument, createLinkedDocument, detachDocument, listDocumentLinks, listDocumentRevisions, listLibraryDocuments } from '../../../../lib/document-api';
+import { attachDocument, createLinkedDocument, stageDocument, getDocument, listDocumentFolders, detachDocument, listDocumentLinks, listDocumentRevisions, listLibraryDocuments } from '../../../../lib/document-api';
 
 vi.mock('../../../../lib/session', () => ({ currentUser: vi.fn(), requireSessionBearer: async () => 'Bearer session' }));
-vi.mock('../../../../lib/document-api', () => ({ attachDocument: vi.fn(), createLinkedDocument: vi.fn(), detachDocument: vi.fn(), listDocumentLinks: vi.fn(), listDocumentRevisions: vi.fn(), listLibraryDocuments: vi.fn() }));
+vi.mock('../../../../lib/document-api', () => ({ attachDocument: vi.fn(), createLinkedDocument: vi.fn(), stageDocument: vi.fn(), getDocument: vi.fn(), listDocumentFolders: vi.fn(), detachDocument: vi.fn(), listDocumentLinks: vi.fn(), listDocumentRevisions: vi.fn(), listLibraryDocuments: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(currentUser).mockResolvedValue({ id: 'editor', email: 'editor@example.test', roles: ['editor'] }); });
 function request(patch: Record<string, string> = {}, origin = 'http://localhost') {
@@ -30,7 +30,7 @@ it('forwards one create-and-link operation with the exact draft scope, without a
 it('returns attachment state in place and never changes a document revision',async()=>{
   vi.mocked(attachDocument).mockResolvedValue([]);vi.mocked(detachDocument).mockResolvedValue([]);
   expect((await POST(request({command:'attach',documentId:'document',revisionId:'revision'}))).status).toBe(200);
-  expect(attachDocument).toHaveBeenCalledWith('amendment','law','document','revision','Bearer session','draft');
+  expect(attachDocument).toHaveBeenCalledWith('amendment','law','document','revision','Bearer session','draft',undefined);
   expect((await POST(request({command:'detach',documentId:'document'}))).status).toBe(200);
   expect(detachDocument).toHaveBeenCalledWith('amendment','law','document','Bearer session','draft');
   expect(createLinkedDocument).not.toHaveBeenCalled();
@@ -64,4 +64,51 @@ it('rejects invalid search pages and viewer library reads before contacting Docu
   expect((await GET(new NextRequest('http://localhost/editor/documents/command?command=search'))).status).toBe(403);
   expect(listLibraryDocuments).not.toHaveBeenCalled();
   expect(listDocumentRevisions).not.toHaveBeenCalled();
+});
+
+it('forwards optional bibliography and citation key in the same atomic upload', async () => {
+  vi.mocked(createLinkedDocument).mockResolvedValue({ id: 'document' } as never);
+  const bibliography = { type: 'book', authors: [{ family: 'Smith', given: 'Jane' }], editors: [], issued: '2026', extra: { jurisdiction: 'Germany' } };
+  expect((await POST(request({ citationKey: 'Smith2026', bibliography: JSON.stringify(bibliography) }))).status).toBe(200);
+  expect(createLinkedDocument).toHaveBeenCalledWith('amendment', 'law', expect.objectContaining({ citationKey: 'Smith2026', bibliography }), null, 'Bearer session');
+  expect((await POST(request({ bibliography: '{broken' }))).status).toBe(400);
+  expect((await POST(request({ bibliography: '[]' }))).status).toBe(400);
+  expect(createLinkedDocument).toHaveBeenCalledTimes(1);
+});
+it('keeps embedded browsing scoped to the selected project folder', async () => {
+  vi.mocked(listLibraryDocuments).mockResolvedValue({ items: [], total: 0, offset: 0, limit: 30 });
+  expect((await GET(new NextRequest('http://localhost/editor/documents/command?command=search&folderId=project&q=Law'))).status).toBe(200);
+  expect(listLibraryDocuments).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'project', q: 'Law', offset: 0 }), 'Bearer session');
+});
+
+it('preserves the exact material scope and citation note when attaching a shared source', async () => {
+  vi.mocked(attachDocument).mockResolvedValue([]);
+  expect((await POST(request({command:'attach',targetType:'change_material',scopeRevisionId:'change-28',documentId:'source',revisionId:'pin',citationNote:'Chapter 3, pp. 42–45'}))).status).toBe(200);
+  expect(attachDocument).toHaveBeenCalledWith('change_material','law','source','pin','Bearer session','change-28','Chapter 3, pp. 42–45');
+  expect((await POST(request({command:'attach',citationNote:'x'.repeat(4001)}))).status).toBe(400);
+});
+
+it('permits publisher event attachments without granting library upload or amendment rights', async () => {
+  vi.mocked(currentUser).mockResolvedValue({id:'publisher',email:'publisher@example.test',roles:['publisher']});
+  vi.mocked(attachDocument).mockResolvedValue([]);
+  expect((await POST(request({command:'attach',targetType:'lifecycle_material',scopeRevisionId:'event',documentId:'source',revisionId:'pin'}))).status).toBe(200);
+  expect((await POST(request({targetType:'lifecycle_material',scopeRevisionId:'event'}))).status).toBe(403);
+  expect((await POST(request({command:'attach',targetType:'change_material',documentId:'source',revisionId:'pin'}))).status).toBe(403);
+  expect(createLinkedDocument).not.toHaveBeenCalled();
+});
+
+it('stages a complete library upload independently of any saved owner and denies publisher creation', async () => {
+  vi.mocked(stageDocument).mockResolvedValue({id:'staged'} as never);
+  const bibliography={type:'report',authors:[{literal:'Archive'}],editors:[],extra:{},abstract:'Original abstract'};
+  const response=await POST(request({command:'stage',targetType:'',targetId:'',citationKey:'Archive2026',bibliography:JSON.stringify(bibliography)}));
+  expect(response.status).toBe(200);
+  expect(stageDocument).toHaveBeenCalledWith(expect.objectContaining({operationId:'operation',citationKey:'Archive2026',bibliography,scopeRevisionId:null}),null,'Bearer session');
+  expect(attachDocument).not.toHaveBeenCalled();
+  vi.mocked(currentUser).mockResolvedValue({id:'publisher',email:'publisher@example.test',roles:['publisher']});
+  expect((await POST(request({command:'stage'}))).status).toBe(403);
+});
+it('forwards image filtering to the bounded library query', async () => {
+  vi.mocked(listLibraryDocuments).mockResolvedValue({items:[],total:0,offset:0,limit:30});
+  expect((await GET(new NextRequest('http://localhost/editor/documents/command?command=search&kind=image&q=seal'))).status).toBe(200);
+  expect(listLibraryDocuments).toHaveBeenCalledWith(expect.objectContaining({q:'seal',kind:'image',limit:30}),'Bearer session');
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState, type MouseEvent } from 'react';
+import { Fragment, useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ConstitutionDetails } from '../../lib/constitution-metadata';
 import { fetchWithTimeout } from '../../lib/fetch-with-timeout';
@@ -11,7 +11,7 @@ import { useTranslation } from '../components/TranslationProvider';
 import { useDraftState } from './EditorDraftState';
 import styles from './ConstitutionDetailsWorkspace.module.css';
 
-type Props = { constitutionId: string; versionId: string; code?: string; canEdit: boolean; canManageStructure: boolean; canPublish: boolean };
+type Props = { constitutionId: string; versionId: string; code?: string; canEdit: boolean; canManageStructure: boolean; canPublish: boolean; sourceDocuments?: ReactNode };
 
 /** Keeps state/effects in their original order and renders the same workspace tree. */
 export function ConstitutionDetailsWorkspace(props: Props) {
@@ -19,7 +19,7 @@ export function ConstitutionDetailsWorkspace(props: Props) {
 }
 
 /** Owns metadata reads, abort/unload guards and optimistic-revision writes for one mounted workspace. */
-function useConstitutionDetailsWorkspace({ constitutionId, versionId, code, canEdit, canManageStructure, canPublish }: Props) {
+function useConstitutionDetailsWorkspace({ constitutionId, versionId, code, canEdit, canManageStructure, canPublish, sourceDocuments }: Props) {
   const t = useTranslation(), copy = (en: string, de: string) => t({ en, de }), router = useRouter();
   const { textDirty, detailsDirty } = useDraftState();
   const sessionDirty = textDirty || detailsDirty;
@@ -58,7 +58,7 @@ function useConstitutionDetailsWorkspace({ constitutionId, versionId, code, canE
     } catch { setError('save_failed'); } finally { setSaving(false); }
   }
   const link = (href: string, label: string) => <a href={href} aria-disabled={blocked || undefined} onClick={guardNavigation}>{label}</a>;
-  return { constitutionId, versionId, code, canEdit, canManageStructure, canPublish, t, copy, textDirty, detailsDirty, sessionDirty, data, title, setTitle, slug, setSlug, loading, saving, error, saved, setSaved, attempt, setAttempt, setLoading, setError, dirty, blocked, feedback, save, link };
+  return { constitutionId, versionId, code, canEdit, canManageStructure, canPublish, sourceDocuments, t, copy, textDirty, detailsDirty, sessionDirty, data, title, setTitle, slug, setSlug, loading, saving, error, saved, setSaved, attempt, setAttempt, setLoading, setError, dirty, blocked, feedback, save, link };
 }
 
 /** Renders in place so metadata fields, details disclosures and their focus stay mounted. */
@@ -94,7 +94,7 @@ function renderMetadataForm(model: ReturnType<typeof useConstitutionDetailsWorks
 
 /** Presents pinned version facts, source, outline and lifecycle without permitting direct version mutation. */
 function renderPublishedDetails(model: ReturnType<typeof useConstitutionDetailsWorkspace> & { data: ConstitutionDetails }) {
-  const { copy, data, canEdit, blocked, versionId, canManageStructure, link, constitutionId, canPublish, code, t } = model;
+  const { copy, data, canEdit, blocked, versionId, canManageStructure, link, constitutionId, canPublish, code, t, sourceDocuments } = model;
   return <>
       <details name="constitution-editor-details"><summary>{copy('Version', 'Textversion')}</summary><div className={styles.section}>
         <dl><dt>{copy('Version', 'Textversion')}</dt><dd>{data.version.versionLabel}</dd><dt>{copy('Effective date', 'Geltungsdatum')}</dt><dd>{data.version.effectiveDate ?? '—'}</dd><dt>{copy('Language', 'Sprache')}</dt><dd>{data.version.languageCode}</dd><dt>{copy('Gazette reference', 'Fundstelle')}</dt><dd>{data.versionFacts?.gazetteReference ?? '—'}</dd>{httpUrl(data.versionFacts?.sourceUrl) ? <><dt>{copy('Source', 'Quelle')}</dt><dd><a href={httpUrl(data.versionFacts?.sourceUrl)!} target="_blank" rel="noreferrer">{data.versionFacts?.sourceUrl}</a></dd></> : null}</dl>
@@ -102,6 +102,7 @@ function renderPublishedDetails(model: ReturnType<typeof useConstitutionDetailsW
       </div></details>
       <details name="constitution-editor-details"><summary>{copy('Archival source', 'Archivquelle')}</summary><div className={styles.section}>
         <SourceDescription evidence={data.version.sourceEvidence ?? null} />
+        {sourceDocuments}
         {canEdit ? <form action="/editor/command" method="post" onSubmit={event => { if (blocked) event.preventDefault(); }}><input type="hidden" name="command" value="open-sources" /><input type="hidden" name="versionId" value={versionId} /><input type="hidden" name="scope" value="sources" /><div className={styles.actions}><button className="btn" disabled={blocked}>{copy('Edit source information', 'Quelleninformationen bearbeiten')}</button></div></form> : null}
         <p className={styles.muted}>{copy('Separate correction draft → review → publication', 'Eigener Korrekturentwurf → Prüfung → Veröffentlichung')}</p>
       </div></details>

@@ -16,6 +16,14 @@ import java.util.UUID
 
 @RestController
 class EditorDocumentController(private val service: EditorDocumentService, private val documents: DocumentService) {
+    @PostMapping("/library/documents", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    @ResponseStatus(HttpStatus.CREATED)
+    fun stage(
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestPart metadata: CreateLinkedDocumentRequest,
+        @RequestPart(required = false) file: MultipartFile?,
+    ): DocumentDto = service.create("library", UUID(0, 0), metadata, file?.originalFilename, file?.contentType, file?.bytes, documents.requireWriter(authorization), authorization)
+
     @PostMapping("/links/{targetType}/{targetId}/documents", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     @ResponseStatus(HttpStatus.CREATED)
     fun create(

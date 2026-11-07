@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffe
 import { createPortal } from 'react-dom';
 import type { FootnoteItem } from '../../lib/footnotes';
 import { useTranslation } from './TranslationProvider';
-import { InlineText } from './InlineText';
+import { CitedText } from './CitedText';
 import { updateFootnoteHitTargets } from '../../lib/footnote-hit-targets';
 import styles from './Footnotes.module.css';
 
@@ -92,7 +92,7 @@ function FootnoteScope({ notes, children, onNavigate }: {
     {typeof document !== 'undefined' && active ? createPortal(
       <section className={styles.drawer} ref={drawer} role="dialog" aria-modal="false" aria-labelledby={id + '-title'} aria-describedby={id + '-body'}>
         <div className={styles.heading}><h2 id={id + '-title'}>{t(copy.footnote)} {active.label}</h2><button ref={closeButton} type="button" aria-label={t(copy.close)} onClick={() => close(true)}>×</button></div>
-        <div id={id + '-body'} className={styles.body}><InlineText text={active.text} marks={active.marks} /></div>
+        <div id={id + '-body'} className={styles.body}><CitedText text={active.text} marks={active.marks} citations={active.citations} /></div>
         {navigationError ? <p role="alert">{t(copy.navigationFailed)}</p> : null}
         <a href={active.href} aria-busy={navigating || undefined} aria-disabled={navigating || undefined} onClick={async event => {
           if (onNavigate) {
@@ -115,7 +115,7 @@ function FootnoteScope({ notes, children, onNavigate }: {
       </section>, document.body) : null}
     {typeof document !== 'undefined' && preview && peek ? createPortal(
       <aside role="tooltip" id={id + '-peek'} className={styles.peek} style={{ left: peek.left, top: peek.top }}>
-        <span>{preview.label} · </span><InlineText text={preview.text} marks={preview.marks} />
+        <span>{preview.label} · </span><CitedText text={preview.text} marks={preview.marks} citations={preview.citations} />
       </aside>, document.body) : null}
   </Context.Provider>;
 }

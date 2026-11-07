@@ -4,12 +4,12 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import CountryPage from '../countries/[code]/page';
 import JurisdictionPage from '../jurisdictions/[id]/page';
 import { ConstitutionHistoryPage as ConstitutionOverview } from './history/ConstitutionHistoryPage';
-import { getCountry, getConstitutionEvents, getWikiPage, listConstitutionAmendments, type ConstitutionSummary, type VersionSummary } from '../../lib/api';
+import { getCountry, getConstitutionEvents, getWikiPage, listConstitutionAmendments, listAllUnits, resolveUnit, type ConstitutionSummary, type VersionSummary } from '../../lib/api';
 import { getJurisdiction, type JurisdictionDetail } from '../../lib/migration-api';
 import { listDocumentLinks } from '../../lib/document-api';
 import { currentUser } from '../../lib/session';
 
-vi.mock('../../lib/api', () => ({ getCountry: vi.fn(), getConstitutionEvents: vi.fn(), listConstitutionAmendments: vi.fn(), getWikiPage: vi.fn() }));
+vi.mock('../../lib/api', () => ({ getCountry: vi.fn(), getConstitutionEvents: vi.fn(), listConstitutionAmendments: vi.fn(), getWikiPage: vi.fn(), listAllUnits: vi.fn(), resolveUnit: vi.fn() }));
 vi.mock('../../lib/migration-api', () => ({ getJurisdiction: vi.fn() }));
 vi.mock('../../lib/document-api', () => ({ listDocumentLinks: vi.fn() }));
 vi.mock('../../lib/session', () => ({ currentUser: vi.fn() }));
@@ -80,4 +80,27 @@ it('rejects a constitution belonging to another region and distinguishes catalog
   vi.mocked(getJurisdiction).mockRejectedValue(new Error('catalog offline'));
   const failed = markup(await ConstitutionOverview({ params: Promise.resolve({ id: 'province', constitutionId: 'charter' }), searchParams:Promise.resolve({}) }));
   expect(failed.querySelector('a[href="/jurisdictions/province/constitutions/charter"]')).not.toBeNull();
+});
+
+it('keeps passage History grouped and renders exact reference-only wording with a return to the source', async () => {
+  const beforeRef = {versionId: 'published-snapshot', logicalId: 'assembly', occurrenceId: 'before-occ', revisionId: 'before-rev'};
+  const afterRef = {...beforeRef, versionId: 'next-pin', occurrenceId: 'after-occ', revisionId: 'after-rev'};
+  vi.mocked(listConstitutionAmendments).mockResolvedValue([{
+    id: 'act', title: 'Assembly amendment', summary: '', enactedOn: '2024-01-01', sourceReference: null,
+    sourceVersionId: beforeRef.versionId, targetVersionId: afterRef.versionId,
+    changes: [{id: 'change', articleId: null, articleNumber: '1', changeType: 'changed', note: 'Public explanation', beforeRef, afterRef}],
+  }]);
+  vi.mocked(listAllUnits).mockResolvedValue([{id: 'before-occ', logicalId: 'assembly', versionId: 'published-snapshot', articleNumber: '1', title: 'Assembly', sortOrder: 1, content: []}]);
+  vi.mocked(resolveUnit).mockImplementation(async versionId => ({
+    ...(versionId === beforeRef.versionId ? beforeRef : afterRef), constitutionId: 'charter',
+    pathLabels: ['Article 1'], deepLink: `/countries/DE/versions/${versionId}#unit`,
+    text: versionId === beforeRef.versionId ? 'Citizens may assemble.' : 'Everyone may assemble.',
+  }));
+  const page = markup(await ConstitutionOverview({params: Promise.resolve({code: 'DE', constitutionId: 'charter'}), searchParams: Promise.resolve({passage: 'assembly', sourceVersion: 'published-snapshot', sourceAnchor: 'before-occ'})}));
+  const group = page.querySelector('[aria-labelledby="history-year-2024"]')!;
+  expect(group.querySelectorAll('article')).toHaveLength(1);
+  expect(group.querySelector('[data-passage-side="before"]')?.textContent).toContain('Citizens may assemble.');
+  expect(group.querySelector('[data-passage-side="after"]')?.textContent).toContain('Everyone may assemble.');
+  expect(page.querySelector('a[href="/countries/DE/versions/published-snapshot#unit-before-occ"]')?.textContent).toContain('Back to viewer');
+  expect([...group.querySelectorAll('a')].some(link => link.textContent === '1900')).toBe(true);
 });

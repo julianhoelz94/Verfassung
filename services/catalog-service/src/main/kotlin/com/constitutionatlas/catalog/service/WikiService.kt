@@ -38,6 +38,10 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
         val kind = requireTarget(targetType, targetId)
         require(request.summary.isNotBlank() && request.summary.length <= 500) { "Summary must be 1–500 characters" }
         require(request.body.length <= 20000) { "Body must be at most 20,000 characters" }
+        require(request.citations.size <= 100 && request.citations.map { it.documentId }.distinct().size == request.citations.size) { "Invalid citation count" }
+        request.citations.forEach { require(it.revision > 0 && it.title.isNotBlank() && it.title.length <= 500 && (it.citationNote?.length ?: 0) <= 4000) { "Invalid document citation" } }
+        require(request.citations.all { citation -> request.images.none { image -> image.documentId == citation.documentId && image.revision != citation.revision } }) { "A picture and citation of the same document must use the same revision" }
+        require(request.images.map { it.documentId }.distinct().size == request.images.size) { "Duplicate image" }
         require(request.images.size <= 30) { "Page may contain at most 30 images" }
         require(request.sourceUrls.size <= 20) { "Page may contain at most 20 sources" }
         request.sourceUrls.forEach { source ->
@@ -55,10 +59,11 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
         val pageId = repo.ensurePage(kind, targetId)
         repo.lockPage(pageId)
         val current = repo.latest(kind, targetId)
+        if (request.operationId != null && current?.id == request.operationId && current.publishedAt == null && current.createdBy == actorId && current.predecessorId == request.expectedRevisionId && current.summary == request.summary.trim() && current.body == request.body.trim() && current.images == request.images && current.citations == request.citations && current.sourceUrls == request.sourceUrls.distinct()) return current
         if (current?.id != request.expectedRevisionId) {
             throw ConflictException("Wiki page changed; reload before saving", "wiki_revision_conflict")
         }
-        val id = repo.append(pageId, current?.id, request.summary.trim(), request.body.trim(), request.images, request.sourceUrls.distinct(), actorId)
+        val id = repo.append(pageId, current?.id, request.summary.trim(), request.body.trim(), request.images, request.sourceUrls.distinct(), actorId, request.citations, request.operationId)
         return repo.revision(kind, targetId, id)!!
     }
 
@@ -70,6 +75,7 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
         val latest = repo.latest(kind, targetId) ?: throw NotFoundException("Wiki draft not found")
         if (latest.id != revisionId) throw ConflictException("Only the latest wiki revision can be published", "wiki_revision_conflict")
         media.requirePinnedImages(kind, targetId, revisionId, latest.images, authorization)
+        media.requirePinnedCitations(kind, targetId, revisionId, latest.citations, authorization)
         repo.publish(pageId, revisionId)
         return repo.revision(kind, targetId, revisionId)!!
     }

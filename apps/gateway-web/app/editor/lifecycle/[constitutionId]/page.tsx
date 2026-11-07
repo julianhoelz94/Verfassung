@@ -1,3 +1,5 @@
+import { StagedRecordForm } from '../StagedRecordForm';
+import { StagedDocumentPicker } from '../../../components/documents/StagedDocumentPicker';
 import { safeReturnTo } from '../../../../lib/return-to';
 import { loadConstitutionCollection } from '../../../../lib/country-directory';
 import { loginHref } from '../../../../lib/return-to';
@@ -108,7 +110,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
         </section>
       ) : null}
       {allowed.length > 0 ? (
-        <Stack as="form" action={appendLifecycleAction} className={["card", surfaceStyles.card].join(' ')}>
+        <StagedRecordForm action={appendLifecycleAction} className={["card", surfaceStyles.card].join(' ')}>
           <input type="hidden" name="constitutionId" value={constitutionId} />
           <input type="hidden" name="code" value={code.toLowerCase()} /><input type="hidden" name="jurisdictionId" value={query.jurisdictionId??''} />
           <label htmlFor="event-type"><T value={ui.editor.lifecycle.constitutionid.page.event} /></label>
@@ -125,11 +127,11 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           <p><T value={ui.editor.lifecycle.constitutionid.page.ifTheDateIsUnknownLeaveThe} /></p>
           <label htmlFor="event-source"><T value={ui.editor.lifecycle.constitutionid.page.sourceUrl} /></label>
           <input id="event-source" type="url" name="sourceUrl" />
-          <p><T value={{en:'After recording the event, add documents from its Sources and commentary section above.',de:'Nach dem Erfassen kannst du Dokumente im Bereich Quellen und Kommentare des Ereignisses oben hinzufügen.'}} /></p>
           <label htmlFor="event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
           <textarea id="event-note" name="note" rows={3} />
+          <StagedDocumentPicker name="stagedDocuments" canCreate={user.roles.includes("editor") || user.roles.includes("admin")} />
           <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordEvent} /></button>
-        </Stack>
+        </StagedRecordForm>
       ) : <p><T value={ui.editor.lifecycle.constitutionid.page.thisConstitutionHasBeenRepealed} /></p>}
       {sourceVersionId ? (
         <section className={["card", surfaceStyles.card].join(' ')}>
@@ -144,7 +146,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
             </select>
             <button type="submit"><T value={ui.editor.lifecycle.constitutionid.page.chooseVersion} /></button>
           </Stack>
-          <Stack as="form" action={appendProvisionAction}>
+          <StagedRecordForm action={appendProvisionAction}>
             <input type="hidden" name="constitutionId" value={constitutionId} />
             <input type="hidden" name="code" value={code.toLowerCase()} /><input type="hidden" name="jurisdictionId" value={query.jurisdictionId??''} />
             <input type="hidden" name="sourceVersionId" value={sourceVersionId} />
@@ -167,11 +169,11 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
             </fieldset>
             <label htmlFor="provision-event-source"><T value={ui.editor.lifecycle.constitutionid.page.sourceUrl} /></label>
             <input id="provision-event-source" type="url" name="sourceUrl" />
-            <p><T value={{en:'After recording the event, add documents from its Source documents section above.',de:'Nach dem Erfassen kannst du Dokumente im Bereich Quelldokumente des Ereignisses oben hinzufügen.'}} /></p>
-            <label htmlFor="provision-event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
+              <label htmlFor="provision-event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
             <textarea id="provision-event-note" name="note" rows={3} />
-            <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordProvisionEvent} /></button>
-          </Stack>
+            <StagedDocumentPicker name="stagedDocuments" canCreate={user.roles.includes("editor") || user.roles.includes("admin")} />
+          <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordProvisionEvent} /></button>
+          </StagedRecordForm>
         </section>
       ) : null}
     </WorkspacePage>

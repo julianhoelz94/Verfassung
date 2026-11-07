@@ -1,3 +1,4 @@
+import { DocumentLinks } from './documents/DocumentLinks';
 import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { T } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
@@ -95,6 +96,7 @@ export async function ImportReview({ jobId, error }: { jobId: string; error?: st
       {statuses.failed}
       {statuses.published}
       {reviewSource(payload, job, outline)}
+      <DocumentLinks targetType="import_job" targetId={jobId} returnTo={`/editor?importJobId=${jobId}`} canEdit />
       {prepared ? (
         <Card>
           <h2>

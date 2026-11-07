@@ -18,7 +18,7 @@ let status = 200;
 let impact = 'reversible';
 let responseBody: unknown;
 let wikiCanonicalType: string | undefined;
-const documentRecord = { id: 'document', currentRevision: 3, revision: { id: 'document-r3', revision: 3, title: 'Official source' } };
+const documentRecord = { id: 'document', currentRevision: 3, revision: { id: 'document-r3', revision: 3, title: 'Official source', fileName: 'seal.png', contentType: 'image/png' } };
 const kinds = [{ kindCode: 'article', displayLabel: 'Article', presentation: 'section', showLabel: true, showTitle: true, showKind: true, titlePolicy: 'optional', labelPolicy: 'required', root: true, allowedChildKinds: [] }];
 const structureForm = () => form({ constitutionId: id, settingsRevisionId: 'settings-r2', outline: JSON.stringify(kinds) });
 const wikiForm = (extra: Record<string, string> = {}) => form({ targetType: 'constitution', targetId: id, code: 'XA', expectedRevisionId: 'wiki-r1', summary: 'Summary', body: 'Authored body', images: '[]', sourceUrls: ' https://archive.example/a \n\nhttps://archive.example/b', ...extra });
@@ -120,9 +120,9 @@ describe('contextual pages separate draft and publication', () => {
   });
   it('pins images to the canonical wiki identity returned for a legacy country alias', async () => {
     wikiCanonicalType = 'country';
-    const data = wikiForm({ targetType: 'jurisdiction', code: '', images: JSON.stringify([{ documentId: 'seal', revision: 2, alt: 'Seal' }]) });
+    const data = wikiForm({ targetType: 'jurisdiction', code: '', images: JSON.stringify([{ documentId: id, revision: 2, alt: 'Seal' }]) });
     expect(await wiki.saveWikiAction(data)).toContain('saved=1');
-    expect(requests[2]).toMatchObject({ path: `/api/document/links/country_wiki/${id}`, body: { documentId: 'seal', revisionId: 'seal-r2', scopeRevisionId: 'wiki-r2' } });
+    expect(requests[2]).toMatchObject({ path: `/api/document/links/country_wiki/${id}`, body: { documentId: id, revisionId: `${id}-r2`, scopeRevisionId: 'wiki-r2' } });
   });
   it('saves authored content with its revision guard and normalized source URLs', async () => {
     expect(await wiki.saveWikiAction(wikiForm())).toContain('saved=1'); expect(requests[0]).toMatchObject({ method: 'PUT', path: `/api/catalog/wiki/constitution/${id}/draft`, body: { expectedRevisionId: 'wiki-r1', summary: 'Summary', body: 'Authored body', images: [], sourceUrls: ['https://archive.example/a', 'https://archive.example/b'] } }); expect(requests).toHaveLength(1);
@@ -142,11 +142,11 @@ describe('contextual pages separate draft and publication', () => {
     expect(await wiki.saveWikiAction(wikiForm({ returnTo }))).toBe(`/editor/wiki/constitution/${id}?code=XA&saved=1`);
   });
   it('pins retained images to the saved draft and removes the selected image', async () => {
-    const data = wikiForm({ images: JSON.stringify([{ documentId: 'keep', revision: 2, alt: 'Old alt' }, { documentId: 'remove', revision: 1, alt: 'Remove' }]), 'remove-remove': 'on', 'alt-keep': ' Official seal ', 'placement-keep': 'before_body' });
+    const data = wikiForm({ images: JSON.stringify([{ documentId: id, revision: 2, alt: 'Old alt' }, { documentId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', revision: 1, alt: 'Remove' }]), 'remove-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb': 'on', [`alt-${id}`]: ' Official seal ', [`placement-${id}`]: 'before_body' });
     expect(await wiki.saveWikiAction(data)).toContain('saved=1');
-    expect(requests[0].body).toMatchObject({ images: [expect.objectContaining({ documentId: 'keep', revision: 2, alt: 'Official seal', placement: 'before_body' })] });
-    expect(requests[1].path).toBe('/api/document/documents/keep?revision=2');
-    expect(requests[2]).toMatchObject({ path: `/api/document/links/constitution_wiki/${id}`, body: { documentId: 'keep', revisionId: 'keep-r2', scopeRevisionId: 'wiki-r2' } });
+    expect(requests[1].body).toMatchObject({ images: [expect.objectContaining({ documentId: id, revision: 2, alt: 'Official seal', placement: 'before_body' })] });
+    expect(requests[0].path).toBe(`/api/document/documents/${id}?revision=2`);
+    expect(requests[2]).toMatchObject({ path: `/api/document/links/constitution_wiki/${id}`, body: { documentId: id, revisionId: `${id}-r2`, scopeRevisionId: 'wiki-r2' } });
   });
   it('requires alternative text before creating a newly uploaded image', async () => {
     const data = wikiForm(); data.set('imageFile', new File(['pixels'], 'seal.png', { type: 'image/png' })); expect(await wiki.saveWikiAction(data)).toContain('error=1'); expect(requests).toEqual([]);

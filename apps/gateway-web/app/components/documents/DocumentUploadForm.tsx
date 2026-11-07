@@ -23,7 +23,7 @@ function reportValidity(group: HTMLElement): boolean {
 }
 
 /** No nested form: safe inside an event form or an editor's unsaved draft. */
-export function DocumentUploadForm({ pending, onCreate, onCancel, contextFields }: { contextFields?: ReactNode; pending: boolean; onCreate: (data: FormData) => Promise<boolean>; onCancel: () => void }) {
+export function DocumentUploadForm({ pending, onCreate, onCancel, contextFields, accept, fileRequired = false }: { accept?: string; fileRequired?: boolean; contextFields?: ReactNode; pending: boolean; onCreate: (data: FormData) => Promise<boolean>; onCancel: () => void }) {
   const formId = `${useId()}-document-upload`;
   const t = useTranslation(), copy = (en: string, de: string) => t({ en, de });
   const group = useRef<HTMLDivElement>(null), busy = useRef(false);
@@ -34,7 +34,7 @@ export function DocumentUploadForm({ pending, onCreate, onCancel, contextFields 
   async function submit() {
     if (pending || busy.current || !group.current || !reportValidity(group.current)) return;
     if (file && (file.size === 0 || file.size > 20 * 1024 * 1024)) { setError(copy('Choose a nonempty file up to 20 MB.', 'Wähle eine nicht leere Datei mit höchstens 20 MB.')); return; }
-    if (!file && !sourceUrl.trim()) { setError(copy('Choose a file or enter its source URL under Optional details.', 'Wähle eine Datei oder gib ihre Quell-URL unter Optionale Angaben ein.')); return; }
+    if (!file && (fileRequired || !sourceUrl.trim())) { setError(copy('Choose a file or enter its source URL under Optional details.', 'Wähle eine Datei oder gib ihre Quell-URL unter Optionale Angaben ein.')); return; }
     const populated = extra.filter(field => field.name.trim());
     if (new Set(populated.map(field => field.name.trim().toLowerCase())).size !== populated.length) { setError(copy('Additional field names must be unique.', 'Die Namen zusätzlicher Felder müssen eindeutig sein.')); return; }
     const data = new FormData(); data.set('title', title); data.set('description', description); data.set('sourceUrl', sourceUrl);
@@ -58,7 +58,7 @@ export function DocumentUploadForm({ pending, onCreate, onCancel, contextFields 
     <Stack as="fieldset" disabled={pending} className={styles.fields}>
       <legend className={styles.visuallyHidden}>{copy('New document', 'Neues Dokument')}</legend>
       {error ? <Alert tone="error">{error}</Alert> : null}
-      <Input form={formId} label={copy('File', 'Datei')} type="file" help={copy('Up to 20 MB. You can use a source URL instead under Optional details.', 'Bis zu 20 MB. Unter Optionale Angaben kannst du stattdessen eine Quell-URL verwenden.')} onChange={event => { const picked = event.target.files?.[0] ?? null; setFile(picked); setError(''); if (!title && picked) setTitle(picked.name.replace(/\.[^.]+$/, '')); }} />
+      <Input form={formId} label={copy('File', 'Datei')} type="file" accept={accept} required={fileRequired} help={fileRequired ? copy('Choose a compatible image, up to 20 MB.', 'Wähle ein passendes Bild mit höchstens 20 MB.') : copy('Up to 20 MB. You can use a source URL instead under Optional details.', 'Bis zu 20 MB. Unter Optionale Angaben kannst du stattdessen eine Quell-URL verwenden.')} onChange={event => { const picked = event.target.files?.[0] ?? null; setFile(picked); setError(''); if (!title && picked) setTitle(picked.name.replace(/\.[^.]+$/, '')); }} />
       <Input form={formId} label={copy('Title', 'Titel')} required maxLength={500} value={title} onChange={event => setTitle(event.target.value)} />
       <details className={styles.details}><summary>{copy('Optional details', 'Optionale Angaben')}</summary><Stack gap="control" className={styles.optionalFields}>
         <Grid columns={2} variant="form" gap="control">

@@ -47,14 +47,14 @@ class EditorDocumentService(
         actor: Actor,
         authorization: String?,
     ): DocumentDto {
-        require(targetType in setOf("constitution", "version", "amendment") || targetType in materialLinkTypes) { "Unsupported editor target" }
+        require(targetType in setOf("library", "constitution", "version", "amendment") || targetType in ingestionLinkTypes || targetType in materialLinkTypes) { "Unsupported editor target" }
         if (actor.roles.none { it == "editor" || it == "admin" }) {
             if (bytes != null || request.citationKey != null || request.description.isNullOrBlank()) throw ForbiddenException("Library uploads require editor or admin")
             if (request.bibliography != null && request.bibliography != BibliographyDto(type = "commentary")) throw ForbiddenException("Library metadata requires editor or admin")
         }
         require(bytes != null || !request.sourceUrl.isNullOrBlank() || (targetType in materialLinkTypes && !request.description.isNullOrBlank())) { "A file, source URL or commentary is required" }
         require((request.description?.length ?: 0) <= 10000 && (request.sourceUrl?.length ?: 0) <= 2048) { "Document metadata is too long" }
-        documents.requireEditableTarget(targetType, targetId, request.scopeRevisionId, authorization)
+        if (targetType != "library") documents.requireEditableTarget(targetType, targetId, request.scopeRevisionId, authorization)
         val hash = digest(mapper.writeValueAsBytes(listOf(targetType, targetId, request, fileName, contentType, bytes?.let(::digest))))
         operations.lock(actor.id, request.operationId)
         operations.find(actor.id, request.operationId)?.let { (previous, id, revision) ->
@@ -77,7 +77,7 @@ class EditorDocumentService(
                 actor,
             )
         }
-        documents.attach(targetType, targetId, LinkRequest(stored.id, stored.revision.id, request.scopeRevisionId, request.citationNote), actor, authorization)
+        if (targetType != "library") documents.attach(targetType, targetId, LinkRequest(stored.id, stored.revision.id, request.scopeRevisionId, request.citationNote), actor, authorization)
         operations.save(actor.id, request.operationId, hash, stored.id, stored.revision.revision)
         return stored
     }

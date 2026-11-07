@@ -1,5 +1,7 @@
 "use client";
 
+import type { OrderedInlineReference } from "../../lib/api";
+import { StagedDocumentPicker } from '../components/documents/StagedDocumentPicker';
 import {
   Bold,
   BookOpen,
@@ -747,6 +749,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
                 logicalId: id ?? "new-note-text",
                 text: noteEdit.text,
                 marks: noteEdit.marks ?? [],
+                references: noteEdit.references ?? [],
               },
             },
           ]}
@@ -766,6 +769,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
           onChange={(blocks) => {
             let offset = 0;
             const marks: OrderedTextMark[] = [];
+            const references: OrderedInlineReference[] = [];
             for (const block of blocks) {
               marks.push(
                 ...block.marks.map((mark) => ({
@@ -774,17 +778,20 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
                   end: mark.end + offset,
                 })),
               );
+              references.push(...block.references.map(reference => ({...reference, start: reference.start + offset, end: reference.end + offset})));
               offset += block.text.length;
             }
             updateNoteDraft({
               ...noteEdit,
               text: blocks.map((block) => block.text).join(""),
               marks: normalizeMarks(marks),
+              references,
             });
           }}
           onUndo={() => travel()}
           onRedo={() => travel(true)}
         />
+        <details><summary>{copy("Cite a document", "Dokument zitieren")}</summary><StagedDocumentPicker heading={copy("Document citation", "Dokumentbeleg")} onChoose={chosen => link({ type: 'document', documentId: chosen.documentId, documentRevision: chosen.document.revision.revision, ...(chosen.citationNote ? { locator: chosen.citationNote } : {}) })} /></details>
         {noteError ? <p role="alert">{noteError}</p> : null}
         <div className={styles.actions}>
           <button
@@ -1403,6 +1410,9 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
         >
           {t(ui.editor.structurededitor.linkToUrl)}
         </button>
+        <details><summary>{copy("Cite a document", "Dokument zitieren")}</summary>
+          <StagedDocumentPicker heading={copy("Document citation", "Dokumentbeleg")} onChoose={chosen => link({ type: 'document', documentId: chosen.documentId, documentRevision: chosen.document.revision.revision, ...(chosen.citationNote ? { locator: chosen.citationNote } : {}) })} />
+        </details>
         {selectedEntry?.references?.map((reference) => (
           <button
             type="button"
@@ -1579,6 +1589,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
                     label: note.entry.footnoteLabel ?? "",
                     text: note.entry.text ?? "",
                     marks: note.entry.marks,
+                    references: note.entry.references,
                   });
                   setPanel("");
                   requestAnimationFrame(() =>
@@ -1679,6 +1690,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
                 label: note.entry.footnoteLabel ?? "*",
                 text: note.entry.text ?? "",
                 marks: note.entry.marks,
+                citations: note.entry.references,
                 href: "#editor-fn-" + note.entry.logicalId,
               })),
             }}
@@ -1738,6 +1750,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
                         label: entry.footnoteLabel ?? "",
                         text: entry.text ?? "",
                         marks: entry.marks,
+                        references: entry.references,
                       })
                     }
                   >
@@ -1908,6 +1921,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
               label: note.entry.footnoteLabel ?? "*",
               text: note.entry.text ?? "",
               marks: note.entry.marks,
+                    references: note.entry.references,
             });
         }}
         onNavigate={() =>
@@ -1927,6 +1941,7 @@ export function renderStructuredEditor(model: StructuredEditorModel) {
         label: note.entry.footnoteLabel ?? "*",
         text: note.entry.text ?? "",
         marks: note.entry.marks,
+                    citations: note.entry.references,
         href: "#editor-fn-" + note.entry.logicalId,
       }))}
       onNavigate={(note) => navigateNote(note.logicalId)}

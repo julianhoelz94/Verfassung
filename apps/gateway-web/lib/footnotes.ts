@@ -1,6 +1,6 @@
-import type { OrderedEntry, OrderedTextMark } from './api';
+import type { OrderedEntry, OrderedInlineReference, OrderedTextMark } from './api';
 
-export type FootnoteItem = { logicalId: string; label: string; text: string; href: string; marks?: OrderedTextMark[]; references?: { id: string; label: string }[] };
+export type FootnoteItem = { logicalId: string; label: string; text: string; href: string; marks?: OrderedTextMark[]; citations?: OrderedInlineReference[]; references?: { id: string; label: string }[] };
 
 /** One index per pinned version, shared by every marker instead of fetched per reference. */
 export function footnoteItems(entries: OrderedEntry[], hrefPrefix = '', idPrefix = ''): FootnoteItem[] {
@@ -8,6 +8,7 @@ export function footnoteItems(entries: OrderedEntry[], hrefPrefix = '', idPrefix
     logicalId: entry.logicalId, label: entry.footnoteLabel ?? '*', text: entry.text ?? '',
     href: hrefPrefix + '#' + idPrefix + 'fn-' + (entry.occurrenceId ?? entry.logicalId),
     marks: entry.marks,
+    ...(entry.references?.length ? { citations: entry.references } : {}),
   }] : []);
 }
 

@@ -245,6 +245,8 @@ services:
       - CONTENT_API_URL=http://content-service:8080
       - CATALOG_API_URL=http://catalog-service:8080
       - AMENDMENT_API_URL=http://amendment-service:8080
+      - INGESTION_API_URL=http://ingestion-service:8080
+      - CONTENT_API_URL=http://content-service:8080
       - SEARCH_API_URL=http://search-service:8080
       - EDITOR_SERVICE_TOKEN=${EDITOR_SERVICE_TOKEN:-}
     depends_on:

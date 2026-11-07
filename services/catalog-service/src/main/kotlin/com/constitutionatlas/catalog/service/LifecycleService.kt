@@ -14,6 +14,7 @@ import java.util.UUID
 @Service
 class LifecycleService(
     private val catalog: CatalogRepository,
+    private val creations: com.constitutionatlas.catalog.repo.EventCreationRepository,
     private val lifecycle: LifecycleRepository,
 ) {
     @org.springframework.transaction.annotation.Transactional
@@ -44,6 +45,7 @@ class LifecycleService(
     @Transactional
     fun append(constitutionId: UUID, request: CreateLifecycleEvent, actorId: UUID): LifecycleEvent {
         if (!catalog.lockConstitution(constitutionId)) throw NotFoundException("Unknown constitution '$constitutionId'")
+        creations.find(actorId, request.operationId, "constitution", constitutionId, request)?.let { id -> return lifecycle.events(constitutionId).first { it.id == id } }
         val kind = request.eventType.trim().lowercase()
         require(request.dateCertainty in setOf("exact", "approximate")) { "Invalid lifecycle date certainty" }
         val events = lifecycle.events(constitutionId)
@@ -63,6 +65,8 @@ class LifecycleService(
         if (sourceUrl != null && !(sourceUrl.startsWith("https://") || sourceUrl.startsWith("http://"))) {
             throw IllegalArgumentException("sourceUrl must be an HTTP(S) URL")
         }
-        return lifecycle.insert(constitutionId, kind, request.eventDate, sourceUrl, request.note?.trim(), request.dateCertainty, actorId)
+        val event = lifecycle.insert(constitutionId, kind, request.eventDate, sourceUrl, request.note?.trim(), request.dateCertainty, actorId)
+        creations.save(actorId, request.operationId, "constitution", constitutionId, request, event.id)
+        return event
     }
 }

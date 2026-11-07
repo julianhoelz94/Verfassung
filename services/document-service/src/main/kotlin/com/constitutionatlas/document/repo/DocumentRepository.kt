@@ -127,6 +127,10 @@ class DocumentRepository(private val jdbc: JdbcTemplate, private val mapper: Obj
             id,
         )
 
+    fun lockCitationVersion(version: UUID) {
+        jdbc.execute("SELECT pg_advisory_xact_lock(hashtextextended('passage-citations:$version', 0))")
+    }
+
     fun linkEvent(targetType: String, targetId: UUID, scopeRevisionId: UUID?, documentId: UUID, revisionId: UUID?, action: String, actorId: UUID, citationNote: String? = null) {
         jdbc.update(
             """INSERT INTO document_link_events (id, target_type, target_id, scope_revision_id, document_id, revision_id, action, actor_id, citation_note)

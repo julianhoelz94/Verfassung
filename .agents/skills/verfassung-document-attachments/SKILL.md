@@ -20,6 +20,7 @@ Paths are relative to the repository root.
 | Authorized server-loaded embedding | `apps/gateway-web/app/editor/documents/DocumentLinks.tsx` |
 | Gateway commands and bounded folder search | `apps/gateway-web/app/editor/documents/command/route.ts` |
 | Shared wire types and HTTP clients | `apps/gateway-web/lib/document-api.ts` |
+| Staged selection for new owners, Wiki and text citations | `apps/gateway-web/app/components/documents/StagedDocumentPicker.tsx`, `lib/document-reference-server.ts` |
 | Atomic create, upload, pin and retry receipt | `services/document-service/src/main/kotlin/com/constitutionatlas/document/service/EditorDocumentService.kt` |
 | Integration examples and rollout plan | `docs/design/document-attachment-template.md` |
 | Interactive preview source/build | `docs/design/prototype/document-attachment/` |
@@ -51,9 +52,11 @@ Paths are relative to the repository root.
 
 ## Lifecycle and other new targets
 
-The live event integration uses `lifecycle_material` links, with constitution ID as target and the saved constitution/provision event ID as scope. The owning Catalog API validates event identity; legacy event `sourceUrl` remains separate. Existing event forms expose attachments after recording the event. A future combined composer must stage choices until the event save succeeds; retries must not append a duplicate event. Keep publisher event rights separate from editor/admin library-writing rights. Do not simulate a relationship by substituting a private document URL into `sourceUrl`, or attach it to a constitution merely to make it public.
+The event integration uses `lifecycle_material` links, with constitution ID as target and the saved constitution/provision event ID as scope. Both new event forms use `StagedDocumentPicker`. Catalog's actor-scoped creation receipts make retries safe after an owner succeeds but attaching evidence fails. Keep publisher relationship rights separate from editor/admin library-writing rights.
 
-The same staged-reference pattern can serve imports or Wiki citations after their owners support it. A selection callback can reuse the template immediately in a local prototype without claiming persistence.
+For unsaved owners use `StagedDocumentPicker`, optionally setting `form` to the owning form's ID when the picker is outside it. Its hidden field carries `{documentId,revision,citationNote?}`. Resolve these references on the server before saving the owner; attach only to the saved exact scope. Library-only uploads are atomic and idempotent via `POST /library/documents`, and remain in the central library if the host is cancelled. Do not switch the mounted composer to an immediate-save adapter after a partial failure.
+
+Wiki image reuse uses the staged adapter's `kind="image"` filter and retains page-owned presentation metadata. Wiki bibliography uses immutable citations and verifies pins at publication. Supplementary import evidence uses private job/proposal/run link targets without modifying captures. Structured references use the `document` target with `documentId`, `documentRevision` and optional `locator`; publication synchronizes them from Content, never from a client-supplied list. Preserve note references through the note editor and popup projections as well as the main reader. Keep legacy URLs compatible.
 
 ## Verification
 

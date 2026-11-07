@@ -56,6 +56,52 @@ class DocumentApiTest {
     }
 
     @Test
+    fun stagedUploadsReplayWithoutOwnerLinksAndSupplementaryEvidenceStaysPrivate() {
+        val operation = UUID.randomUUID()
+        val metadata = """{"operationId":"$operation","title":"Staged source","citationKey":"Staged$operation","bibliography":{"type":"report","abstract":"Source summary"}}"""
+        fun upload(token: String = EDITOR, body: String = metadata) = mvc.perform(
+            multipart("/library/documents")
+                .file(MockMultipartFile("metadata", "metadata.json", "application/json", body.toByteArray()))
+                .file(MockMultipartFile("file", "source.txt", "text/plain", "Immutable captured bytes".toByteArray())).header("Authorization", token),
+        )
+        val document = mapper.readTree(upload().andExpect(status().isCreated).andReturn().response.contentAsString)
+        val id = document.path("id").asText()
+        val pin = document.path("revision").path("id").asText()
+        upload().andExpect(status().isCreated).andExpect(jsonPath("$.id").value(id))
+        upload(body = metadata.replace("Staged source", "Different source")).andExpect(status().isConflict)
+        upload(VIEWER).andExpect(status().isForbidden)
+        val publisherToken = "Bearer staging-publisher"
+        Mockito.`when`(identity.authenticate(publisherToken)).thenReturn(Actor(UUID.randomUUID(), "publisher@example.test", listOf("publisher")))
+        upload(publisherToken).andExpect(status().isForbidden)
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM document_link_events WHERE document_id = ?::uuid", Int::class.java, id))
+        for (type in listOf("import_job", "setup_proposal", "migration_run")) {
+            val target = UUID.randomUUID()
+            val body = """{"documentId":"$id","revisionId":"$pin","citationNote":"Supplementary only"}"""
+            repeat(2) {
+                mvc.post("/links/$type/$target") {
+                    header("Authorization", EDITOR)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = body
+                }.andExpect { status { isOk() } }
+            }
+            mvc.get("/links/$type/$target").andExpect { status { isNotFound() } }
+            mvc.get("/links/$type/$target") { header("Authorization", EDITOR) }.andExpect {
+                status { isOk() }
+                jsonPath("$[0].citationNote") { value("Supplementary only") }
+            }
+            org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM document_link_events WHERE target_id = ?", Int::class.java, target))
+        }
+        mvc.get("/documents/$id").andExpect { status { isNotFound() } }
+        val bytes = mvc.get("/documents/$id/revisions/2/file") { header("Authorization", EDITOR) }.andReturn().response.contentAsByteArray
+        org.junit.jupiter.api.Assertions.assertArrayEquals("Immutable captured bytes".toByteArray(), bytes)
+        mvc.get("/library/documents?kind=image") { header("Authorization", EDITOR) }.andExpect {
+            status { isOk() }
+            jsonPath("$.items[?(@.id == '$id')]") { isEmpty() }
+        }
+        mvc.get("/library/documents?kind=executable") { header("Authorization", EDITOR) }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
     fun editorUploadCreatesOnePinnedRecordAndReplaysWithoutDuplicates() {
         val target = UUID.randomUUID()
         val operation = UUID.randomUUID()

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { currentUser, requireSessionBearer } from '../../../../lib/session';
-import { attachDocument, createLinkedDocument, detachDocument, listDocumentLinks, listDocumentRevisions, listLibraryDocuments, reviseMaterial, type DocumentBibliography } from '../../../../lib/document-api';
+import { attachDocument, createLinkedDocument, stageDocument, getDocument, listDocumentFolders, detachDocument, listDocumentLinks, listDocumentRevisions, listLibraryDocuments, reviseMaterial, type DocumentBibliography } from '../../../../lib/document-api';
 import { canChangeDocumentLinks, editableDocumentTarget, isMaterialTarget, type EditableDocumentTarget } from '../../../../lib/document-target';
 import { canManageDocuments, canReadDocuments } from '../../../../lib/nav';
 import { hasTrustedOrigin } from '../../../../lib/request-origin';
@@ -11,15 +11,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!user || !canReadDocuments(user.roles)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const command = request.nextUrl.searchParams.get('command');
   const headers = { 'Cache-Control': 'private, no-store' };
-  if (command === 'search') {
-    const q = request.nextUrl.searchParams.get('q') ?? '';
-    const offset = Number(request.nextUrl.searchParams.get('offset') ?? '0');
-    if (q.length > 500 || !Number.isSafeInteger(offset) || offset < 0) return NextResponse.json({ error: 'search' }, { status: 400 });
-    const folderId = request.nextUrl.searchParams.get('folderId');
-    if (folderId && folderId.length > 100) return NextResponse.json({ error: 'folder' }, { status: 400 });
-    try { return NextResponse.json(await listLibraryDocuments({ q, offset, limit: 30, status: 'active', sort: 'title', ...(folderId ? { folderId } : {}) }, await requireSessionBearer()), { headers }); }
+  if (command === 'folders') {
+    try { return NextResponse.json(await listDocumentFolders(await requireSessionBearer()), { headers }); }
     catch { return NextResponse.json({ error: 'document' }, { status: 502 }); }
   }
+  if (command === 'document') return readPinnedDocument(request);
+  if (command === 'search') return searchLibrary(request);
   if (command === 'revisions') {
     const documentId = request.nextUrl.searchParams.get('documentId');
     if (!documentId || documentId.length > 100) return NextResponse.json({ error: 'documentId' }, { status: 400 });
@@ -32,6 +29,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try { return NextResponse.json({ links: await listDocumentLinks('amendment', targetId, scope, await requireSessionBearer()) },{headers:{'Cache-Control':'private, no-store'}}); }
   catch { return NextResponse.json({ error: 'document' }, { status: 502 }); }
 }
+
+async function readPinnedDocument(request: NextRequest): Promise<NextResponse> {
+  const headers = { 'Cache-Control': 'private, no-store' };
+    const id = request.nextUrl.searchParams.get('documentId') ?? '';
+    const revision = Number(request.nextUrl.searchParams.get('revision'));
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !Number.isSafeInteger(revision) || revision < 1) return NextResponse.json({ error: 'document' }, { status: 400 });
+    try { return NextResponse.json(await getDocument(id, revision, await requireSessionBearer()), { headers }); }
+    catch { return NextResponse.json({ error: 'document' }, { status: 502 }); }
+  }
+
+async function searchLibrary(request: NextRequest): Promise<NextResponse> {
+  const headers = { 'Cache-Control': 'private, no-store' };
+    const q = request.nextUrl.searchParams.get('q') ?? '';
+    const offset = Number(request.nextUrl.searchParams.get('offset') ?? '0');
+    if (q.length > 500 || !Number.isSafeInteger(offset) || offset < 0) return NextResponse.json({ error: 'search' }, { status: 400 });
+    const folderId = request.nextUrl.searchParams.get('folderId');
+    if (folderId && folderId.length > 100) return NextResponse.json({ error: 'folder' }, { status: 400 });
+    try { return NextResponse.json(await listLibraryDocuments({ q, offset, limit: 30, status: 'active', sort: 'title', ...(request.nextUrl.searchParams.get('kind') === 'image' ? { kind: 'image' as const } : {}), ...(folderId ? { folderId } : {}) }, await requireSessionBearer()), { headers }); }
+    catch { return NextResponse.json({ error: 'document' }, { status: 502 }); }
+  }
 
 function optionalMetadata(form: FormData): { citationKey?: string; bibliography?: DocumentBibliography } {
   const citationKey = String(form.get('citationKey') ?? '').trim();
@@ -49,6 +66,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const form = await request.formData();
     const value = (key: string) => String(form.get(key) ?? '');
+    if (value('command') === 'stage') {
+      if (!canManageDocuments(user.roles)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+      const file = form.get('file');
+      if (file instanceof File && (file.size === 0 || file.size > 20 * 1024 * 1024)) return NextResponse.json({ error: 'size' }, { status: 400 });
+      const document = await stageDocument({ operationId: value('operationId'), title: value('title'), description: value('description'), sourceUrl: value('sourceUrl'), scopeRevisionId: null, ...optionalMetadata(form) }, file instanceof File ? file : null, await requireSessionBearer());
+      return NextResponse.json({ document });
+    }
     const targetType = value('targetType');
     const targetId = value('targetId');
     const scopeRevisionId = value('scopeRevisionId') || null;

@@ -2,10 +2,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from './route';
 import { currentUser } from '../../../../lib/session';
-import { attachDocument, createLinkedDocument, detachDocument, listDocumentLinks, listDocumentRevisions, listLibraryDocuments } from '../../../../lib/document-api';
+import { attachDocument, createLinkedDocument, stageDocument, getDocument, listDocumentFolders, detachDocument, listDocumentLinks, listDocumentRevisions, listLibraryDocuments } from '../../../../lib/document-api';
 
 vi.mock('../../../../lib/session', () => ({ currentUser: vi.fn(), requireSessionBearer: async () => 'Bearer session' }));
-vi.mock('../../../../lib/document-api', () => ({ attachDocument: vi.fn(), createLinkedDocument: vi.fn(), detachDocument: vi.fn(), listDocumentLinks: vi.fn(), listDocumentRevisions: vi.fn(), listLibraryDocuments: vi.fn() }));
+vi.mock('../../../../lib/document-api', () => ({ attachDocument: vi.fn(), createLinkedDocument: vi.fn(), stageDocument: vi.fn(), getDocument: vi.fn(), listDocumentFolders: vi.fn(), detachDocument: vi.fn(), listDocumentLinks: vi.fn(), listDocumentRevisions: vi.fn(), listLibraryDocuments: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(currentUser).mockResolvedValue({ id: 'editor', email: 'editor@example.test', roles: ['editor'] }); });
 function request(patch: Record<string, string> = {}, origin = 'http://localhost') {
@@ -95,4 +95,20 @@ it('permits publisher event attachments without granting library upload or amend
   expect((await POST(request({targetType:'lifecycle_material',scopeRevisionId:'event'}))).status).toBe(403);
   expect((await POST(request({command:'attach',targetType:'change_material',documentId:'source',revisionId:'pin'}))).status).toBe(403);
   expect(createLinkedDocument).not.toHaveBeenCalled();
+});
+
+it('stages a complete library upload independently of any saved owner and denies publisher creation', async () => {
+  vi.mocked(stageDocument).mockResolvedValue({id:'staged'} as never);
+  const bibliography={type:'report',authors:[{literal:'Archive'}],editors:[],extra:{},abstract:'Original abstract'};
+  const response=await POST(request({command:'stage',targetType:'',targetId:'',citationKey:'Archive2026',bibliography:JSON.stringify(bibliography)}));
+  expect(response.status).toBe(200);
+  expect(stageDocument).toHaveBeenCalledWith(expect.objectContaining({operationId:'operation',citationKey:'Archive2026',bibliography,scopeRevisionId:null}),null,'Bearer session');
+  expect(attachDocument).not.toHaveBeenCalled();
+  vi.mocked(currentUser).mockResolvedValue({id:'publisher',email:'publisher@example.test',roles:['publisher']});
+  expect((await POST(request({command:'stage'}))).status).toBe(403);
+});
+it('forwards image filtering to the bounded library query', async () => {
+  vi.mocked(listLibraryDocuments).mockResolvedValue({items:[],total:0,offset:0,limit:30});
+  expect((await GET(new NextRequest('http://localhost/editor/documents/command?command=search&kind=image&q=seal'))).status).toBe(200);
+  expect(listLibraryDocuments).toHaveBeenCalledWith(expect.objectContaining({q:'seal',kind:'image',limit:30}),'Bearer session');
 });

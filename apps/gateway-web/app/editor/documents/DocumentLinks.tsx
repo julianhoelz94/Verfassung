@@ -36,9 +36,12 @@ export async function DocumentLinks(props: {
   const documents = page.items;
   const events = eventsResult.status === 'fulfilled' ? eventsResult.value : [];
   const available = documents.filter(document => document.status === 'active');
+  const supplementary = ['import_job', 'setup_proposal', 'migration_run'].includes(props.targetType);
+  const heading = props.heading ?? (supplementary ? (locale === 'de' ? 'Ergänzende Belege' : 'Supplementary evidence') : undefined);
   return <Stack as="section" className={surfaceStyles.card}>
     {unavailable ? <Alert tone="error"><T value={ui.editor.documents.documentlinks.documentServiceIsUnavailableLinksMayBe} /></Alert> : null}
-    <DocumentManager heading={props.heading} headingLevel={props.headingLevel} canCreate={canCreate} key={`${props.targetType}:${props.targetId}:${props.scopeRevisionId ?? ''}`} links={links} documents={available}
+    {supplementary ? <p><T value={{ en: 'Additional references for this review. Captured source files and checksums stay unchanged.', de: 'Zusätzliche Belege für diese Prüfung. Erfasste Quelldateien und Prüfsummen bleiben unverändert.' }} /></p> : null}
+    <DocumentManager heading={heading} headingLevel={props.headingLevel} canCreate={canCreate} key={`${props.targetType}:${props.targetId}:${props.scopeRevisionId ?? ''}`} links={links} documents={available}
       revisions={{}} documentTotal={page.total} folders={foldersResult.status === 'fulfilled' ? foldersResult.value : []} remoteSearch
       targetType={props.targetType} targetId={props.targetId} scopeRevisionId={props.scopeRevisionId} canEdit={canEdit && !unavailable} />
     {events.length ? <details><summary><T value={ui.editor.documents.documentlinks.linkHistory} /></summary><ol>{events.map((event) => <li key={event.id}>

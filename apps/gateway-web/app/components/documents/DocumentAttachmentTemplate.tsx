@@ -11,6 +11,8 @@ import styles from './DocumentAttachmentTemplate.module.css';
 
 export type DocumentAttachmentTemplateProps = {
   heading?: string;
+  uploadAccept?: string;
+  uploadFileRequired?: boolean;
   headingLevel?: 'h2' | 'h3' | 'h4';
   links: DocumentLink[];
   documents: DocumentRecord[];
@@ -26,6 +28,7 @@ export type DocumentAttachmentTemplateProps = {
   searchPending?: boolean;
   revisionPending?: boolean;
   onSearch?: (query: string, offset: number, folderId?: string) => Promise<boolean>;
+  onBrowse?: () => void;
   onSelect?: (documentId: string) => Promise<void>;
   onInspect?: (document: DocumentRecord) => void;
   renderAttachmentContext?: (link: DocumentLink) => ReactNode;
@@ -36,7 +39,7 @@ export type DocumentAttachmentTemplateProps = {
 };
 
 /** Shared editor presentation; route adapters retain authorization and target ownership. */
-export function DocumentAttachmentTemplate({ heading, headingLevel: Heading = 'h2', links, documents, revisions, canEdit, canCreate = canEdit, folders = [], pending, error, notice, documentTotal, documentOffset = 0, searchPending, revisionPending, onSearch, onSelect, onInspect, onCreate, onAttach, onDetach, contextFields, renderAttachmentContext }: DocumentAttachmentTemplateProps) {
+export function DocumentAttachmentTemplate({ heading, uploadAccept, uploadFileRequired, headingLevel: Heading = 'h2', links, documents, revisions, canEdit, canCreate = canEdit, folders = [], pending, error, notice, documentTotal, documentOffset = 0, searchPending, revisionPending, onSearch, onBrowse, onSelect, onInspect, onCreate, onAttach, onDetach, contextFields, renderAttachmentContext }: DocumentAttachmentTemplateProps) {
   const t = useTranslation(), copy = (en: string, de: string) => t({ en, de });
   const id = useId();
   const [opened,setOpened]=useState({new:false,existing:false});
@@ -49,7 +52,7 @@ export function DocumentAttachmentTemplate({ heading, headingLevel: Heading = 'h
     </li>)}</ul> : <p className={styles.muted}>{copy('No documents linked yet.', 'Noch keine Dokumente verknüpft.')}</p>;
   }
   function renderNew() {
-    return <div id={`${id}-new`} hidden={task !== 'new'}>{opened.new ? <DocumentUploadForm pending={pending} onCreate={onCreate} contextFields={contextFields?.('upload')} onCancel={() => setTask(null)} /> : null}</div>;
+    return <div id={`${id}-new`} hidden={task !== 'new'}>{opened.new ? <DocumentUploadForm accept={uploadAccept} fileRequired={uploadFileRequired} pending={pending} onCreate={onCreate} contextFields={contextFields?.('upload')} onCancel={() => setTask(null)} /> : null}</div>;
   }
 
   function renderExisting() {
@@ -62,7 +65,7 @@ export function DocumentAttachmentTemplate({ heading, headingLevel: Heading = 'h
     {renderLinks()}
     {canEdit ? <>
       <Inline>{canCreate ? <Button type="button" variant={task === 'new' ? 'primary' : 'secondary'} size="sm" disabled={pending} aria-pressed={task === 'new'} aria-expanded={task === 'new'} aria-controls={`${id}-new`} onClick={() => {setOpened(current=>({...current,new:true}));setTask(task === 'new' ? null : 'new');}}>{copy('Upload new document', 'Neues Dokument hochladen')}</Button> : null}
-        <Button type="button" variant={task === 'existing' ? 'primary' : 'secondary'} size="sm" disabled={pending} aria-pressed={task === 'existing'} aria-expanded={task === 'existing'} aria-controls={`${id}-existing`} onClick={() => {setOpened(current=>({...current,existing:true}));setTask(task === 'existing' ? null : 'existing');}}>{copy('Choose existing document', 'Vorhandenes Dokument auswählen')}</Button></Inline>
+        <Button type="button" variant={task === 'existing' ? 'primary' : 'secondary'} size="sm" disabled={pending} aria-pressed={task === 'existing'} aria-expanded={task === 'existing'} aria-controls={`${id}-existing`} onClick={() => {onBrowse?.();setOpened(current=>({...current,existing:true}));setTask(task === 'existing' ? null : 'existing');}}>{copy('Choose existing document', 'Vorhandenes Dokument auswählen')}</Button></Inline>
     {renderNew()}
     {renderExisting()}
     </> : null}

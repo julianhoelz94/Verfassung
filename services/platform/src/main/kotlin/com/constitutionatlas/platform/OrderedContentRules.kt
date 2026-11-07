@@ -150,6 +150,17 @@ object OrderedContentRules {
         if (errors.isNotEmpty()) throw OrderedContentValidationException(errors)
     }
 
+    private fun validReferenceTarget(target: OrderedReferenceTarget, footnotes: Set<UUID>, units: Set<UUID>?): Boolean {
+        if (target.type == "document") return target.documentId != null && (target.documentRevision ?: 0) > 0 && (target.locator?.length ?: 0) <= 4000 && target.logicalId == null && target.url == null && target.footnoteId == null
+        if (target.documentId != null || target.documentRevision != null || target.locator != null) return false
+        return when (target.type) {
+            "unit" -> target.logicalId != null && target.url == null && target.footnoteId == null && (units == null || target.logicalId in units)
+            "external" -> target.url?.startsWith("https://") == true && target.logicalId == null && target.footnoteId == null
+            "footnote" -> target.footnoteId in footnotes && target.logicalId == null && target.url == null
+            else -> false
+        }
+    }
+
     fun referenceErrors(text: String, format: String?, references: List<OrderedInlineReference>, footnotes: Set<UUID>, path: String, logicalId: UUID? = null, units: Set<UUID>? = null): List<OrderedValidationError> {
         val errors = mutableListOf<OrderedValidationError>()
         var end = 0
@@ -162,13 +173,9 @@ object OrderedContentRules {
                 (reference.start < reference.end || reference.start == reference.end && target.type == "footnote") &&
                 !splitsSurrogate(text, reference.start) &&
                 !splitsSurrogate(text, reference.end)
-            val validTarget = when (target.type) {
-                "unit" -> target.logicalId != null && target.url == null && target.footnoteId == null && (units == null || target.logicalId in units)
-                "external" -> target.url?.startsWith("https://") == true && target.logicalId == null && target.footnoteId == null
-                "footnote" -> target.footnoteId in footnotes && target.logicalId == null && target.url == null
-                else -> false
-            }
-            if ((format ?: "plain") != "plain" || !identities.add(reference.logicalId) || !span || !validTarget) {
+            val validTarget = validReferenceTarget(target, footnotes, units)
+            val plainReferences = (format ?: "plain") == "plain" || format == "footnote" && target.type != "footnote"
+            if (!plainReferences || !identities.add(reference.logicalId) || !span || !validTarget) {
                 val missingUnit = target.type == "unit" && target.logicalId != null && units != null && target.logicalId !in units
                 errors += if (missingUnit) {
                     OrderedValidationError("UNIT_REFERENCE_TARGET", "$path.references[$index]", logicalId, "Unit target '${target.logicalId}' is not part of this constitution version; choose an existing unit or text entry, or remove the reference")

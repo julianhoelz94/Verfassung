@@ -1,6 +1,7 @@
 package com.constitutionatlas.document.service
 
 import com.constitutionatlas.platform.NotFoundException
+import com.constitutionatlas.platform.documentCitations
 import com.constitutionatlas.platform.scalarText
 import com.constitutionatlas.platform.timedRestClient
 import org.springframework.beans.factory.annotation.Value
@@ -10,10 +11,12 @@ import org.springframework.web.client.RestClientResponseException
 import tools.jackson.databind.JsonNode
 import java.util.UUID
 
+internal val ingestionLinkTypes = setOf("import_job", "setup_proposal", "migration_run")
 internal val wikiLinkTypes = setOf("country_wiki", "constitution_wiki", "jurisdiction_wiki")
 internal val materialLinkTypes = setOf("amendment_material", "change_material", "lifecycle_material")
 
 interface LinkTargetClient {
+    fun isPassageCitationPublic(versionId: UUID, documentId: UUID, revision: Int): Boolean = false
     fun requireTarget(targetType: String, targetId: UUID, authorization: String?)
     fun isPublic(targetType: String, targetId: UUID, scopeRevisionId: UUID?): Boolean
     fun requireAmendmentRevision(targetId: UUID, scopeRevisionId: UUID, authorization: String?, allowPublished: Boolean)
@@ -27,12 +30,25 @@ interface LinkTargetClient {
 class RestLinkTargetClient(
     @Value("\${catalog.api.url:http://localhost/api/catalog}") catalogUrl: String,
     @Value("\${amendment.api.url:http://localhost/api/amendment}") amendmentUrl: String,
+    @Value("\${ingestion.api.url:http://localhost/api/ingestion}") ingestionUrl: String = "http://localhost/api/ingestion",
+    @Value("\${content.api.url:http://localhost/api/content}") contentUrl: String = "http://localhost/api/content",
 ) : LinkTargetClient {
+    private val content = timedRestClient(contentUrl)
+    private val ingestion = timedRestClient(ingestionUrl)
     private val catalog = timedRestClient(catalogUrl)
     private val amendment = timedRestClient(amendmentUrl)
 
+    override fun isPassageCitationPublic(versionId: UUID, documentId: UUID, revision: Int): Boolean = runCatching {
+        if (!isPublic("version", versionId, null)) return@runCatching false
+        val snapshot = content.get().uri("/versions/$versionId/content").retrieve().body(com.constitutionatlas.platform.OrderedSnapshot::class.java)
+        snapshot?.versionId == versionId && snapshot.documentCitations().any { it.documentId == documentId && it.documentRevision == revision }
+    }.getOrDefault(false)
+
     override fun requireTarget(targetType: String, targetId: UUID, authorization: String?) {
         val (client, path) = when (targetType) {
+            "import_job" -> ingestion to "/import-jobs/$targetId"
+            "setup_proposal" -> ingestion to "/import-setup-proposals/$targetId"
+            "migration_run" -> ingestion to "/migration-runs/$targetId"
             "constitution" -> catalog to "/constitutions/$targetId/metadata"
             "version" -> catalog to "/versions/$targetId"
             "amendment" -> amendment to "/amendments/$targetId"
@@ -77,7 +93,7 @@ class RestLinkTargetClient(
                     val versions = catalog.get().uri("/constitutions/$targetId/versions").retrieve().body(JsonNode::class.java)
                     versions?.isArray == true && versions.size() > 0
                 }
-                "version" -> {
+                "version", "passage_citation" -> {
                     val version = catalog.get().uri("/versions/$targetId").retrieve().body(JsonNode::class.java)
                     // Published editorial corrections remain public by their immutable ID.
                     version?.path("publicationStatus")?.scalarText() == "published"
@@ -146,7 +162,7 @@ class RestLinkTargetClient(
             val kind = targetType.removeSuffix("_wiki")
             val page = catalog.get().uri("/wiki/$kind/$targetId/revisions/$scopeRevisionId").retrieve().body(JsonNode::class.java)
             page?.path("id")?.scalarText() == scopeRevisionId.toString() &&
-                page.path("images").any { image ->
+                (page.path("images").toList() + page.path("citations").toList()).any { image ->
                     image.path("documentId").scalarText() == documentId.toString() &&
                         image.path("revision").asInt(0) == revision
                 }

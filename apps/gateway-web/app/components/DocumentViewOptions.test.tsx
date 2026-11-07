@@ -1,12 +1,28 @@
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { getByRole, queryByRole } from "@testing-library/dom";
-import { mount, click } from "../../test/dom";
-import { DocumentView } from "./DocumentViewOptions";
+import { mount, click, change } from "../../test/dom";
+import { DocumentView, ReadingPreferenceControls } from "./DocumentViewOptions";
+import { readReaderPreferences } from "../../lib/reader";
 import { readerPreferenceSnapshot } from "../../lib/reader-preferences";
 let view: Awaited<ReturnType<typeof mount>>;
 afterEach(async () => {
   if (view) await view.close();
   localStorage.clear();
+});
+it("shares labelled text-size and layout controls while leaving host-specific options intact", async () => {
+  const onChange = vi.fn();
+  const preferences = readReaderPreferences(null);
+  view = await mount(<ReadingPreferenceControls value={preferences} onChange={onChange}>
+    <label>Detail level<select defaultValue="full"><option value="full">Full text</option></select></label>
+  </ReadingPreferenceControls>);
+  await change(getByRole(view.host, "combobox", {name: "Text size"}) as HTMLSelectElement, "20");
+  expect(onChange).toHaveBeenCalledWith({size: "20"});
+  await click(getByRole(view.host, "checkbox", {name: "Show indentation"}));
+  expect(onChange).toHaveBeenCalledWith({indentation: false});
+  expect(getByRole(view.host, "combobox", {name: "Detail level"})).toBeTruthy();
+  await view.render(<ReadingPreferenceControls value={{...preferences, size: "20"}} onChange={onChange} hierarchy={false} />);
+  expect(queryByRole(view.host, "checkbox")).toBeNull();
+  expect((getByRole(view.host, "combobox", {name: "Text size"}) as HTMLSelectElement).value).toBe("20");
 });
 it("hides guides when indentation is off, preserving the last guide choice and the open menu", async () => {
   view = await mount(

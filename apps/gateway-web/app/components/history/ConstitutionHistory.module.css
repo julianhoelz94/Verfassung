@@ -1,6 +1,12 @@
 .viewer {
   background: var(--color-paper);
 }
+.viewer[data-viewer-mode="history"] .body {
+  background: var(--color-paper);
+}
+.viewer[data-viewer-mode="history"] .body h1 {
+  font-size: clamp(2rem, 3.2vw, 2.75rem);
+}
 .viewer .menu {
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -33,7 +39,6 @@
 .tool[aria-expanded="true"] {
   background: var(--color-accent-soft);
   color: var(--color-accent);
-  box-shadow: inset 0 -2px var(--color-accent);
 }
 .spacer {
   flex: 1;
@@ -46,6 +51,39 @@
 }
 .close {
   float: right;
+}
+.preferencePanel {
+  position: fixed;
+  top: calc(var(--page-header-height) + var(--page-menu-height) + 10px);
+  right: var(--gutter);
+  width: min(310px, calc(100vw - 2rem));
+  max-height: calc(
+    100dvh - var(--page-header-height) - var(--page-menu-height) - 24px
+  );
+  overflow: auto;
+  z-index: var(--z-menu);
+  padding: 18px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+}
+.preferencePanel h2 {
+  padding-right: 28px;
+}
+.preferencePanel .close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 7px;
+  border: 0;
+  background: transparent;
+}
+.preferencePanel .close svg {
+  width: 16px;
+  height: 16px;
 }
 .eyebrow {
   text-transform: uppercase;
@@ -134,10 +172,41 @@
 }
 .timeline {
   display: grid;
-  gap: 24px;
+  gap: 30px;
+}
+.yearGroup {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 16px;
+}
+.yearMarker {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-start;
+}
+.yearMarker h2 {
+  margin: 0;
+  font: 400 1.45rem/1.3 var(--font-text);
+  color: var(--color-ink-2);
+  overflow-wrap: anywhere;
+}
+.yearMarker > span {
+  flex: 1;
+  width: 1px;
+  min-height: 24px;
+  margin-left: 4px;
+  background: var(--color-line);
+}
+.yearEvents {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
 }
 .event {
-  padding: 26px;
+  position: relative;
+  min-width: 0;
+  padding: 22px 24px;
   border: 1px solid var(--color-line);
   border-radius: 7px;
   background: var(--color-surface);
@@ -146,12 +215,45 @@
 .event[data-kind="amendment"] {
   background: var(--color-accent-soft);
 }
+.event[data-kind="amendment"]::before {
+  content: "";
+  position: absolute;
+  left: -21px;
+  top: 29px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.event[data-kind="event"] {
+  background: transparent;
+  border-color: transparent;
+  padding-block: 12px;
+}
 .event[aria-current="true"] {
   border-color: var(--color-accent);
   box-shadow: inset 3px 0 var(--color-accent);
 }
-.event h2 {
-  margin: 16px 0;
+.event h3 {
+  font: 400 1.65rem/1.3 var(--font-text);
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.versionLinks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.versionLinks a {
+  padding: 4px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  font-size: var(--text-xs);
+  text-decoration: none;
+}
+.versionLinks a:hover {
+  border-color: var(--color-accent);
 }
 .event p {
   line-height: 1.7;
@@ -165,10 +267,17 @@
   font-size: var(--text-xs);
 }
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: 4px;
   background: var(--color-accent-soft);
   padding: 5px 9px;
   color: var(--color-accent);
+}
+.badge svg {
+  width: 14px;
+  height: 14px;
 }
 .reading {
   background: var(--color-accent);
@@ -181,6 +290,12 @@
   justify-content: flex-end;
   gap: 15px;
   margin-top: 24px;
+}
+.action a {
+  text-decoration: none;
+}
+.action a:hover {
+  text-decoration: underline;
 }
 .nav {
   display: grid;
@@ -203,6 +318,26 @@
   display: block;
   color: var(--color-ink-2);
   margin-top: 4px;
+}
+.historyFilters a {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+}
+.historyFilters a small {
+  margin: 0;
+}
+.historyFilters a svg {
+  width: 17px;
+  height: 17px;
+}
+.historyFilters .readMore {
+  grid-template-columns: 18px minmax(0, 1fr);
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-line);
+  border-radius: 0;
 }
 .comment {
   border-left: 2px solid var(--color-accent);
@@ -315,7 +450,23 @@
     margin-left: 0;
   }
   .event {
-    padding: 20px;
+    padding: 16px;
+  }
+  .yearGroup {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .yearMarker h2 {
+    font-size: 1.05rem;
+  }
+  .event h3 {
+    font-size: 1.4rem;
+  }
+  .event[data-kind="amendment"]::before {
+    left: -16px;
+    top: 25px;
+    width: 6px;
+    height: 6px;
   }
 }
 

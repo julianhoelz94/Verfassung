@@ -12,6 +12,7 @@ import { FullWidthPage } from "../layout/PageChrome";
 import { T } from "../TranslationProvider";
 import { ConstitutionViewer } from "./ConstitutionViewer";
 import { PassageChange } from "./PassageChange";
+import { loadPassageWording } from "./passage-wording";
 import { RecordMaterials } from "./RecordMaterials";
 import {
   ViewerUnavailable,
@@ -101,6 +102,7 @@ export async function AmendmentViewerPage({
     return <ViewerUnavailable params={values} />;
   const amendment = model.amendments.find((a) => a.id === values.amendmentId);
   if (!amendment) notFound();
+  const changes = await loadPassageWording(amendment.changes, model.constitution.id);
   const href = `${model.base}/amendments/${amendment.id}`,
     returnTo = recordReturn(query.return, model.owner);
   const publicHref =
@@ -133,7 +135,7 @@ export async function AmendmentViewerPage({
       <p className={styles.eyebrow}>
         <T value={{ en: "In this amendment", de: "In dieser Änderung" }} />
       </p>
-      {amendment.changes.map((change, index) => (
+      {changes.map((change, index) => (
         <a key={change.id} href={"#change-" + change.id}>
           {String(index + 1).padStart(2, "0")} ·{" "}
           {change.afterRef?.label ??
@@ -231,7 +233,7 @@ export async function AmendmentViewerPage({
         <h2>
           <T value={{ en: "Affected passages", de: "Betroffene Passagen" }} />
         </h2>
-        {amendment.changes.map((change, index) => (
+        {changes.map((change, index) => (
           <div key={change.id}>
             <PassageChange change={change} />
             {model.canEdit ? (

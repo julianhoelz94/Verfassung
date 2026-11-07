@@ -10,6 +10,50 @@ test.beforeEach(async ({ request }) => {
   await request.post(mock + "/__sprint50_content");
 });
 
+for (const locale of ["en", "de"])
+  for (const width of [390, 1440])
+    test(`timeline grouping and compact preferences in ${locale} at ${width}px`, async ({ browser }, testInfo) => {
+      const context = await browser.newContext({locale, viewport: {width, height: 1000}});
+      await context.addInitScript(() => localStorage.setItem("ca_cookie_notice_v1", "dismissed"));
+      const page = await context.newPage();
+      try {
+        await page.goto(base);
+        const year = page.getByRole("region", {name: "2022", exact: true});
+        await expect(year.locator('article[data-kind="version"]')).toHaveCount(1);
+        await expect(year.locator('article[data-kind="amendment"]')).toHaveCount(1);
+        const rail = year.locator(":scope > div").first().locator("span");
+        await expect(rail).toBeVisible();
+        expect((await rail.boundingBox())!.height).toBeGreaterThan(40);
+        const menu = page.getByRole("navigation", {name: locale === "en" ? "Constitution viewer" : "Verfassungsansicht"});
+        for (const control of [menu.getByRole("button", {name: locale === "en" ? "Contents" : "Inhalt", exact: true}), menu.getByRole("link", {name: locale === "en" ? "History" : "Geschichte", exact: true})])
+          await expect(control).toHaveCSS("box-shadow", "none");
+        await page.screenshot({path: testInfo.outputPath(`history-${locale}-${width}.png`), fullPage: true});
+        const preferencesName = locale === "en" ? "Reading preferences" : "Leseeinstellungen";
+        await menu.getByRole("button", {name: preferencesName, exact: true}).click();
+        const recordPreferences = page.locator("#constitution-preferences");
+        await expect(recordPreferences).toBeVisible();
+        expect((await recordPreferences.boundingBox())!.width).toBeLessThanOrEqual(310);
+        await expect(recordPreferences.getByRole("combobox", {name: locale === "en" ? "Text size" : "Textgröße", exact: true})).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(recordPreferences).toBeHidden();
+        await expect(menu.getByRole("button", {name: preferencesName, exact: true})).toBeFocused();
+        await page.goto(`/countries/DE/versions/${VERSION_1949}`);
+        await page.getByRole("button", {name: locale === "en" ? "Reading preferences" : "Leseeinstellungen", exact: true}).click();
+        const indent = page.getByRole("checkbox", {name: locale === "en" ? "Show indentation" : "Einrückung anzeigen", exact: true});
+        await indent.check();
+        const box = (await indent.boundingBox())!;
+        const label = (await indent.locator("..").locator("span").boundingBox())!;
+        expect(label.x).toBeGreaterThan(box.x + box.width);
+        expect(Math.abs((label.y + label.height / 2) - (box.y + box.height / 2))).toBeLessThan(3);
+        await expect(indent.locator("..")).toHaveCSS("margin-top", "0px");
+        await expect(page.getByRole("combobox", {name: locale === "en" ? "Text size" : "Textgröße", exact: true})).toBeVisible();
+        await page.locator('[data-reader-menu][open] > div').screenshot({path: testInfo.outputPath(`preferences-${locale}-${width}.png`)});
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.keyboard.press("Escape");
+        await expect(indent).toBeHidden();
+      } finally { await context.close(); }
+    });
+
 for (const width of [390, 844, 1440])
   test(`shared record and History navigation at ${width}px`, async ({
     page,

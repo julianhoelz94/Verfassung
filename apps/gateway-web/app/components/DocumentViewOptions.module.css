@@ -2,14 +2,72 @@
   display: grid;
   gap: var(--gap-control);
 }
-.options label {
+.options .option {
   display: flex;
   align-items: center;
   gap: var(--gap-related);
-  min-height: 36px;
+  min-height: 40px;
+  margin: 0;
+  padding: 6px 0;
+  color: var(--color-ink);
+  font: 400 var(--text-sm) / 1.5 var(--font-ui);
 }
-.options input {
+.options .option input {
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+.options .option span {
+  min-width: 0;
+}
+.preferences {
+  display: grid;
+  gap: 16px;
+  max-width: 320px;
+}
+.preferences .title {
+  margin: 0;
+  font: 500 1rem/1.4 var(--font-ui);
+}
+.preferences .options {
+  gap: 2px;
+}
+.preferences .fields {
+  display: grid;
+  gap: 14px;
+}
+.preferences .options + .fields {
+  padding-top: 16px;
+  border-top: 1px solid var(--color-line);
+}
+.preferences .fields > label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-ink-2);
+  font: 400 var(--text-xs) / 1.5 var(--font-ui);
+}
+.preferences .fields select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  background: var(--color-paper);
+}
+.preferences .fields > label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+@media (pointer: coarse) {
+  .options .option,
+  .preferences .fields > label:has(input[type="checkbox"]),
+  .preferences .fields select {
+    min-height: 44px;
+  }
 }
 .menu {
   margin-block-end: var(--gap-field);

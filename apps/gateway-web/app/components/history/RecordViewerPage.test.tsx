@@ -21,6 +21,7 @@ vi.mock("../../../lib/api", async (originalModule) => ({
   getConstitutionEvents: vi.fn(),
   getWikiPage: vi.fn(),
   listConstitutionAmendments: vi.fn(),
+  resolveUnit: vi.fn(),
 }));
 vi.mock("../../../lib/session", () => ({ currentUser: vi.fn() }));
 vi.mock("../../../lib/server-locale", () => ({
@@ -133,6 +134,78 @@ beforeEach(() => {
   vi.mocked(api.getConstitutionEvents).mockResolvedValue([event]);
   vi.mocked(listDocumentLinks).mockResolvedValue([]);
   vi.mocked(currentUser).mockResolvedValue(null);
+});
+
+it("loads persisted reference-only passages from the exact Content snapshots", async () => {
+  const before = {
+    versionId: "old-snapshot",
+    logicalId: "logical-1",
+    occurrenceId: "old-unit",
+    revisionId: "old-revision",
+  };
+  const after = {
+    versionId: "new-snapshot",
+    logicalId: "logical-1",
+    occurrenceId: "new-unit",
+    revisionId: "new-revision",
+  };
+  vi.mocked(api.listConstitutionAmendments).mockResolvedValue([
+    {
+      ...law,
+      changes: [{ ...law.changes[0], beforeRef: before, afterRef: after }],
+    },
+  ]);
+  vi.mocked(api.resolveUnit).mockImplementation(async (versionId) => ({
+    ...(versionId === before.versionId ? before : after),
+    constitutionId: "charter",
+    pathLabels: ["Article 1", "Paragraph 1"],
+    text:
+      versionId === before.versionId
+        ? "Some citizens may vote."
+        : "Every adult citizen may vote.",
+    deepLink: `/countries/XA/versions/${versionId}#unit`,
+  }));
+  const page = await dom(amendmentPage());
+  expect(
+    page.querySelector('[data-passage-side="before"]')?.textContent,
+  ).toContain("Some citizens may vote.");
+  expect(
+    page.querySelector('[data-passage-side="after"]')?.textContent,
+  ).toContain("Every adult citizen may vote.");
+  expect(page.querySelector("del")?.textContent).toBe("Some");
+  expect(page.querySelector("ins")?.textContent).toBe("Every");
+  expect(api.resolveUnit).toHaveBeenCalledWith("old-snapshot", "logical-1");
+  expect(api.resolveUnit).toHaveBeenCalledWith("new-snapshot", "logical-1");
+});
+
+it("retains available wording without falsely marking it all added when the other snapshot is unavailable", async () => {
+  vi.mocked(api.listConstitutionAmendments).mockResolvedValue([
+    {
+      ...law,
+      changes: [
+        {
+          ...law.changes[0],
+          beforeRef: {
+            ...law.changes[0].beforeRef,
+            text: null,
+            versionId: "missing",
+          },
+        },
+      ],
+    },
+  ]);
+  vi.mocked(api.resolveUnit).mockRejectedValue(
+    new Error("Content unavailable"),
+  );
+  const page = await dom(amendmentPage());
+  expect(
+    page.querySelector('[data-passage-side="before"]')?.textContent,
+  ).toContain("Passage text is temporarily unavailable.");
+  expect(
+    page.querySelector('[data-passage-side="after"]')?.textContent,
+  ).toContain("Every adult citizen may vote.");
+  expect(page.querySelector("ins")).toBeNull();
+  expect(page.querySelector("del")).toBeNull();
 });
 
 it.each(["viewer", "editor", "reviewer", "publisher", "admin"])(

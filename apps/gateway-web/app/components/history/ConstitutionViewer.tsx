@@ -1,5 +1,5 @@
 "use client";
-import { HierarchyViewOptions } from "../DocumentViewOptions";
+import { ReadingPreferenceControls } from "../DocumentViewOptions";
 
 import {
   useEffect,
@@ -92,6 +92,7 @@ export function ConstitutionViewer({
     <PageChromeSurface
       ref={surface}
       className={styles.viewer}
+      data-viewer-mode={mode}
       style={
         {
           "--constitution-font-size": preferences.size + "px",
@@ -179,7 +180,7 @@ export function ConstitutionViewer({
       </PageMenuFrame>
       {panel ? (
         <section
-          className={styles.panel}
+          className={`${styles.panel} ${panel === "preferences" ? styles.preferencePanel : ""}`}
           id={"constitution-" + panel}
           aria-label={
             panel === "wiki"
@@ -242,33 +243,11 @@ function ReadingPreferences({
   preferences: ReaderPreferences;
   hierarchy: boolean;
 }) {
-  const t = useTranslation();
   return (
-    <>
-      {hierarchy ? (
-        <HierarchyViewOptions
-          value={preferences}
-          onChange={(patch) =>
-            saveReaderPreferences({ ...preferences, ...patch })
-          }
-        />
-      ) : null}
-      <label>
-        {t({ en: "Text size", de: "Textgröße" })}
-        <select
-          value={preferences.size}
-          onChange={(event) =>
-            saveReaderPreferences({
-              ...preferences,
-              size: event.target.value as typeof preferences.size,
-            })
-          }
-        >
-          <option value="16">{t({ en: "Small", de: "Klein" })}</option>
-          <option value="17">{t({ en: "Standard", de: "Standard" })}</option>
-          <option value="20">{t({ en: "Large", de: "Groß" })}</option>
-        </select>
-      </label>
-    </>
+    <ReadingPreferenceControls
+      value={preferences}
+      hierarchy={hierarchy}
+      onChange={(patch) => saveReaderPreferences({ ...preferences, ...patch })}
+    />
   );
 }

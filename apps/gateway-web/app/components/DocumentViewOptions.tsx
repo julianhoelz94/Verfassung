@@ -38,24 +38,67 @@ export function HierarchyViewOptions({
   const t = useTranslation();
   return (
     <div className={styles.options}>
-      <label>
+      <label className={styles.option}>
         <input
           type="checkbox"
           checked={value.indentation}
           onChange={(event) => onChange({ indentation: event.target.checked })}
         />
-        {t(copy.indent)}
+        <span>{t(copy.indent)}</span>
       </label>
       {value.indentation ? (
-        <label>
+        <label className={styles.option}>
           <input
             type="checkbox"
             checked={value.guides}
             onChange={(event) => onChange({ guides: event.target.checked })}
           />
-          {t(copy.guides)}
+          <span>{t(copy.guides)}</span>
         </label>
       ) : null}
+    </div>
+  );
+}
+
+/** Shared presentation for the text reader and record/comparison viewer menus. */
+export function ReadingPreferenceControls({
+  value,
+  onChange,
+  hierarchy = true,
+  children,
+}: {
+  value: ReaderPreferences;
+  onChange: (patch: Partial<ReaderPreferences>) => void;
+  hierarchy?: boolean;
+  children?: ReactNode;
+}) {
+  const t = useTranslation();
+  return (
+    <div className={styles.preferences}>
+      <h2 className={styles.title}>
+        {t({ en: "Reading preferences", de: "Leseeinstellungen" })}
+      </h2>
+      {hierarchy ? (
+        <HierarchyViewOptions value={value} onChange={onChange} />
+      ) : null}
+      <div className={styles.fields}>
+        <label>
+          {t({ en: "Text size", de: "Textgröße" })}
+          <select
+            value={value.size}
+            onChange={(event) =>
+              onChange({
+                size: event.target.value as ReaderPreferences["size"],
+              })
+            }
+          >
+            <option value="16">{t({ en: "Small", de: "Klein" })}</option>
+            <option value="17">{t({ en: "Standard", de: "Standard" })}</option>
+            <option value="20">{t({ en: "Large", de: "Groß" })}</option>
+          </select>
+        </label>
+        {children}
+      </div>
     </div>
   );
 }

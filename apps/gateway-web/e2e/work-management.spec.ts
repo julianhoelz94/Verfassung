@@ -79,6 +79,8 @@ test('imports use shared disclosures and completed imports can be archived and r
   await expect(submitted).toHaveCount(1);
   for (const disclosure of [technical, submitted]) {
     await expect(disclosure).not.toHaveAttribute('open', '');
+    await page.getByRole('tab', { name: disclosure === technical ? 'History' : 'Content', exact: true }).click();
+    if (disclosure === submitted) await page.getByRole('button', { name: 'Source only', exact: true }).click();
     await disclosure.locator('summary').click();
     await expect(disclosure).toHaveAttribute('open', '');
     await disclosure.locator('summary').press('Enter');

@@ -73,7 +73,8 @@ test('an admin reviews and publishes their MCP import in the editor journey', as
     await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
     await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
     await expect(page.getByText('A reviewed import is required.', { exact: true }).first()).toBeVisible();
-    await page.getByLabel('Review reason').first().fill('Verified my MCP source and structure before publication.');
+    await page.getByRole('tab', { name: 'Review', exact: true }).click();
+    await page.getByLabel('Review reason').fill('Verified my MCP source and structure before publication.');
     await page.getByRole('button', { name: 'Approve prepared draft' }).click();
     await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
     await page.reload();

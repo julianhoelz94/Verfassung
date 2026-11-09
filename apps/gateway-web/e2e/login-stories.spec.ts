@@ -32,6 +32,7 @@ for (const story of stories) {
     await expect(page.getByText(email, { exact: true })).toBeVisible();
     const primary = page.getByRole('navigation', { name: 'Primary' });
     await expect(primary.getByRole('link', { name: 'Editor', exact: true })).toHaveCount(story.editorial ? 1 : 0);
+    await expect(primary.getByRole('link', { name: 'Imports', exact: true })).toHaveCount(story.editorial ? 1 : 0);
     await expect(primary.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(story.admin ? 1 : 0);
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/$/);

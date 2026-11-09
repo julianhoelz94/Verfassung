@@ -126,10 +126,12 @@ test('editorial roles stage, review, and publish a new constitution through the 
   await expect(page.getByRole('button', { name: 'Prepare unpublished draft' })).toBeVisible();
   await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
   await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('tab', { name: 'Review', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Awaiting review – not public' })).toBeVisible();
   await signOut(page);
   await signIn(page, 'reviewer');
   await page.goto(reviewUrl);
+  await page.getByRole('tab', { name: 'Review', exact: true }).click();
   await page.getByLabel('Review reason').first().fill('Source wording and article structure match the submitted text.');
   await page.getByRole('button', { name: 'Approve prepared draft' }).click();
   await expect(page.getByRole('heading', { name: 'Approved – publication pending' })).toBeVisible({ timeout: 15_000 });

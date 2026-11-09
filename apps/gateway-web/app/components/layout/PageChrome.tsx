@@ -5,7 +5,7 @@ import styles from './PageChrome.module.css';
 export type PageContentsItem = { id: string; href: string; label: ReactNode; description?: ReactNode; children?: PageContentsItem[] };
 
 /** The page body owns its reading measure; shared chrome spans the viewport. */
-export function FullWidthPage({ template, className, ...props }: ComponentPropsWithoutRef<'main'> & { template: 'collection' | 'reader' }) {
+export function FullWidthPage({ template, className, ...props }: ComponentPropsWithoutRef<'main'> & { template: 'collection' | 'reader' | 'workspace' }) {
   return <PageMain {...props} width="content" data-template={template} className={[styles.page, className].filter(Boolean).join(' ')} />;
 }
 
@@ -21,8 +21,12 @@ export function PageMenuFrame({ className, ...props }: ComponentPropsWithRef<'di
   return <div {...props} className={[styles.menuFrame, className].filter(Boolean).join(' ')} />;
 }
 
-export function PageMenuBar({ as: Element = 'div', label, className, ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'nav'; label: string }) {
-  return <Element {...props} aria-label={label} className={[styles.menuBar, className].filter(Boolean).join(' ')} />;
+export function PageMenuBar({ as: Element = 'div', label, compact = false, className, ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'nav'; label: string; compact?: boolean }) {
+  return <Element {...props} aria-label={label} className={[styles.menuBar, compact ? styles.compact : undefined, className].filter(Boolean).join(' ')} />;
+}
+
+export function PageMenuDivider() {
+  return <span className={styles.divider} aria-hidden="true" />;
 }
 
 export function PageContentsLayout({ navigation, navigationId, navigationRef, expanded, children }: {

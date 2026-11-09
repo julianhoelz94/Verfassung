@@ -9,6 +9,7 @@ const clients = vi.hoisted(() => ({
   getPreparedImportContent: vi.fn(), getReaderOutline: vi.fn(),
 }));
 
+vi.mock('../../lib/server-locale', () => ({ currentLocale: async () => 'en' }));
 vi.mock('./documents/DocumentLinks', () => ({ DocumentLinks: (props: { targetType: string; targetId: string }) => <section data-document-target={props.targetType} data-document-owner={props.targetId}>Supplementary evidence</section> }));
 vi.mock('../../lib/session', () => ({ currentUser: clients.currentUser, requireSessionBearer: clients.requireSessionBearer }));
 vi.mock('../../lib/ingestion-api', () => ({
@@ -88,7 +89,7 @@ describe('prepared import reader presentation', () => {
     clients.getPreparedImportContent.mockRejectedValue(new Error('content unavailable'));
     const document = await renderedReview();
     const buttons = Array.from(document.querySelectorAll('button'), element => element.textContent);
-    expect(buttons).not.toContain('Approve prepared draft');
+    expect(document.querySelector('button[value="approve"]')?.hasAttribute('disabled')).toBe(true);
     expect(buttons).toContain('Reject import');
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('prepared');
   });

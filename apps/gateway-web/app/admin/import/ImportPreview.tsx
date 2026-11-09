@@ -57,7 +57,7 @@ export function ImportPreview({ payload, outline: confirmedOutline }: { payload:
     {outline ? <table><thead><tr><th><T value={ui.admin.import.importpreview.kind} /></th><th><T value={ui.admin.import.importpreview.display} /></th><th><T value={ui.admin.import.importpreview.presentation} /></th></tr></thead><tbody>{outline.kinds.map(kind => <tr key={kind.kindCode}>
       <td>{kind.kindCode}</td><td>{kind.displayLabel}</td><td>{kind.presentation}</td>
     </tr>)}</tbody></table> : <p><T value={ui.admin.import.importpreview.usesTheConstitutionsExistingLayoutRevision} />{" "}{string(payload.settingsRevisionId)}.</p>}
-    <OrderedContentTree entries={previewRoots(roots).map(node => ({ type: 'child', node }))} outline={outline} />
+    <OrderedContentTree entries={previewRoots(roots).map(node => ({ type: 'child', node }))} outline={outline} idPrefix="submitted-import-" />
     {roots.length > 100 ? <p><T value={ui.admin.import.importpreview.showingTheFirst100TopLevelUnits} />{" "}{roots.length}.</p> : null}
   </>;
 }

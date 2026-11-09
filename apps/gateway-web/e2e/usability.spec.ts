@@ -59,7 +59,8 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
       await page.keyboard.press('Escape');
       await expect(page.getByRole('button', { name: english ? 'Account menu' : 'Kontomenü' })).toBeFocused();
       await page.goto(`/editor?importJobId=${jobId}`);
-      await expect(page.locator('#reason-approve')).toBeVisible();
+      await page.getByRole('tab', { name: english ? 'Review' : 'Prüfung', exact: true }).click();
+      await expect(page.getByRole('textbox', { name: english ? 'Review reason' : 'Begründung der Entscheidung', exact: true })).toBeVisible();
       await expect(page.locator('.technical-identifiers code').first()).toBeHidden();
       await audit('import-review');
       await page.goto(`/search?q=dignity&country=DE&versionId=${VERSION_2022}`);

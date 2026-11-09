@@ -112,6 +112,11 @@ async function assertReviewPage(page: Page, route: ReviewRoute, locale: string) 
 
 /** Keep task-specific controls and setup safety assertions on their original route variants. */
 async function assertReviewControls(page: Page, route: ReviewRoute, locale: string) {
+  if (route.entry.startsWith('/admin/import') || route.entry.startsWith('/admin/migrations') || route.entry === 'import-review' || route.entry === 'import-new-structure') {
+    const primary = page.locator('.nav-primary');
+    await expect(primary.locator('[aria-current="page"]')).toHaveCount(1);
+    await expect(primary.locator('a[href="/admin/import"]')).toHaveAttribute('aria-current', 'page');
+  }
   if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
   if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.getByRole('heading', { name: locale === 'en' ? 'Your confirmation is required' : 'Ihre Bestätigung ist erforderlich' })).toBeVisible();
   if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.locator('input[name="logicalUnitIds"]').first()).toBeVisible();

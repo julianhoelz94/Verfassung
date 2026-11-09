@@ -19,6 +19,16 @@ beforeEach(() => {
 });
 
 describe('embedded library loading', () => {
+  it.each(['import_job', 'setup_proposal', 'migration_run'] as const)('keeps %s evidence scoped and restricts writes to editors/admins', async targetType => {
+    const props = { targetType, targetId: 'owner', returnTo: '/admin/import', canEdit: true };
+    for (const role of ['reviewer', 'publisher', 'editor', 'admin']) {
+      vi.mocked(currentUser).mockResolvedValue({ id: role, email: `${role}@example.test`, roles: [role] });
+      const element = await DocumentLinks(props);
+      const manager = element.props.children.find((child: { type?: unknown }) => child?.type === DocumentManager);
+      expect(manager.props).toMatchObject({ targetType, targetId: 'owner', canEdit: ['editor', 'admin'].includes(role), canCreate: ['editor', 'admin'].includes(role) });
+      expect(listDocumentLinks).toHaveBeenLastCalledWith(targetType, 'owner', undefined, 'Bearer session');
+    }
+  });
   it('lets publishers select existing event sources while keeping uploads restricted', async () => {
     vi.mocked(currentUser).mockResolvedValue({ id: 'publisher', email: 'publisher@example.test', roles: ['publisher'] });
     const element = await DocumentLinks({ targetType: 'lifecycle_material', targetId: 'constitution', scopeRevisionId: 'event', returnTo: '/editor/lifecycle/constitution', canEdit: true });

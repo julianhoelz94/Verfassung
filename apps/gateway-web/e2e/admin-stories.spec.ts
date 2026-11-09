@@ -87,7 +87,8 @@ test('administrator stages constitution JSON for review without publishing it', 
   await expect(page).toHaveURL(/\/editor\?importJobId=/);
   await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
   await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
-  await page.getByLabel('Review reason').first().fill('Checked my imported text against the original source.');
+  await page.getByRole('tab', { name: 'Review', exact: true }).click();
+  await page.getByLabel('Review reason').fill('Checked my imported text against the original source.');
   await page.getByRole('button', { name: 'Approve prepared draft' }).click();
   await expect(page.getByRole('heading', { name: 'Approved – publication pending' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Publication', exact: true })).toBeVisible();

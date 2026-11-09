@@ -56,6 +56,7 @@ export function primaryNavLinks(user: NavUser | null, apiDocsAvailable = false, 
   }
   if (canVisitEditor(user.roles)) {
     links.push({ href: '/editor', label: 'Editor', message: ui.nav.editor });
+    links.push({ href: '/admin/import', label: 'Imports', message: ui.nav.import });
     links.push({ href: '/documents', label: 'Documents', message: ui.nav.documents });
   }
   if (canVisitAdmin(user.roles)) {
@@ -95,7 +96,6 @@ export function adminLinks(): NavLink[] {
     { href: '/admin/settings', label: 'Site settings', message: reviewUi.siteSettings },
     { href: '/admin/anonymous-browsing', label: 'Anonymous browsing', message: ui.nav.anonymousBrowsing },
     { href: '/admin/constitutions', label: 'Constitutions', message: ui.nav.outlines },
-    { href: '/admin/import', label: 'Import', message: ui.nav.import },
     { href: '/admin/legal/impressum', label: 'Legal pages', message: reviewUi.legalPages },
   ];
 }
@@ -149,9 +149,17 @@ export function menuSections(user: NavUser | null, apiDocsAvailable = false, nee
   return sections.filter((section) => section.identity || section.links.length > 0);
 }
 
+export function isImportPage(pathname: string, query = ''): boolean {
+  return pathname === '/admin/import' || pathname.startsWith('/admin/import/') ||
+    pathname === '/admin/migrations' || pathname.startsWith('/admin/migrations/') ||
+    (pathname === '/editor' && Boolean(new URLSearchParams(query).get('importJobId')));
+}
+
 export function isCurrentNavHref(pathname: string, href: string, query = ''): boolean {
   const path = href.split('?')[0] ?? href;
   if (href.includes('#')) return false;
+  if (path === '/admin/import') return isImportPage(pathname, query);
+  if (isImportPage(pathname, query) && (path === '/editor' || path === '/admin')) return false;
   if (href.includes('?')) {
     if (pathname !== path) return false;
     const expected = new URLSearchParams(href.slice(href.indexOf('?') + 1));

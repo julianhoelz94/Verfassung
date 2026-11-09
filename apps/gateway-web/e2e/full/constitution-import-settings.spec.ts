@@ -207,7 +207,7 @@ test('constitution configuration governs MCP imports, review previews and the pu
     expect(staged.errors).toEqual([]);
     await page.goto(`/editor?importJobId=${staged.jobId}`);
     await page.getByRole('button', { name: 'Prepare unpublished draft', exact: true }).click();
-    const preview = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Prepared draft as readers will see it', exact: true }) });
+    const preview = page.locator('[data-constitution-document]');
     await expect(preview.locator('.node-kind-article > .node-heading')).toHaveText('Provision Protected rights I');
     await expect(preview.locator('.constitution-concat')).toHaveText('(a)Every person is free. (b)Every person is equal.');
     await expect(preview.locator('.constitution-concat sup.num')).toHaveText(['(a)', '(b)']);

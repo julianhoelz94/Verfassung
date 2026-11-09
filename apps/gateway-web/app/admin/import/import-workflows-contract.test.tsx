@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ImportJob, SetupProposal } from '../../../lib/ingestion-api';
 import type { MigrationRun } from '../../../lib/migration-review';
 import AdminImportPage from './page';
+import ImportPackagePage from './packages/[id]/page';
 import MigrationReviewPage from '../migrations/[id]/page';
 import { ImportReview } from '../../editor/ImportReview';
 import { SetupProposalReview } from './setup/SetupProposalReview';
@@ -157,6 +158,14 @@ function documentOf(markup: string) {
 }
 
 describe('import administration contracts', () => {
+  it('preserves the selected package item and display through sign-in', async () => {
+    clients.currentUser.mockResolvedValue(null);
+    await expect(ImportPackagePage({
+      params: Promise.resolve({ id: 'package' }),
+      searchParams: Promise.resolve({ item: 'snapshot', source: 'archive', view: 'review', display: 'source' }),
+    })).rejects.toThrow(`redirect:/login?next=${encodeURIComponent('/admin/import/packages/package?item=snapshot&source=archive&view=review&display=source')}`);
+    expect(clients.getMigrationRun).not.toHaveBeenCalled();
+  });
   it('checks access before reading jobs and retains the login destination', async () => {
     clients.currentUser.mockResolvedValue(null);
     await expect(AdminImportPage({ searchParams: Promise.resolve({ mode: 'new' }) })).rejects.toThrow(

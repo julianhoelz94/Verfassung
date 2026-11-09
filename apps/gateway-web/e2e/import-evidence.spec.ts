@@ -1,6 +1,11 @@
 import { test, expect } from "./fixtures/consent";
 import type { Locator } from "@playwright/test";
-import { signInAdmin, signInReviewer, signInPublisher } from "./helpers";
+import {
+  signInAdmin,
+  signInReviewer,
+  signInPublisher,
+  signOut,
+} from "./helpers";
 
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 const run = "01900000-0000-4000-8000-000000008500";
@@ -13,6 +18,26 @@ test.beforeEach(async ({ request }) => {
   await request.post(`${mock}/__sprint59_content`);
   await request.post(`${mock}/__import_review`, { data: {} });
   await request.post(`${mock}/__editor_documents`);
+});
+
+test("review drafts stay with their author when accounts change in the same tab", async ({
+  page,
+}) => {
+  await signInAdmin(page);
+  await page.goto(`${href}?view=review`);
+  const reason = page.getByLabel("Review reason", { exact: true });
+  await reason.fill("Administrator's unfinished private review note.");
+  await signOut(page);
+  await signInReviewer(page);
+  await page.goto(`${href}?view=review`);
+  await expect(reason).toHaveValue("");
+  await reason.fill("Reviewer's independent assessment of the source.");
+  await signOut(page);
+  await signInAdmin(page);
+  await page.goto(`${href}?view=review`);
+  await expect(reason).toHaveValue(
+    "Administrator's unfinished private review note.",
+  );
 });
 
 for (const width of [390, 1440]) {

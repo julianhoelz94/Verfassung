@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { transitionImportAction, prepareImportPackageAction } from "./actions";
+import { ImportTransitionError } from "../../../lib/ingestion-api";
 const api = vi.hoisted(() => ({
   currentUser: vi.fn(),
   requireSessionBearer: vi.fn(),
@@ -66,6 +67,13 @@ it("resumes eligible package dependencies after publication by an editor/admin",
     "/admin/import/packages/run?view=review&item=item",
   );
   expect(api.prepareImportPackage).toHaveBeenCalledWith("run", "Bearer staff");
+});
+it("returns to the selected package review after an expired-session sign-in", async () => {
+  api.transitionImportJob.mockRejectedValueOnce(new ImportTransitionError("session_expired"));
+  expect(await transitionImportAction(form())).toBe(
+    `/login?next=${encodeURIComponent("/admin/import/packages/run?view=review&item=item")}`,
+  );
+  expect(api.prepareImportPackage).not.toHaveBeenCalled();
 });
 it("does not silently grant preparation rights to a publisher-only account", async () => {
   api.currentUser.mockResolvedValue({

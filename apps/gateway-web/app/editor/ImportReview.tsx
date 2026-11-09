@@ -129,7 +129,17 @@ export async function ImportReview({
           ...extra,
         })
       : `/editor?importJobId=${encodeURIComponent(jobId ?? "")}`;
-  const model = { ...data, run, job, selected, source, capture, query, href };
+  const model = {
+    ...data,
+    actorId: user.id,
+    run,
+    job,
+    selected,
+    source,
+    capture,
+    query,
+    href,
+  };
   const evidence = await supplementaryEvidence(
     job,
     run,
@@ -364,6 +374,7 @@ function NativeImportItem({
 
 type ReviewJob = NonNullable<Awaited<ReturnType<typeof getImportJob>>>;
 type ReviewModel = Awaited<ReturnType<typeof loadReviewData>> & {
+  actorId: string;
   run: MigrationRun | null;
   job: ReviewJob | null;
   selected?: MigrationItem;
@@ -716,7 +727,14 @@ function ImportReviewPanel({
       {statuses?.failed}
       {statuses?.published}
       <ImportChecks fidelity={model.fidelity} />
-      {reviewWorkflow(job, phase, actions, error ?? query.error, context)}
+      {reviewWorkflow(
+        job,
+        model.actorId,
+        phase,
+        actions,
+        error ?? query.error,
+        context,
+      )}
       {job.errors.length ? (
         <ul>
           {job.errors.map((problem) => (

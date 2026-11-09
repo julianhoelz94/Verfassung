@@ -6,6 +6,7 @@ import { createImportJob, createSetupProposal, ImportTransitionError, isImportRe
 import { getMigrationRun } from '../../../lib/migration-review';
 import { prepareImportPackage } from '../../../lib/prepare-import-package';
 import { packageReviewHref } from '../../../lib/import-review';
+import { loginHref } from '../../../lib/return-to';
 
 function hasRole(roles: string[], role: string) { return roles.includes(role) || roles.includes('admin'); }
 
@@ -112,7 +113,7 @@ export async function transitionImportAction(
       if (error.code === "mfa")
         return `/account/step-up?returnTo=${encodeURIComponent(returnTo)}`;
       if (error.code === "session_expired")
-        return `/login?returnTo=${encodeURIComponent(returnTo)}`;
+        return loginHref(returnTo);
       return `${returnTo}&error=${encodeURIComponent(error.code)}`;
     }
     return `${returnTo}&error=transition`;

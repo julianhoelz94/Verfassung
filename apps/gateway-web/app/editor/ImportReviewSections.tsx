@@ -50,6 +50,7 @@ type ReaderOutline = Awaited<ReturnType<typeof getReaderOutline>>;
 /** Renders the phase, safe failure and available actions without changing form boundaries. */
 export function reviewWorkflow(
   job: ImportJob,
+  actorId: string,
   phase: ReturnType<typeof importPhase>,
   actions: ImportAction[],
   error?: string,
@@ -107,6 +108,8 @@ export function reviewWorkflow(
               (action) => action === "approve" || action === "reject",
             ) ? (
               <ImportDecisionForm
+                key={`${actorId}:${job.id}`}
+                actorId={actorId}
                 jobId={job.id}
                 canApprove={actions.includes("approve")}
                 canReject={actions.includes("reject")}

@@ -460,6 +460,7 @@ function userForEmail(email) {
   if (email === "local-reviewer@example.local") {
     return {
       ...identityMe,
+      id: "01900000-0000-4000-8000-000000000413",
       email,
       roles: ["reviewer"],
       mfaEnabled: false,

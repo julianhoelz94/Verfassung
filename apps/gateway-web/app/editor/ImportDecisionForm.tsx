@@ -11,12 +11,14 @@ import styles from "./ImportReviewWorkspace.module.css";
 import { useHydrated } from "../../lib/use-hydrated";
 
 export function ImportDecisionForm({
+  actorId,
   jobId,
   runId,
   itemId,
   canApprove,
   canReject,
 }: {
+  actorId: string;
   jobId: string;
   runId?: string;
   itemId?: string;
@@ -26,7 +28,7 @@ export function ImportDecisionForm({
   const t = useTranslation(),
     [reason, setReason] = useState<string | null>(null),
     hydrated = useHydrated();
-  const key = `atlas-import-review-reason:${jobId}`;
+  const key = `atlas-import-review-reason:${actorId}:${jobId}`;
   const confirmation = useRef<HTMLDialogElement>(null);
   const value = reason ?? (hydrated ? readReason(key) : "");
   return (

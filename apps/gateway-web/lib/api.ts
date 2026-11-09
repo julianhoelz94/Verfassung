@@ -161,6 +161,7 @@ export type WikiPageRevision = {
   summary: string;
   body: string;
   images: WikiImage[];
+  citations?: (import('./document-reference').DocumentReference & { title: string })[];
   sourceUrls: string[];
   createdAt?: string | null;
   createdBy?: string | null;
@@ -235,6 +236,7 @@ export type AmendmentUnitRef = {
 };
 
 export type Amendment = {
+  revisionId?: string | null;
   id: string;
   title: string;
   summary: string;
@@ -426,7 +428,7 @@ export function getConstitutionEvents(constitutionId: string): Promise<Constitut
 
 export function appendConstitutionLifecycle(
   constitutionId: string,
-  payload: { eventType: ConstitutionLifecycleEvent['eventType']; eventDate: string; dateCertainty?: ConstitutionLifecycleEvent['dateCertainty']; sourceUrl?: string; note?: string },
+  payload: { operationId?: string; eventType: ConstitutionLifecycleEvent['eventType']; eventDate: string; dateCertainty?: ConstitutionLifecycleEvent['dateCertainty']; sourceUrl?: string; note?: string },
   authorization: string,
 ): Promise<ConstitutionLifecycleEvent> {
   return sendJson<ConstitutionLifecycleEvent>(
@@ -462,6 +464,7 @@ export function getExportedUnits(versionId: string): Promise<{ roots: ExportedUn
 export function appendProvisionLifecycle(
   constitutionId: string,
   payload: {
+    operationId?: string;
     sourceVersionId: string;
     eventType: ProvisionLifecycleEvent['eventType'];
     eventDate: string;
@@ -494,9 +497,11 @@ export async function getWikiHistory(targetType: WikiTargetType, targetId: strin
 
 export function saveWikiDraft(targetType: WikiTargetType, targetId: string, payload: {
   expectedRevisionId: string | null;
+  operationId?: string;
   summary: string;
   body: string;
   images: WikiImage[];
+  citations?: (import('./document-reference').DocumentReference & { title: string })[];
   sourceUrls: string[];
 }, authorization: string): Promise<WikiPageRevision> {
   return sendJson<WikiPageRevision>(`${catalogBaseUrl()}/wiki/${targetType}/${encodeURIComponent(targetId)}/draft`, 'catalog', 'PUT', payload, authorization);
@@ -810,7 +815,7 @@ export function restoreSettings(id: string, revisionId: string, expectedRevision
 export type OrderedNode = { logicalId: string; revisionId: string; occurrenceId: string; kind: string; label: string | null; title: string | null; content: OrderedEntry[] };
 export type OrderedTableCell = { logicalId: string; text: string; header?: boolean; rowSpan?: number; colSpan?: number; headers?: string[] };
 export type OrderedTable = { caption?: string | null; rows: { logicalId: string; cells: OrderedTableCell[] }[] };
-export type OrderedInlineReference = { logicalId: string; start: number; end: number; target: { type: 'unit' | 'external' | 'footnote'; logicalId?: string | null; url?: string | null; footnoteId?: string | null } };
+export type OrderedInlineReference = { logicalId: string; start: number; end: number; target: { type: 'unit' | 'external' | 'footnote' | 'document'; documentId?: string | null; documentRevision?: number | null; locator?: string | null; logicalId?: string | null; url?: string | null; footnoteId?: string | null } };
 export type OrderedTextMark = { type: 'bold' | 'italic' | 'underline' | 'strikethrough'; start: number; end: number };
 export type OrderedEntry = { type: 'text' | 'child'; node?: OrderedNode | null; logicalId?: string | null; revisionId?: string | null; occurrenceId?: string | null; text?: string | null; format?: 'plain' | 'table' | 'footnote' | null; table?: OrderedTable | null; footnoteLabel?: string | null; lineBreaksBefore?: number; references?: OrderedInlineReference[]; marks?: OrderedTextMark[]; annotation?: { kind: 'source' | 'editorial' | 'amendment'; attribution?: string | null; sourceUrl?: string | null; anchorLogicalIds?: string[] } | null };
 

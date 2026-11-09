@@ -84,6 +84,7 @@ export function ImportReviewWorkspace({
       <PageChromeSurface ref={root} className={styles.surface}>
         <div className={styles.header}>
           <PageHeader
+            separator={false}
             title={t(ui.importReview.title)}
             breadcrumbs={[
               { href: "/admin/import", label: t(copy.imports) },

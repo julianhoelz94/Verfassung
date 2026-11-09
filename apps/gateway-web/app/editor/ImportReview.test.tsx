@@ -9,6 +9,8 @@ const clients = vi.hoisted(() => ({
   getPreparedImportContent: vi.fn(), getReaderOutline: vi.fn(),
 }));
 
+vi.mock('../../lib/server-locale', () => ({ currentLocale: async () => 'en' }));
+vi.mock('./documents/DocumentLinks', () => ({ DocumentLinks: (props: { targetType: string; targetId: string }) => <section data-document-target={props.targetType} data-document-owner={props.targetId}>Supplementary evidence</section> }));
 vi.mock('../../lib/session', () => ({ currentUser: clients.currentUser, requireSessionBearer: clients.requireSessionBearer }));
 vi.mock('../../lib/ingestion-api', () => ({
   getImportJob: clients.getImportJob, getImportPayload: clients.getImportPayload,

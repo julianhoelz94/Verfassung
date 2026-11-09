@@ -10,8 +10,8 @@ import java.util.UUID
 
 @Repository
 class LibraryRepository(private val jdbc: JdbcTemplate, private val documents: DocumentRepository) {
-    fun search(q: String?, folderId: UUID?, tagId: UUID?, status: String, offset: Int, limit: Int, sort: String): DocumentPageDto {
-        val (where, args) = filters(q, folderId, tagId, status)
+    fun search(q: String?, folderId: UUID?, tagId: UUID?, status: String, offset: Int, limit: Int, sort: String, kind: String? = null): DocumentPageDto {
+        val (where, args) = filters(q, folderId, tagId, status, kind)
         val from = "FROM documents d JOIN document_revisions r ON r.document_id = d.id AND r.revision = d.current_revision $where"
         val total = jdbc.queryForObject("SELECT count(*) $from", Int::class.java, *args.toTypedArray()) ?: 0
         val order = when (sort) {
@@ -33,7 +33,7 @@ class LibraryRepository(private val jdbc: JdbcTemplate, private val documents: D
         ).mapNotNull { documents.get(it) }
     }
 
-    private fun filters(q: String?, folderId: UUID?, tagId: UUID?, status: String): Pair<String, MutableList<Any>> {
+    private fun filters(q: String?, folderId: UUID?, tagId: UUID?, status: String, kind: String? = null): Pair<String, MutableList<Any>> {
         val clauses = mutableListOf<String>()
         val args = mutableListOf<Any>()
         if (status != "all") {
@@ -48,6 +48,7 @@ class LibraryRepository(private val jdbc: JdbcTemplate, private val documents: D
             clauses += "EXISTS (SELECT 1 FROM document_tag_memberships m WHERE m.document_id = d.id AND m.tag_id = ?)"
             args += tagId
         }
+        if (kind == "image") clauses += "r.content_type IN ('image/jpeg','image/png','image/gif','image/webp','image/avif') AND r.file_name IS NOT NULL"
         val term = q?.trim().orEmpty()
         if (term.isNotEmpty()) {
             clauses += """(r.title ILIKE ? OR d.citation_key ILIKE ? OR r.bibliography::text ILIKE ?

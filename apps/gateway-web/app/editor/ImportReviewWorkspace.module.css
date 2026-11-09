@@ -247,6 +247,11 @@
   display: grid;
   gap: 16px;
 }
+.evidence {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
 @media (max-width: 760px) {
   .layout[data-navigation="true"] {
     grid-template-columns: 1fr;

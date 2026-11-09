@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verfassung Document Attachments"
+  short_description: "Reuse compact document browsing and optional upload metadata"
+  default_prompt: "Use $verfassung-document-attachments to integrate the shared document attachment template into this workflow, preserving revision pins, permissions and unsaved input."

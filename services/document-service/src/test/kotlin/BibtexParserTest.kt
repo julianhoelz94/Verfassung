@@ -122,6 +122,17 @@ class BibtexParserTest {
         assertEquals("Edited note", parser.parse(BibtexCodec.encode(listOf(changed))).entries.single().fields["note"])
     }
 
+    @Test
+    fun abstractAndCatalogNoteHaveSeparateMeanings() {
+        val entry = parser.parse("@article{Key,title={Source},abstract={Published author summary},note={Catalog description}}").entries.single()
+        val decoded = BibtexCodec.decode(entry)
+        assertEquals("Published author summary", decoded.bibliography.abstract)
+        assertEquals("Catalog description", decoded.description)
+        val abstractOnly = BibtexCodec.decode(parser.parse("@article{Key,title={Source},abstract={Published author summary}}").entries.single())
+        assertEquals(null, abstractOnly.description)
+        assertEquals("Published author summary", abstractOnly.bibliography.abstract)
+    }
+
     private fun document(key: String, record: BibtexCodec.Record): DocumentDto {
         val id = UUID.randomUUID()
         val now = OffsetDateTime.now()

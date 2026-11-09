@@ -22,6 +22,29 @@ class SuccessorReadinessClientTest {
     private val noteId = UUID.randomUUID()
 
     @Test
+    fun publicationSynchronizesDocumentCitationsUsingTheValidatedContentGeneration() {
+        val citation = OrderedInlineReference(UUID.randomUUID(), 0, 3, OrderedReferenceTarget("document", documentId = UUID.randomUUID(), documentRevision = 2, locator = "p. 42"))
+        val snapshot = OrderedSnapshot(version, 7, null, listOf(root(listOf(OrderedEntry("text", logicalId = UUID.randomUUID(), text = "Law", references = listOf(citation))))))
+        val requests = mutableListOf<String>()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            requests += "${exchange.requestMethod} ${exchange.requestURI.path}:${exchange.requestHeaders.getFirst("Authorization")}:${exchange.requestBody.readAllBytes().decodeToString()}"
+            val bytes = jacksonObjectMapper().writeValueAsBytes(snapshot)
+            exchange.responseHeaders.set("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        try {
+            val url = "http://127.0.0.1:${server.address.port}"
+            SuccessorReadinessClient(url, url).requireValidContent(version, "Bearer publisher")
+            assertThat(requests).containsExactly("GET /versions/$version/content:Bearer publisher:", "POST /versions/$version/citations/synchronize:Bearer publisher:{\"generation\":7}")
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun directPublicationChecksTheCompleteSnapshotAndAcceptsSharedNotesAcrossRoots() {
         for (count in 0..3) {
             val snapshot = snapshot(count)

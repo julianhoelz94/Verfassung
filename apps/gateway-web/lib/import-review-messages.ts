@@ -1,4 +1,7 @@
 export const importReviewUi = {
+  supplementaryEvidence: { en: "Supplementary evidence", de: "Ergänzende Belege" },
+  jobEvidence: { en: "Evidence for this import", de: "Belege für diesen Import" },
+  packageEvidence: { en: "Evidence for this package", de: "Belege für dieses Paket" },
   approvalHint: {
     en: "Approval does not publish this version.",
     de: "Die Freigabe veröffentlicht diese Fassung noch nicht.",

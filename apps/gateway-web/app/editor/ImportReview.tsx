@@ -1,4 +1,8 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { currentLocale } from "../../lib/server-locale";
+import { message } from "../../lib/messages";
+import { DocumentLinks } from "./documents/DocumentLinks";
 import { notFound } from "next/navigation";
 import { currentUser, requireSessionBearer } from "../../lib/session";
 import {
@@ -126,6 +130,11 @@ export async function ImportReview({
         })
       : `/editor?importJobId=${encodeURIComponent(jobId ?? "")}`;
   const model = { ...data, run, job, selected, source, capture, query, href };
+  const evidence = await supplementaryEvidence(
+    job,
+    run,
+    href({ display: "source" }),
+  );
   const next = run?.items.find(
     (item) =>
       item.id !== selected?.id &&
@@ -151,7 +160,7 @@ export async function ImportReview({
           : job?.status
       }
       reading={<ImportReading model={model} />}
-      source={<ImportSourceView model={model} />}
+      source={<ImportSourceView model={model} evidence={evidence} />}
       review={
         job && phase ? (
           <ImportReviewPanel
@@ -433,7 +442,13 @@ async function loadReviewData(
   };
 }
 
-function ImportSourceView({ model }: { model: ReviewModel }) {
+function ImportSourceView({
+  model,
+  evidence,
+}: {
+  model: ReviewModel;
+  evidence: ReactNode;
+}) {
   const {
     run,
     selected,
@@ -514,7 +529,48 @@ function ImportSourceView({ model }: { model: ReviewModel }) {
           returnTo={href({ display: "source" })}
         />
       ) : null}
+      {evidence}
     </>
+  );
+}
+
+async function supplementaryEvidence(
+  job: ReviewJob | null,
+  run: MigrationRun | null,
+  returnTo: string,
+) {
+  if (!job && !run) return null;
+  const locale = await currentLocale();
+  const [jobEvidence, packageEvidence] = await Promise.all([
+    job
+      ? DocumentLinks({
+          targetType: "import_job",
+          targetId: job.id,
+          returnTo,
+          canEdit: true,
+          headingLevel: "h3",
+          heading: message(locale, copy.jobEvidence),
+        })
+      : null,
+    run
+      ? DocumentLinks({
+          targetType: "migration_run",
+          targetId: run.id,
+          returnTo,
+          canEdit: true,
+          headingLevel: "h3",
+          heading: message(locale, copy.packageEvidence),
+        })
+      : null,
+  ]);
+  return (
+    <section id="supplementary-evidence" className={styles.evidence}>
+      <h2>
+        <T value={copy.supplementaryEvidence} />
+      </h2>
+      {jobEvidence}
+      {packageEvidence}
+    </section>
   );
 }
 

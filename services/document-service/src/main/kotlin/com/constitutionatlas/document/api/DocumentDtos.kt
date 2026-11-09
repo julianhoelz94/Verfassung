@@ -51,6 +51,7 @@ data class LinkRequest(
     val documentId: UUID,
     val revisionId: UUID? = null,
     val scopeRevisionId: UUID? = null,
+    val citationNote: String? = null,
 )
 
 data class ReviseMaterialRequest(
@@ -66,6 +67,7 @@ data class DocumentLinkDto(
     val documentId: UUID,
     val revisionId: UUID?,
     val document: DocumentDto,
+    val citationNote: String? = null,
 )
 
 data class DocumentLinkEventDto(
@@ -78,6 +80,7 @@ data class DocumentLinkEventDto(
     val action: String,
     val actorId: UUID,
     val occurredAt: OffsetDateTime,
+    val citationNote: String? = null,
 )
 
 data class CreatorDto(val family: String? = null, val given: String? = null, val literal: String? = null)

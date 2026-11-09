@@ -86,7 +86,7 @@ object BibtexCodec {
             extra[RAW + name] = raw
             extra[VALUE + name] = canonical.getValue(name)
         }
-        val description = fields["abstract"] ?: fields["note"]
+        val description = fields["note"]
         if ((description?.length ?: 0) > 10000) warnings.add("The long description is retained in the bibliography without duplicating it as a description.")
         return Record(title, bibliography.copy(extra = extra), source?.takeIf { validUrl(it) && it.length <= 2048 }, description?.takeIf { it.length <= 10000 }, warnings)
     }

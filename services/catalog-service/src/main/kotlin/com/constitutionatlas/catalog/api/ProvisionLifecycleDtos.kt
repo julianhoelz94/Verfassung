@@ -21,4 +21,5 @@ data class CreateProvisionLifecycleEvent(
     val logicalUnitIds: List<UUID>,
     val sourceUrl: String? = null,
     val note: String? = null,
+    val operationId: UUID? = null,
 )

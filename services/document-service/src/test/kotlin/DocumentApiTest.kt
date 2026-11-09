@@ -56,6 +56,82 @@ class DocumentApiTest {
     }
 
     @Test
+    fun fileReplacementReplaysTheOriginalRevisionWithoutUploadingAgain() {
+        val created = mapper.readTree(
+            mvc.post("/documents") {
+                header("Authorization", EDITOR)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"title":"Wiki image source"}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        )
+        val id = created.path("id").asText()
+        val operation = UUID.randomUUID()
+        fun upload(bytes: String = "Replacement bytes", token: String = EDITOR) = mvc.perform(
+            multipart("/library/documents/$id/file")
+                .file(MockMultipartFile("metadata", "metadata.json", "application/json", """{"operationId":"$operation","expectedRevision":1}""".toByteArray()))
+                .file(MockMultipartFile("file", "source.txt", "text/plain", bytes.toByteArray())).header("Authorization", token),
+        )
+        val first = mapper.readTree(upload().andExpect(status().isOk).andReturn().response.contentAsString)
+        val pin = first.path("revision").path("id").asText()
+        upload().andExpect(status().isOk).andExpect(jsonPath("$.revision.id").value(pin))
+        mvc.put("/documents/$id") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Later metadata","expectedRevision":2}"""
+        }.andExpect { status { isOk() } }
+        upload().andExpect(status().isOk).andExpect(jsonPath("$.revision.id").value(pin))
+        upload("Changed bytes").andExpect(status().isConflict)
+        upload(token = VIEWER).andExpect(status().isForbidden)
+        org.junit.jupiter.api.Assertions.assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM document_revisions WHERE document_id = ?::uuid", Int::class.java, id))
+    }
+
+    @Test
+    fun stagedUploadsReplayWithoutOwnerLinksAndSupplementaryEvidenceStaysPrivate() {
+        val operation = UUID.randomUUID()
+        val metadata = """{"operationId":"$operation","title":"Staged source","citationKey":"Staged$operation","bibliography":{"type":"report","abstract":"Source summary"}}"""
+        fun upload(token: String = EDITOR, body: String = metadata) = mvc.perform(
+            multipart("/library/documents")
+                .file(MockMultipartFile("metadata", "metadata.json", "application/json", body.toByteArray()))
+                .file(MockMultipartFile("file", "source.txt", "text/plain", "Immutable captured bytes".toByteArray())).header("Authorization", token),
+        )
+        val document = mapper.readTree(upload().andExpect(status().isCreated).andReturn().response.contentAsString)
+        val id = document.path("id").asText()
+        val pin = document.path("revision").path("id").asText()
+        upload().andExpect(status().isCreated).andExpect(jsonPath("$.id").value(id))
+        upload(body = metadata.replace("Staged source", "Different source")).andExpect(status().isConflict)
+        upload(VIEWER).andExpect(status().isForbidden)
+        val publisherToken = "Bearer staging-publisher"
+        Mockito.`when`(identity.authenticate(publisherToken)).thenReturn(Actor(UUID.randomUUID(), "publisher@example.test", listOf("publisher")))
+        upload(publisherToken).andExpect(status().isForbidden)
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM document_link_events WHERE document_id = ?::uuid", Int::class.java, id))
+        for (type in listOf("import_job", "setup_proposal", "migration_run")) {
+            val target = UUID.randomUUID()
+            val body = """{"documentId":"$id","revisionId":"$pin","citationNote":"Supplementary only"}"""
+            repeat(2) {
+                mvc.post("/links/$type/$target") {
+                    header("Authorization", EDITOR)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = body
+                }.andExpect { status { isOk() } }
+            }
+            mvc.get("/links/$type/$target").andExpect { status { isNotFound() } }
+            mvc.get("/links/$type/$target") { header("Authorization", EDITOR) }.andExpect {
+                status { isOk() }
+                jsonPath("$[0].citationNote") { value("Supplementary only") }
+            }
+            org.junit.jupiter.api.Assertions.assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM document_link_events WHERE target_id = ?", Int::class.java, target))
+        }
+        mvc.get("/documents/$id").andExpect { status { isNotFound() } }
+        val bytes = mvc.get("/documents/$id/revisions/2/file") { header("Authorization", EDITOR) }.andReturn().response.contentAsByteArray
+        org.junit.jupiter.api.Assertions.assertArrayEquals("Immutable captured bytes".toByteArray(), bytes)
+        mvc.get("/library/documents?kind=image") { header("Authorization", EDITOR) }.andExpect {
+            status { isOk() }
+            jsonPath("$.items[?(@.id == '$id')]") { isEmpty() }
+        }
+        mvc.get("/library/documents?kind=executable") { header("Authorization", EDITOR) }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
     fun editorUploadCreatesOnePinnedRecordAndReplaysWithoutDuplicates() {
         val target = UUID.randomUUID()
         val operation = UUID.randomUUID()
@@ -88,6 +164,45 @@ class DocumentApiTest {
             content = """{"title":"Later revision","expectedRevision":$revision}"""
         }.andExpect { status { isOk() } }
         upload().andExpect(jsonPath("$.revision.id").value(pin))
+    }
+
+    @Test
+    fun linkedUploadPreservesBibliographyAndIncludesItInRetryIdentity() {
+        val target = UUID.randomUUID()
+        val operation = UUID.randomUUID()
+        val key = "source" + operation.toString().replace("-", "")
+        val metadata = """{"operationId":"$operation","title":"Full source","citationKey":"$key","citationNote":"Chapter 3","bibliography":{"type":"book","authors":[{"family":"Smith","given":"Jane"}],"issued":"2026","extra":{"jurisdiction":"Germany"}}}"""
+        fun upload(body: String = metadata) = mvc.perform(
+            multipart("/links/constitution/$target/documents")
+                .file(MockMultipartFile("metadata", "metadata.json", "application/json", body.toByteArray()))
+                .file(MockMultipartFile("file", "source.txt", "text/plain", "Exact source bytes".toByteArray()))
+                .header("Authorization", EDITOR),
+        )
+        val created = mapper.readTree(
+            upload().andExpect(status().isCreated)
+                .andExpect(jsonPath("$.citationKey").value(key))
+                .andExpect(jsonPath("$.revision.bibliography.authors[0].family").value("Smith"))
+                .andExpect(jsonPath("$.revision.bibliography.issued").value("2026"))
+                .andExpect(jsonPath("$.revision.bibliography.extra.jurisdiction").value("Germany"))
+                .andReturn().response.contentAsString,
+        )
+        upload().andExpect(status().isCreated).andExpect(jsonPath("$.id").value(created["id"].asText()))
+        upload(metadata.replace("2026", "2025")).andExpect(status().isConflict)
+        upload(metadata.replace("Chapter 3", "Chapter 4")).andExpect(status().isConflict)
+        val pin = created["revision"]["id"].asText()
+        mvc.get("/links/constitution/$target") { header("Authorization", EDITOR) }.andExpect {
+            jsonPath("$[0].revisionId") { value(pin) }
+            jsonPath("$[0].document.revision.bibliography.type") { value("book") }
+            jsonPath("$[0].citationNote") { value("Chapter 3") }
+        }
+    }
+
+    @Test
+    fun defaultLinkedRequestSerializationRetainsExistingRetryHashes() {
+        val operation = UUID.randomUUID()
+        val request = com.constitutionatlas.document.service.CreateLinkedDocumentRequest(operation, "Legacy", sourceUrl = "https://example.org/law")
+        val legacy = linkedMapOf("operationId" to operation, "title" to "Legacy", "description" to null, "sourceUrl" to "https://example.org/law", "scopeRevisionId" to null)
+        org.junit.jupiter.api.Assertions.assertEquals(mapper.writeValueAsString(legacy), mapper.writeValueAsString(request))
     }
 
     @Test
@@ -250,14 +365,105 @@ class DocumentApiTest {
         mvc.get("/legal-pages/datenschutz").andExpect { status { isNotFound() } }
     }
 
-    private fun create(): Pair<String, String> {
+    private fun create(commentary: Boolean = false): Pair<String, String> {
         val body = mvc.post("/documents") {
             header("Authorization", EDITOR)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"title":"Official gazette","sourceUrl":"https://example.org/gazette"}"""
+            content = if (commentary) """{"title":"Event commentary","description":"An independent event note.","bibliography":{"type":"commentary"}}""" else """{"title":"Official gazette","sourceUrl":"https://example.org/gazette"}"""
         }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
         val json = mapper.readTree(body)
         return json["id"].asText() to json["revision"]["id"].asText()
+    }
+
+    @Test
+    fun citationNotesRemainWithTheirChangeAndPinWhenTheSameSourceIsReused() {
+        val target = UUID.randomUUID()
+        val scopes = listOf(UUID.randomUUID(), UUID.randomUUID())
+        val (document, pin) = create()
+        scopes.forEachIndexed { index, scope ->
+            Mockito.`when`(targets.isPublic("change_material", target, scope)).thenReturn(true)
+            mvc.post("/links/change_material/$target") {
+                header("Authorization", EDITOR)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"documentId":"$document","revisionId":"$pin","scopeRevisionId":"$scope","citationNote":"Chapter ${index + 3}"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$[0].citationNote") { value("Chapter ${index + 3}") }
+            }
+        }
+        mvc.get("/documents/$document") { header("Authorization", EDITOR) }.andExpect {
+            status { isOk() }
+            jsonPath("$.revision.description") { doesNotExist() }
+            jsonPath("$.currentRevision") { value(1) }
+        }
+        mvc.put("/links/change_material/$target/$document/material") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Corrected title","expectedRevision":1,"expectedLinkedRevisionId":"$pin","scopeRevisionId":"${scopes[0]}"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].citationNote") { value("Chapter 3") }
+        }
+        mvc.get("/links/change_material/$target?scopeRevisionId=${scopes[1]}").andExpect {
+            status { isOk() }
+            jsonPath("$[0].revisionId") { value(pin) }
+            jsonPath("$[0].citationNote") { value("Chapter 4") }
+        }
+    }
+
+    @Test
+    fun publisherCanCreateEventCommentaryButCannotUploadLibraryFilesThroughMaterials() {
+        val publisherToken = "Bearer scoped-publisher"
+        Mockito.`when`(identity.authenticate(publisherToken)).thenReturn(Actor(UUID.randomUUID(), "publisher@example.test", listOf("publisher")))
+        val target = UUID.randomUUID()
+        val scope = UUID.randomUUID()
+        Mockito.`when`(targets.isPublic("lifecycle_material", target, scope)).thenReturn(true)
+        val metadata = MockMultipartFile("metadata", "metadata.json", "application/json", """{"operationId":"${UUID.randomUUID()}","title":"Event note","description":"Why this event occurred.","scopeRevisionId":"$scope","bibliography":{"type":"commentary"}}""".toByteArray())
+        mvc.perform(
+            multipart("/links/lifecycle_material/$target/documents").file(metadata)
+                .file(MockMultipartFile("file", "source.txt", "text/plain", "source".toByteArray())).header("Authorization", publisherToken),
+        )
+            .andExpect(status().isForbidden)
+        mvc.perform(multipart("/links/lifecycle_material/$target/documents").file(metadata).header("Authorization", publisherToken))
+            .andExpect(status().isCreated)
+        mvc.get("/links/lifecycle_material/$target?scopeRevisionId=$scope").andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+        }
+    }
+
+    @Test
+    fun publisherCannotReviseMetadataOnlyLibrarySourcesThroughAnEvent() {
+        val token = "Bearer metadata-publisher"
+        Mockito.`when`(identity.authenticate(token)).thenReturn(Actor(UUID.randomUUID(), "publisher@example.test", listOf("publisher")))
+        val target = UUID.randomUUID()
+        val scope = UUID.randomUUID()
+        Mockito.`when`(targets.isPublic("lifecycle_material", target, scope)).thenReturn(true)
+        listOf("book", "commentary").forEach { type ->
+            val created = mapper.readTree(
+                mvc.post("/documents") {
+                    header("Authorization", EDITOR)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"title":"Original $type","bibliography":{"type":"$type"}}"""
+                }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+            )
+            val id = created.path("id").asText()
+            val pin = created.path("revision").path("id").asText()
+            mvc.post("/links/lifecycle_material/$target") {
+                header("Authorization", token)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"documentId":"$id","revisionId":"$pin","scopeRevisionId":"$scope"}"""
+            }.andExpect { status { isOk() } }
+            mvc.put("/links/lifecycle_material/$target/$id/material") {
+                header("Authorization", token)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"title":"Changed $type","expectedRevision":1,"expectedLinkedRevisionId":"$pin","scopeRevisionId":"$scope"}"""
+            }.andExpect { status { if (type == "commentary") isOk() else isForbidden() } }
+            mvc.get("/documents/$id") { header("Authorization", EDITOR) }.andExpect {
+                jsonPath("$.revision.title") { value(if (type == "commentary") "Changed $type" else "Original $type") }
+                jsonPath("$.currentRevision") { value(if (type == "commentary") 2 else 1) }
+            }
+        }
     }
 
     @Test
@@ -521,7 +727,7 @@ class DocumentApiTest {
             val target = UUID.randomUUID()
             val scope = if (type == "amendment_material") null else UUID.randomUUID()
             val scopeJson = scope?.let { "\"$it\"" } ?: "null"
-            val (document, pin) = create()
+            val (document, pin) = create(type == "lifecycle_material")
             Mockito.`when`(targets.isPublic(type, target, scope)).thenReturn(true)
             val path = "/links/$type/$target"
             val body = """{"documentId":"$document","revisionId":"$pin","scopeRevisionId":$scopeJson}"""

@@ -17,6 +17,8 @@ import { Disclosure } from '../../../components/Disclosure';
 import type { HistoryMilestone } from '../../../components/HistoryTimeline';
 import surfaceStyles from '../../../components/surfaces.module.css';
 import fieldStyles from '../../../components/fields.module.css';
+import { DocumentReferences } from '../../../components/documents/DocumentReferences';
+import { listDocumentLinks } from '../../../../lib/document-api';
 
 const labels: Record<ConstitutionLifecycleEvent['eventType'], UiMessage> = {
   adopted: ui.lifecycleEvents.adopted,
@@ -46,6 +48,9 @@ export async function loadConstitutionHistory(country: CountryDetail, onValue?: 
   ].sort(
     (a, b) => a.eventDate.localeCompare(b.eventDate) || a.id.localeCompare(b.id),
   );
+  const documentLinks = new Map(await Promise.all(dated.map(async event => [
+    event.id, await listDocumentLinks('lifecycle_material', event.constitutionId, event.id).catch(() => []),
+  ] as const)));
   const units = new Map<string, ResolvedUnit | null>(
     await Promise.all((provisionEvents ?? []).flatMap((event) =>
       event.logicalUnitIds.map(async (logicalId) => [
@@ -126,6 +131,7 @@ export async function loadConstitutionHistory(country: CountryDetail, onValue?: 
           </ul>
         ) : null}
         {event.sourceUrl ? <p><a href={event.sourceUrl}><T value={ui.countries.code.constitutionTimeline.page.source} /></a></p> : null}
+        <DocumentReferences links={documentLinks.get(event.id) ?? []} />
       </article>
     ) };
   });

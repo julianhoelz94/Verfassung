@@ -82,6 +82,12 @@ bevor Sie die Pfade verwenden. Ohne Dateiexport oder ohne Anhänge entfällt `fi
 vollständig. Ausgewählte archivierte Einträge lassen sich ebenfalls exportieren;
 Bibliotheks- und Ordnerexporte umfassen aktive Einträge.
 
+### Quellen im jeweiligen Kontext wiederverwenden
+
+Die kompakten Dokumentfunktionen stehen auch bei Materialien zu veröffentlichten Rechtsänderungen und einzelnen Änderungen, bei gespeicherten Verfassungs- und Artikelereignissen sowie unter **Quellen dieser Textversion** in **Angaben → Archivquelle** und in der Quellenbearbeitung bereit. Allgemeine Verfassungsquellen und Quellen einer bestimmten Textversion haben getrennte Zuordnungen. Erfassen Sie ein Ereignis zuerst und öffnen Sie anschließend dessen Quellenbereich. Veröffentlichende können vorhandene Ereignisquellen auswählen; Bibliotheksuploads benötigen zusätzlich Editor- oder Admin-Rechte.
+
+Die Suche aktualisiert sich beim Tippen und behält die Trefferliste bei. Wählen Sie mit den Pfeiltasten und Enter einen Treffer und speichern Sie mit **Dokument verknüpfen**. **Zitieroptionen** bestimmt die gespeicherte Dokumentrevision. **Zitiernotiz / relevante Stelle** speichert Kapitel, Seitenangaben oder Erläuterungen zu dieser Verknüpfung, getrennt von der gemeinsamen Beschreibung und der veröffentlichten Zusammenfassung. Andere Zuordnungen derselben Quelle behalten ihre eigenen Notizen. Uploads und Verknüpfungen verwerfen keinen umgebenden Textentwurf. Ergänzende Quelldokumente werden getrennt von geprüften Korrekturen der Quellenbeschreibung gespeichert.
+
 ## 2. Prüfen
 
 **Erforderlich: Prüfer oder Administrator.**
@@ -158,3 +164,7 @@ Die private Vorschlagsseite zeigt Quelle, schreibgeschützte Gliederung, das tat
 Unter **Änderungen über den Chat-Client anfordern** können Sie Hinweise speichern. Bitten Sie anschließend den Chat-Client, den Vorschlag erneut über MCP abzurufen. Die Website versendet keine Nachricht automatisch. Eine Überarbeitung zeigt die Änderungen und das vorherige Beispiel zum Vergleich. Laden Sie nach einer Chat-Änderung den aktuellen Vorschlag. Veraltete Speicher- und Bestätigungsversuche werden abgewiesen. Solange eine angeforderte Überarbeitung aussteht, ist die Bestätigung gesperrt.
 
 Wählen Sie nach der Prüfung **Struktur bestätigen und vollständigen Upload ermöglichen**. Der Chat-Client muss auf diese Bestätigung auf der Website warten, bevor er den vollständigen Text hochlädt. Setzen Sie danach die Arbeit im Chat fort; der Client ruft die bestätigten Einstellungen selbst ab. Damit wird nur die Einrichtung bestätigt. Der hochgeladene Text benötigt weiterhin Prüfung, Freigabe und eine ausdrückliche Veröffentlichung.
+
+Quellen können bereits vor dem ersten Speichern einer Änderung oder eines Verfassungs-/Passagenereignisses ausgewählt oder hochgeladen werden. Die Verknüpfung entsteht nach dem Speichern des Datensatzes; Uploads bleiben auch beim Abbrechen in der gemeinsamen Bibliothek. Fehlgeschlagene Vorgänge erhalten die Eingaben und verwenden beim Wiederholen den bereits gespeicherten Datensatz. Publisher können Ereignisquellen auswählen; Bibliotheksuploads erfordern Editor-/Adminrechte.
+
+Wiki-Bearbeiter können vorhandene Bilder mit seiteneigenem Alternativtext und Bildnachweis sowie revisionsgebundene Literaturbelege mit Stellenangabe verwenden. Import-, Einrichtungs- und Migrationsprüfungen bieten ergänzende Belege, ohne Originaldateien oder Prüfsummen zu ändern. Im Texteditor verknüpft **Verweise → Dokument zitieren**, auch beim Bearbeiten einer Fußnote, markierten Text mit einer genauen Quellrevision. Speichern/übernehmen Sie den Textentwurf und veröffentlichen Sie seine Belege über den normalen Veröffentlichungsablauf.

@@ -8,6 +8,7 @@ const href = `/admin/import/packages/${run}`;
 test.beforeEach(async ({ request }) => {
   await request.post(`${mock}/__reset`);
   await request.post(`${mock}/__import_review`, { data: {} });
+  await request.post(`${mock}/__editor_documents`);
 });
 
 for (const width of [390, 820, 1440])

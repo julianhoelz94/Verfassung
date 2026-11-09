@@ -1,4 +1,6 @@
 'use client';
+import { useHydrated } from '../../../lib/use-hydrated';
+import { StagedDocumentPicker } from '../../components/documents/StagedDocumentPicker';
 
 import { fetchWithTimeout } from '../../../lib/fetch-with-timeout';
 
@@ -49,6 +51,8 @@ export function AmendmentForm({ amendmentId, constitutionId, amendment, versions
   const [changeRows, setChangeRows] = useState<ChangeRow[]>(() => initialRows(amendment));
   const [suggestError, setSuggestError] = useState(''), [pending, startTransition] = useTransition();
   const [dirty, setDirty] = useState(false), [review, setReview] = useState(diffReview);
+  const ready = useHydrated();
+  const creationAttempt = useRef(''), savedRecord = useRef('');
   const [saveError,setSaveError]=useState(''),[savePending,setSavePending]=useState(false);
   const locale=useLocale(), saving=useRef(false);
   const submitting = useRef(false);
@@ -90,11 +94,19 @@ export function AmendmentForm({ amendmentId, constitutionId, amendment, versions
       afterRef:after?{versionId:after.versionId,logicalId:after.logicalId,occurrenceId:after.occurrenceId,revisionId:after.revisionId,unitKind:after.kind==='text_entry'?'text_entry':'node'}:null }]);
     setDirty(true); go('passages');
   }
+  function saveData(host: HTMLFormElement) {
+    const data = new FormData(host);
+    if (!creationAttempt.current) creationAttempt.current = crypto.randomUUID();
+    data.set('creationAttemptId', creationAttempt.current);
+    if (savedRecord.current) data.set('amendmentId', savedRecord.current);
+    return data;
+  }
   async function saveDraft(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if(saving.current)return; saving.current=true;setSavePending(true);setSaveError('');
+    event.preventDefault(); if(!ready||saving.current)return; saving.current=true;setSavePending(true);setSaveError('');
     try {
-      const response=await fetchWithTimeout('/editor/command',{method:'POST',headers:{accept:'application/json'},body:new FormData(event.currentTarget)});
+      const response=await fetchWithTimeout('/editor/command',{method:'POST',headers:{accept:'application/json'},body:saveData(event.currentTarget)});
       const result=await response.json();
+      if (result.savedId) savedRecord.current = result.savedId;
       if(!response.ok||!result.destination){setSaveError(amendmentErrorMessage(result.key,locale)||copy('The draft could not be saved. Your edits are still here.','Der Entwurf konnte nicht gespeichert werden. Deine Eingaben bleiben erhalten.'));if(result.key==='title')go('details');return;}
       submitting.current=true;setDirty(false);window.location.assign(result.destination);
     } catch {setSaveError(copy('Saving could not be confirmed. Your edits are still here. Check the saved history before submitting again.','Das Speichern konnte nicht bestätigt werden. Deine Eingaben bleiben erhalten. Prüfe den gespeicherten Verlauf vor einem erneuten Versuch.'));}
@@ -118,7 +130,7 @@ export function AmendmentForm({ amendmentId, constitutionId, amendment, versions
   /** Render current attachments separately from older source references. */
   function renderDocuments(): ReactNode {
     return <Stack hidden={view!=='documents'} id="amendment-view-documents">
-        {documentsPanel ?? <Alert tone="info">{copy('Save this amendment first, then upload or choose documents here.','Speichere diese Änderung zuerst. Danach kannst du hier Dokumente hochladen oder auswählen.')}</Alert>}
+        {documentsPanel ?? (!readOnly && canSave ? <StagedDocumentPicker name="stagedDocuments" form="amendment-draft-form" onChange={() => setDirty(true)} /> : null)}
         {amendment?.documents?.length ? <details><summary>{copy('Older source references','Ältere Quellenverweise')}</summary><ul>{amendment.documents.map((document,index) => <li key={index}>{document.url?<a href={document.url} target="_blank" rel="noreferrer">{document.label||document.url}</a>:document.label||document.fileId}</li>)}</ul></details>:null}
       </Stack>;
   }
@@ -142,7 +154,7 @@ export function AmendmentForm({ amendmentId, constitutionId, amendment, versions
   return <PageChromeSurface ref={root} className={styles.workspace}>
     <PageMenuFrame ref={menu}><PageMenuBar as="nav" label={copy('Amendment workspace','Änderungsarbeitsbereich')}>
       {views.map(item => <button key={item} type="button" className={chrome.tool} aria-pressed={view===item} aria-controls={'amendment-view-'+item} onClick={() => go(item)}>{labels[item]}{item==='review' && unresolved ? ` (${unresolved})` : ''}</button>)}
-      {canSave ? <Button type="submit" form="amendment-draft-form" variant="primary" size="sm" disabled={savePending||pending} className={styles.menuSave}>{savePending?copy('Saving…','Wird gespeichert…'):copy('Save draft','Entwurf speichern')}</Button>:null}
+      {canSave ? <Button type="submit" form="amendment-draft-form" variant="primary" size="sm" disabled={!ready||savePending||pending} className={styles.menuSave}>{savePending?copy('Saving…','Wird gespeichert…'):copy('Save draft','Entwurf speichern')}</Button>:null}
     </PageMenuBar></PageMenuFrame>
     <Stack className={styles.body} gap="card">
       {saveError?<Alert tone="error">{saveError}</Alert>:null}
@@ -157,15 +169,15 @@ export function AmendmentForm({ amendmentId, constitutionId, amendment, versions
         <input type="hidden" name="sourceVersionId" value={sourceVersionId}/><input type="hidden" name="targetVersionId" value={targetVersionId}/><input type="hidden" name="documentsJson" value={JSON.stringify(amendment?.documents ?? [])}/>
         <Stack hidden={view!=='details'} id="amendment-view-details" data-amendment-task="details">
           <h2>{labels.details}</h2>
-          <Input id="amendment-title" name="title" label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelTitle}/>} defaultValue={amendment?.title ?? ''} required disabled={readOnly}/>
-          <Input id="amendment-citation" name="sourceReference" label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelCitation}/>} defaultValue={amendment?.sourceReference ?? ''} disabled={readOnly}/>
-          <Grid columns={2} variant="form"><Input id="amendment-enacted" name="enactedOn" type="date" label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelEnacted}/>} defaultValue={amendment?.enactedOn ?? ''} disabled={readOnly}/><Input id="amendment-effective" name="effectiveOn" type="date" label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelEffective}/>} defaultValue={amendment?.effectiveOn ?? ''} disabled={readOnly}/></Grid>
-          <TextArea id="amendment-summary" name="summary" label={<T value={ui.attrs.editorAmendmentsAmendmentformTextAreaLabelSummary}/>} defaultValue={amendment?.summary ?? ''} disabled={readOnly}/>
+          <Input id="amendment-title" name="title" label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelTitle}/>} defaultValue={amendment?.title ?? ''} required disabled={readOnly||!ready}/>
+          <Input id="amendment-citation" name="sourceReference" label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelCitation}/>} defaultValue={amendment?.sourceReference ?? ''} disabled={readOnly||!ready}/>
+          <Grid columns={2} variant="form"><Input id="amendment-enacted" name="enactedOn" type="date" label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelEnacted}/>} defaultValue={amendment?.enactedOn ?? ''} disabled={readOnly||!ready}/><Input id="amendment-effective" name="effectiveOn" type="date" label={<T value={ui.attrs.editorAmendmentsAmendmentformInputLabelEffective}/>} defaultValue={amendment?.effectiveOn ?? ''} disabled={readOnly||!ready}/></Grid>
+          <TextArea id="amendment-summary" name="summary" label={<T value={ui.attrs.editorAmendmentsAmendmentformTextAreaLabelSummary}/>} defaultValue={amendment?.summary ?? ''} disabled={readOnly||!ready}/>
           <Button type="button" onClick={() => go('passages')}>{copy('Continue to affected passages','Weiter zu betroffenen Passagen')}</Button>
         </Stack>
         <Stack hidden={view!=='passages'} id="amendment-view-passages" data-amendment-task="passages" gap="card">
           {pair}
-          <TextArea id="amendment-comment" name="comment" label={copy('Public amendment comment','Öffentlicher Änderungskommentar')} defaultValue={amendment?.comment ?? ''} required disabled={readOnly} rows={4}/>
+          <TextArea id="amendment-comment" name="comment" label={copy('Public amendment comment','Öffentlicher Änderungskommentar')} defaultValue={amendment?.comment ?? ''} required disabled={readOnly||!ready} rows={4}/>
           {!readOnly ? <Inline><Button type="button" disabled={!contentAvailable||pending} onClick={suggest}>{pending?copy('Finding passages…','Passagen werden ermittelt…'):copy('Find affected passages','Betroffene Passagen ermitteln')}</Button>{!contentAvailable?<p className={styles.muted}>{copy('Constitution text is unavailable.','Verfassungstext ist nicht verfügbar.')}</p>:null}</Inline>:null}
           {suggestError?<Alert tone="error">{suggestError}</Alert>:null}
           <AmendmentChangesTable initialRows={changeRows} articleNumbers={articleNumbers} unitTreesByVersion={unitTreesByVersion} readerOwners={readerOwners} navigationRef={navigation} sourceVersionId={sourceVersionId} targetVersionId={targetVersionId} readOnly={readOnly} onRowsChange={rows => {setChangeRows(rows);setDirty(true);}}/>

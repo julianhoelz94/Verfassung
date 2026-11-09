@@ -35,9 +35,10 @@ class LibraryController(private val library: LibraryService, private val documen
         @RequestParam(defaultValue = "0") offset: Int,
         @RequestParam(defaultValue = "30") limit: Int,
         @RequestParam(defaultValue = "created") sort: String,
+        @RequestParam(required = false) kind: String?,
     ): DocumentPageDto {
         documents.requireReader(authorization)
-        return library.search(q, folderId, tagId, status, offset, limit, sort)
+        return library.search(q, folderId, tagId, status, offset, limit, sort, kind)
     }
 
     @GetMapping("/folders")

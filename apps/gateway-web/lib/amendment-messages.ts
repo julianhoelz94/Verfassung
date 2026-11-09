@@ -8,6 +8,7 @@ export const AMENDMENT_ERROR_MESSAGES = {
   invalid: ui.errors.amendmentSaveFailed,
   create_failed: ui.errors.createAmendmentFailed,
   save_failed: ui.errors.saveDraftFailed,
+  documents: { en: 'The amendment was saved, but its documents could not be attached. Your selections are preserved. Retry to finish linking them.', de: 'Die Änderung wurde gespeichert, ihre Dokumente konnten jedoch nicht verknüpft werden. Deine Auswahl bleibt erhalten. Erneut versuchen, um die Verknüpfung abzuschließen.' },
   publish_failed: ui.errors.publishAmendmentFailed,
   withdraw_failed: ui.errors.withdrawAmendmentFailed,
   title: ui.errors.titleRequired,

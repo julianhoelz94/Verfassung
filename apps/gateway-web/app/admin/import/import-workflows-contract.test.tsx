@@ -23,6 +23,8 @@ const clients = vi.hoisted(() => ({
   getImportFidelity: vi.fn(),
   readCapturedSource: vi.fn(),
 }));
+vi.mock('../../../lib/server-locale', () => ({ currentLocale: async () => 'en' }));
+vi.mock('../../editor/documents/DocumentLinks', () => ({ DocumentLinks: (props: { targetType: string; targetId: string }) => <section data-document-target={props.targetType} data-document-owner={props.targetId}>Supplementary evidence</section> }));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw new Error(`redirect:${url}`);
@@ -205,6 +207,7 @@ describe('import review workflow contracts', () => {
     expect(clients.getImportPayload).toHaveBeenCalledWith('job/a', 'Bearer session');
     expect(clients.getReaderOutline).toHaveBeenCalledWith('draft', 'Bearer session');
     expect(doc.querySelector('textarea[name="reason"]')?.getAttribute('minlength')).toBe('10');
+    expect(doc.querySelector('[data-document-target="import_job"]')?.getAttribute('data-document-owner')).toBe('job/a');
   });
   it('keeps successful public links encoded and unknown errors safe', async () => {
     clients.getImportJob.mockResolvedValue({
@@ -294,6 +297,8 @@ describe('migration review selection and evidence contracts', () => {
       doc.querySelector('a[href="/admin/import/packages/run?source=source+a&sourceOffset=60000&display=source&item=target"]'),
     ).not.toBeNull();
     expect(doc.querySelector('a[href="/documents/doc?revision=2"]')).not.toBeNull();
+    expect(doc.querySelector('[data-document-target="import_job"]')?.getAttribute('data-document-owner')).toBe('job/a');
+    expect(doc.querySelector('[data-document-target="migration_run"]')?.getAttribute('data-document-owner')).toBe('run');
   });
   it('keeps selected review details independent of list filters and withholds prepare from reviewers', async () => {
     clients.currentUser.mockResolvedValue({ roles: ['reviewer'] });

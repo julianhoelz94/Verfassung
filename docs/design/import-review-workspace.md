@@ -16,6 +16,9 @@ section regardless of their existing URL family.
 The shared workspace uses the constitution viewer's `FullWidthPage` shell with
 `PageHeader`, `PageChromeSurface` and sticky menu, measured header offsets, semantic tokens,
 `ReaderIcon` and the shared `ConstitutionDocument`/`OrderedContentTree` renderer.
+Its heading uses the shared `PageHeader` without a separator; the menu retains
+the normal lower border. The current cross-page comparison and remaining
+differences are recorded in [the design audit](import-review-design-audit.md).
 The menu spans the viewport while the heading and review body keep their content
 measure. Both viewers share compact menu spacing, a divider after the pane toggle,
 active button styling and labels that collapse to accessible icons on phones.
@@ -69,3 +72,19 @@ of a publisher's permissions.
 The former migration screen sources are retained outside the deployment build in
 `archive/legacy-routing/migration-review/`. Redirect routes contain no duplicate
 review implementation.
+
+## Supplementary evidence
+
+The shared `DocumentLinks` loader/controller from PR #248 is embedded in the
+source area. Import-job evidence (`import_job`) and package evidence
+(`migration_run`) have distinct headings and saved owners. Constitution setup
+retains its `setup_proposal` picker. The common picker supplies live keyboard
+search, uploads, revision selection and contextual citation notes; the import
+workspace does not implement a separate picker or attachment API.
+
+Only editors/admins can change these links or create library records; reviewers
+and publishers retain read access. Mounted content panels preserve attachment
+inputs and review reasons across tab switches and failed writes. Supplementary
+evidence remains private and independent of fixed capture bytes, checksums and
+provenance. Detaching a link leaves the central library record and other owners'
+links intact.

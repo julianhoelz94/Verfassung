@@ -21,7 +21,7 @@ type Props = LifecycleFormContext & { scope: LifecycleScope; allowed: string[]; 
 
 export function LifecycleEventForm({ scope, allowed, lastDate, versions, initialVersionId, initialUnits, action, ...context }: Props) {
   const t = useTranslation(), locale = useLocale(), form = useRef<HTMLFormElement>(null), confirmed = useRef(false), generation = useRef(0);
-  const [review, setReview] = useState<FormData | null>(null), [documents, setDocuments] = useState<DocumentLink[]>([]);
+  const [review, setReview] = useState<FormData | null>(null), [documents, setDocuments] = useState<DocumentLink[]>([]), [documentsPending, setDocumentsPending] = useState(false);
   const [version, setVersion] = useState(initialVersionId ?? ''), [units, setUnits] = useState(initialUnits), [selected, setSelected] = useState<string[]>([]);
   const [versionRequest, setVersionRequest] = useState(''), [loading, setLoading] = useState(false), [error, setError] = useState('');
   const whole = scope === 'whole', prefix = whole ? 'event' : 'provision-event';
@@ -37,6 +37,7 @@ export function LifecycleEventForm({ scope, allowed, lastDate, versions, initial
     finally { if (generation.current === attempt) setLoading(false); }
   }
   function beforeSubmit(element: HTMLFormElement) {
+    if (loading || documentsPending) return false;
     if (!whole && !selected.length) { setError(t(copy.noneSelected)); return false; }
     if (confirmed.current) { confirmed.current = false; setReview(null); return true; }
     setReview(new FormData(element)); return false;
@@ -51,7 +52,7 @@ export function LifecycleEventForm({ scope, allowed, lastDate, versions, initial
         {!whole ? <Stack gap="field"><Select id="scope-version" name="sourceVersionId" label={t(copy.sourceVersion)} value={version} disabled={loading} onChange={event => { if (selected.length) setVersionRequest(event.target.value); else void loadVersion(event.target.value); }}><>{versions.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}</></Select>
           {loading ? <p role="status">{t(copy.loading)}</p> : null}
           {selected.map(id => <input type="hidden" name="logicalUnitIds" value={id} key={id} />)}
-          <LifecyclePassagePicker units={units} selected={selected} onChange={setSelected} />
+          <LifecyclePassagePicker disabled={loading} units={units} selected={selected} onChange={setSelected} />
         </Stack> : null}
         <Stack as="section" gap="field"><h2 className={styles.sectionTitle}><span>2</span>{t(copy.eventDate)}</h2>
           <Select id={`${prefix}-type`} name="eventType" label={t(copy.event)} defaultValue="" required info={{ description: t(copy.eventHelp), changeability: 'once', changeNote: t(copy.fixedEvent) }}><option value="">{t(copy.chooseEvent)}</option>{allowed.map(kind => <option value={kind} key={kind}>{t(lifecycleEventLabels[kind])}</option>)}</Select>
@@ -60,11 +61,11 @@ export function LifecycleEventForm({ scope, allowed, lastDate, versions, initial
           <details><summary>{t(copy.unknown)}</summary><p className={styles.muted}>{t(whole ? copy.dateHelp : copy.provisionDateHelp)}</p></details>
         </Stack>
         <Stack as="section" gap="field"><div className={styles.heading}><h2 className={styles.sectionTitle}><span>3</span>{t(copy.evidenceNote)}</h2><SettingInfo label={t(copy.documents)} description={t(copy.evidenceHelp)} changeability="later" /></div>
-          <StagedDocumentPicker name="stagedDocuments" heading={t(copy.documents)} headingLevel="h3" canCreate={context.canCreate} onLinksChange={setDocuments} />
+          <StagedDocumentPicker name="stagedDocuments" heading={t(copy.documents)} headingLevel="h3" canCreate={context.canCreate} onLinksChange={setDocuments} onPendingChange={setDocumentsPending} />
           <TextArea id={`${prefix}-note`} name="note" label={<>{t(copy.note)} <span className={styles.muted}>{t(copy.optional)}</span></>} rows={3} maxLength={10000} info={{ description: t(copy.noteHelp), changeability: 'later' }} />
         </Stack>
       </div>
-      <div className={styles.formFooter}><p className={styles.muted}>{t(copy.reviewHelp)}</p><Button type="submit" variant="primary" disabled={loading}>{t(copy.review)} <span aria-hidden="true">→</span></Button></div>
+      <div className={styles.formFooter}><p className={styles.muted}>{t(copy.reviewHelp)}</p><Button type="submit" variant="primary" disabled={loading || documentsPending}>{t(copy.review)} <span aria-hidden="true">→</span></Button></div>
     </StagedRecordForm>
     {review ? <LifecycleReview data={review} documents={documents} scope={scope} versionLabel={versions.find(item => item.id === version)?.label} units={units.filter(unit => selected.includes(unit.id))} onClose={() => setReview(null)} onSave={() => { confirmed.current = true; form.current?.requestSubmit(); }} locale={locale} /> : null}
     {versionRequest ? <VersionConfirmation onClose={() => setVersionRequest('')} onConfirm={() => void loadVersion(versionRequest)} /> : null}

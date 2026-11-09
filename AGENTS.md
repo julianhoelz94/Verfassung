@@ -6,6 +6,8 @@ Public constitution site: countries → versions → articles, amendments, searc
 
 Read [`docs/CODEMAPS/INDEX.md`](docs/CODEMAPS/INDEX.md), then the relevant area map and listed files. Trust code over maps. Work in one service (or gateway + Caddy) unless the task is cross-cutting. Do not start SRV-7 (MCP) unless asked.
 
+For document selection, uploads, citations or evidence attachments—including interactive mocks—use [the document attachment skill](.agents/skills/verfassung-document-attachments/SKILL.md). Its canonical picker is `components/documents/DocumentAttachmentTemplate.tsx`, with `DocumentLibraryPicker` for live search. Verify those sources before choosing an older `DocumentManagerTemplate` or recreating the controls.
+
 Linear is the source of truth for tracked work: find the issue before starting, use its identifier in progress reports, and complete it after verification. `backlog.md` is historical; grep an ID when needed, never use it as a status board. Do not create issues for untracked maintenance. If Linear is unavailable, report the issue ID and status to the user. Two-axis versioning: [`ADR 0005`](docs/adr/0005-two-axis-versions.md) and [`design`](docs/design/two-axis-versions.md).
 
 ## Verify

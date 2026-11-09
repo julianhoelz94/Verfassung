@@ -116,3 +116,37 @@ test('version loading failures and history filters preserve unsaved entries', as
   await expect(form.locator('[name=logicalUnitIds]')).toHaveCount(0);
   await expect(form.getByLabel('Effective date', { exact: true })).toHaveValue('2030-01-01');
 });
+
+test('pending uploads block event review and retain complete optional metadata', async ({ page }) => {
+  await signInAdmin(page); await page.goto(route);
+  const form = page.locator('form').filter({ has: page.locator('#event-date') });
+  await form.getByLabel('Event', { exact: true }).selectOption('adopted');
+  await form.getByLabel('Effective date', { exact: true }).fill('1949-05-08');
+  let finishUpload: (() => Promise<void>) | undefined;
+  let uploaded: FormData | undefined;
+  const documentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await page.route('**/editor/documents/command', async route => {
+    uploaded = await new Response(route.request().postDataBuffer()!, { headers: { 'content-type': route.request().headers()['content-type'] } }).formData();
+    finishUpload = () => route.fulfill({ json: { document: { id: documentId, status: 'active', currentRevision: 1, createdAt: '2026-01-01', revision: { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', documentId, revision: 1, title: 'Archival record', createdAt: '2026-01-01', createdBy: 'editor' } } } });
+  });
+  await form.getByRole('button', { name: 'Upload new document', exact: true }).click();
+  await form.getByLabel('Title', { exact: true }).fill('Archival record');
+  await form.getByText('Optional details', { exact: true }).click();
+  await form.getByLabel('Source URL', { exact: true }).fill('https://example.org/archive');
+  await form.getByLabel('Citation key', { exact: true }).fill('Archive1949');
+  await form.getByText('Publication details', { exact: true }).click();
+  await form.getByLabel('Publisher', { exact: true }).fill('Parliamentary Council');
+  await form.getByText('Library note', { exact: true }).click();
+  await form.getByLabel('Description', { exact: true }).fill('Separate catalogue note');
+  await form.getByRole('button', { name: 'Create and attach', exact: true }).click();
+  await expect(form.getByRole('button', { name: 'Review details' })).toBeDisabled();
+  await expect.poll(() => Boolean(finishUpload)).toBe(true);
+  expect(uploaded?.get('citationKey')).toBe('Archive1949');
+  expect(uploaded?.get('description')).toBe('Separate catalogue note');
+  expect(JSON.parse(String(uploaded?.get('bibliography'))).publisher).toBe('Parliamentary Council');
+  await finishUpload!();
+  await expect(form.getByRole('link', { name: 'Archival record', exact: true })).toBeVisible();
+  await expect(form.getByRole('button', { name: 'Review details' })).toBeEnabled();
+  await form.getByRole('button', { name: 'Review details' }).click();
+  await expect(page.getByRole('dialog', { name: 'Review event', exact: true })).toContainText('Archival record · Revision 1');
+});

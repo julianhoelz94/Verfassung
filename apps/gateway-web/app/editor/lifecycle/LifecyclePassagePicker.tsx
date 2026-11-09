@@ -8,15 +8,15 @@ import { Button, Input } from '../../components/ui';
 import { Inline, Stack } from '../../components/layout/Layout';
 import styles from './LifecycleWorkspace.module.css';
 
-export function LifecyclePassagePicker({ units, selected, onChange }: { units: LifecycleUnit[]; selected: string[]; onChange: (ids: string[]) => void }) {
+export function LifecyclePassagePicker({ units, selected, onChange, disabled = false }: { disabled?: boolean; units: LifecycleUnit[]; selected: string[]; onChange: (ids: string[]) => void }) {
   const t = useTranslation(), dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false), [query, setQuery] = useState(''), [draft, setDraft] = useState<string[]>([]);
   useEffect(() => { if (open) dialog.current?.showModal(); }, [open]);
   const matches = units.filter(unit => `${unit.path} ${unit.text}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   return <Stack gap="related">
     <div className={styles.selection}>
-      <Inline><span>{selected.length ? `${t(copy.selected)}: ${selected.length}` : t(copy.noneSelected)}</span><Button type="button" variant="ghost" onClick={() => { setDraft([...selected]); setQuery(''); setOpen(true); }}>{t(copy.selectPassages)}</Button></Inline>
-      {selected.length ? <ul className={styles.chips}>{selected.map(id => <li key={id}><span>{units.find(unit => unit.id === id)?.path ?? id}</span><Button type="button" size="sm" variant="ghost" aria-label={`${t({ en: 'Remove', de: 'Entfernen' })}: ${units.find(unit => unit.id === id)?.path ?? id}`} onClick={() => onChange(selected.filter(value => value !== id))}>×</Button></li>)}</ul> : null}
+      <Inline><span>{selected.length ? `${t(copy.selected)}: ${selected.length}` : t(copy.noneSelected)}</span><Button type="button" variant="ghost" disabled={disabled} onClick={() => { setDraft([...selected]); setQuery(''); setOpen(true); }}>{t(copy.selectPassages)}</Button></Inline>
+      {selected.length ? <ul className={styles.chips}>{selected.map(id => <li key={id}><span>{units.find(unit => unit.id === id)?.path ?? id}</span><Button type="button" size="sm" variant="ghost" disabled={disabled} aria-label={`${t({ en: 'Remove', de: 'Entfernen' })}: ${units.find(unit => unit.id === id)?.path ?? id}`} onClick={() => onChange(selected.filter(value => value !== id))}>×</Button></li>)}</ul> : null}
     </div>
     {open ? <dialog ref={dialog} className={styles.dialog} aria-labelledby="lifecycle-passage-title" onCancel={() => setOpen(false)}>
       <div className={styles.dialogHeading}><h2 id="lifecycle-passage-title">{t(copy.selectPassages)}</h2><Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t(copy.close)}</Button></div>

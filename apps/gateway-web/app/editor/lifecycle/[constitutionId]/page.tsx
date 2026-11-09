@@ -129,7 +129,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
           <input id="event-source" type="url" name="sourceUrl" />
           <label htmlFor="event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
           <textarea id="event-note" name="note" rows={3} />
-          <StagedDocumentPicker name="stagedDocuments" canCreate={user.roles.includes("editor") || user.roles.includes("admin")} />
+          <StagedDocumentPicker name="stagedDocuments" heading={locale === 'de' ? 'Dokumente zum Verfassungsereignis' : 'Constitution event documents'} canCreate={user.roles.includes("editor") || user.roles.includes("admin")} />
           <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordEvent} /></button>
         </StagedRecordForm>
       ) : <p><T value={ui.editor.lifecycle.constitutionid.page.thisConstitutionHasBeenRepealed} /></p>}
@@ -171,7 +171,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
             <input id="provision-event-source" type="url" name="sourceUrl" />
               <label htmlFor="provision-event-note"><T value={ui.editor.lifecycle.constitutionid.page.note} /></label>
             <textarea id="provision-event-note" name="note" rows={3} />
-            <StagedDocumentPicker name="stagedDocuments" canCreate={user.roles.includes("editor") || user.roles.includes("admin")} />
+            <StagedDocumentPicker name="stagedDocuments" heading={locale === 'de' ? 'Dokumente zum Artikelereignis' : 'Provision event documents'} headingLevel="h3" canCreate={user.roles.includes("editor") || user.roles.includes("admin")} />
           <button className="btn" type="submit"><T value={ui.editor.lifecycle.constitutionid.page.recordProvisionEvent} /></button>
           </StagedRecordForm>
         </section>

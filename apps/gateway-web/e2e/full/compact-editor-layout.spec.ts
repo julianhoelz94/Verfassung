@@ -225,7 +225,7 @@ for (const viewport of [
       await expect(wiki.getByLabel('Short description', { exact: true })).toBeVisible();
       await expect(wiki.getByLabel('Page text', { exact: true })).toBeVisible();
       expect(await wiki.locator('#wiki-sources').evaluate(element => element.closest('details')!.open)).toBe(false);
-      expect(await wiki.locator('#wiki-image').evaluate(element => element.closest('details')!.open)).toBe(false);
+      expect(await wiki.locator('[name=newImages]').evaluate(element => element.closest('details')!.open)).toBe(false);
       await expect(wiki.getByRole('button', { name: 'Save Wiki draft', exact: true })).toBeVisible();
       await noHorizontalOverflow(page); await screenshot(page, testInfo, `editor-${viewport.width}-wiki`);
       await workspace.getByRole('button', { name: 'Details', exact: true }).click();

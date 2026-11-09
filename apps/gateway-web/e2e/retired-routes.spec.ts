@@ -19,7 +19,7 @@ test('retired pre-launch URLs return not found instead of redirecting or serving
   }
 });
 
-test('an MCP import opens its prepared text and approval action directly in the editor', async ({ page, request }) => {
+test('an MCP import opens its prepared text and review decision in the shared editor workspace', async ({ page, request }) => {
   const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
   expect((await request.post(`${mock}/__reset`)).ok()).toBeTruthy();
   expect((await request.post(`${mock}/__sprint59_content`)).ok()).toBeTruthy();
@@ -27,6 +27,7 @@ test('an MCP import opens its prepared text and approval action directly in the 
   await signInReviewer(page);
   await page.goto('/editor?importJobId=01900000-0000-4000-8000-000000000701');
   await expect(page.locator('.import-review')).toBeVisible();
+  await page.getByRole('tab', { name: 'Review', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Approve prepared draft', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish approved version', exact: true })).toHaveCount(0);
   await expect(page).toHaveURL(/\/editor\?importJobId=/);

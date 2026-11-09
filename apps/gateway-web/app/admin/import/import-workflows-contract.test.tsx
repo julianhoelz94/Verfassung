@@ -18,6 +18,7 @@ const clients = vi.hoisted(() => ({
   getReaderOutline: vi.fn(),
   getVersionSettings: vi.fn(),
   getMigrationRun: vi.fn(),
+  getMigrationRuns: vi.fn(),
   getMigrationAttempts: vi.fn(),
   getImportFidelity: vi.fn(),
   readCapturedSource: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock('../../../lib/api', async (original) => ({
 vi.mock('../../../lib/migration-review', async (original) => ({
   ...(await original<typeof import('../../../lib/migration-review')>()),
   getMigrationRun: clients.getMigrationRun,
+  getMigrationRuns: clients.getMigrationRuns,
   getMigrationAttempts: clients.getMigrationAttempts,
   getImportFidelity: clients.getImportFidelity,
   readCapturedSource: clients.readCapturedSource,
@@ -62,6 +64,7 @@ vi.mock('./actions', () => ({
   createImportAction: vi.fn(),
   createSetupProposalAction: vi.fn(),
   transitionImportAction: vi.fn(),
+  prepareImportPackageAction: vi.fn(),
 }));
 vi.mock('./setup/actions', () => ({ reviewSetupAction: vi.fn() }));
 vi.mock('../migrations/actions', () => ({ prepareMigrationAction: vi.fn() }));
@@ -108,6 +111,7 @@ const migration = {
     {
       id: 'capture',
       sourceKey: 'capture',
+      dependencies: [],
       kind: 'document',
       state: 'prepared',
       attempts: 1,
@@ -116,6 +120,7 @@ const migration = {
     {
       id: 'target',
       sourceKey: 'target',
+      dependencies: ['capture'],
       kind: 'version',
       state: 'staged',
       attempts: 2,
@@ -140,6 +145,7 @@ beforeEach(() => {
   clients.getReaderOutline.mockResolvedValue(null);
   clients.getVersionSettings.mockResolvedValue(null);
   clients.getMigrationRun.mockResolvedValue(migration);
+  clients.getMigrationRuns.mockResolvedValue([]);
   clients.getMigrationAttempts.mockResolvedValue({ items: [], nextOffset: null });
   clients.getImportFidelity.mockResolvedValue(null);
   clients.readCapturedSource.mockResolvedValue('A'.repeat(60001));
@@ -194,8 +200,8 @@ describe('import review workflow contracts', () => {
     clients.getImportReviewDecisions.mockRejectedValue(new Error('offline'));
     clients.getReaderOutline.mockRejectedValue(new Error('offline'));
     const doc = documentOf(renderToStaticMarkup(await ImportReview({ jobId: 'job/a', error: 'reason' })));
-    expect(doc.querySelector('input[value="approve"]')).toBeNull();
-    expect(doc.querySelector('input[value="reject"]')).not.toBeNull();
+    expect(doc.querySelector('button[value="approve"]')?.hasAttribute('disabled')).toBe(true);
+    expect(doc.querySelector('button[value="reject"]')).not.toBeNull();
     expect(clients.getImportPayload).toHaveBeenCalledWith('job/a', 'Bearer session');
     expect(clients.getReaderOutline).toHaveBeenCalledWith('draft', 'Bearer session');
     expect(doc.querySelector('textarea[name="reason"]')?.getAttribute('minlength')).toBe('10');
@@ -262,17 +268,16 @@ describe('setup review presentation contracts', () => {
 });
 
 describe('migration review selection and evidence contracts', () => {
-  it('selects source aliases and preserves ordered downstream reads and pagination links', async () => {
+  it('selects source aliases and preserves pinned reads and pagination links', async () => {
     const doc = documentOf(
       renderToStaticMarkup(
-        await MigrationReviewPage({
-          params: Promise.resolve({ id: 'run' }),
-          searchParams: Promise.resolve({
+        await ImportReview({ runId: 'run',
+          query: {
             item: 'target',
             source: 'source a',
             sourceOffset: '30000',
             attemptOffset: '-3',
-          }),
+          },
         }),
       ),
     );
@@ -283,15 +288,10 @@ describe('migration review selection and evidence contracts', () => {
     );
     expect(clients.getPreparedImportContent).toHaveBeenCalledWith('draft', 'Bearer session');
     expect(clients.getMigrationAttempts).toHaveBeenCalledWith('run', 'target', 0, 'Bearer session');
-    expect(clients.readCapturedSource.mock.invocationCallOrder[0]).toBeLessThan(
-      clients.getPreparedImportContent.mock.invocationCallOrder[0],
-    );
-    expect(clients.getPreparedImportContent.mock.invocationCallOrder[0]).toBeLessThan(
-      clients.getVersionSettings.mock.invocationCallOrder[0],
-    );
+    expect(clients.getReaderOutline).toHaveBeenCalledWith('draft', 'Bearer session');
     expect(doc.querySelector('pre')?.textContent).toHaveLength(30000);
     expect(
-      doc.querySelector('a[href="/admin/migrations/run?item=target&source=source%20a&sourceOffset=60000"]'),
+      doc.querySelector('a[href="/admin/import/packages/run?source=source+a&sourceOffset=60000&display=source&item=target"]'),
     ).not.toBeNull();
     expect(doc.querySelector('a[href="/documents/doc?revision=2"]')).not.toBeNull();
   });
@@ -299,23 +299,21 @@ describe('migration review selection and evidence contracts', () => {
     clients.currentUser.mockResolvedValue({ roles: ['reviewer'] });
     const doc = documentOf(
       renderToStaticMarkup(
-        await MigrationReviewPage({
-          params: Promise.resolve({ id: 'run' }),
-          searchParams: Promise.resolve({ item: 'target', state: 'prepared' }),
+        await ImportReview({ runId: 'run',
+          query: { item: 'target', state: 'prepared' },
         }),
       ),
     );
-    expect(doc.querySelector('a[href="/editor?importJobId=job"]')).not.toBeNull();
-    expect(doc.querySelector('input[name="itemId"]')).toBeNull();
+    expect(doc.querySelector('button[value="approve"]')).not.toBeNull();
+    expect(doc.querySelector('button[value="prepare"]')).toBeNull();
     expect(clients.getPreparedImportContent).toHaveBeenCalled();
   });
   it('shows failed evidence without erasing the prepared text or download link', async () => {
     clients.readCapturedSource.mockRejectedValue(new Error('checksum'));
     const doc = documentOf(
       renderToStaticMarkup(
-        await MigrationReviewPage({
-          params: Promise.resolve({ id: 'run' }),
-          searchParams: Promise.resolve({ item: 'target' }),
+        await ImportReview({ runId: 'run',
+          query: { item: 'target' },
         }),
       ),
     );
@@ -324,4 +322,8 @@ describe('migration review selection and evidence contracts', () => {
     expect(doc.querySelector('a[href="/documents/doc?revision=2"]')).not.toBeNull();
     expect(clients.getPreparedImportContent).toHaveBeenCalled();
   });
+});
+
+it('redirects former migration review links into the unified package workspace', async () => {
+ await expect(MigrationReviewPage({params: Promise.resolve({id:'run'}), searchParams: Promise.resolve({item:'target', source:'source a'})})).rejects.toThrow('redirect:/admin/import/packages/run?item=target&source=source+a');
 });

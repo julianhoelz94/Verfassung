@@ -3,6 +3,10 @@
 import { currentUser, requireSessionBearer } from '../../../lib/session';
 import { createImportJob, createSetupProposal, ImportTransitionError, isImportRequest, parseImportJson, transitionImportJob } from '../../../lib/ingestion-api';
 
+import { getMigrationRun } from '../../../lib/migration-review';
+import { prepareImportPackage } from '../../../lib/prepare-import-package';
+import { packageReviewHref } from '../../../lib/import-review';
+
 function hasRole(roles: string[], role: string) { return roles.includes(role) || roles.includes('admin'); }
 
 export async function createImportAction(formData: FormData): Promise<string> {
@@ -50,25 +54,90 @@ export async function createSetupProposalAction(formData: FormData): Promise<str
   return `/admin/import/setup/${encodeURIComponent(proposalId)}`;
 }
 
-export async function transitionImportAction(formData: FormData): Promise<string> {
+export async function transitionImportAction(
+  formData: FormData,
+): Promise<string> {
   const user = await currentUser();
-  const jobId = String(formData.get('jobId') ?? '');
-  const returnTo = `/editor?importJobId=${encodeURIComponent(jobId)}`;
-  const action = String(formData.get('action') ?? '');
-  const reason = String(formData.get('reason') ?? '').trim();
-  const role = { 'confirm-outline': 'editor', prepare: 'editor', approve: 'reviewer', reject: 'reviewer', publish: 'publisher' }[action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish'];
-  if (!user || !role || !hasRole(user.roles, role)) return `${returnTo}&error=forbidden`;
-  if (['approve', 'reject'].includes(action) && (reason.length < 10 || reason.length > 2000)) return `${returnTo}&error=reason`;
-  if (action === 'publish' && !user.stepUpFresh) return `/account/step-up?returnTo=${encodeURIComponent(returnTo)}`;
+  const jobId = String(formData.get("jobId") ?? "");
+  const runId = String(formData.get("runId") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+  const returnTo = runId
+    ? packageReviewHref(runId, itemId, { view: "review" })
+    : `/editor?importJobId=${encodeURIComponent(jobId)}`;
+  const action = String(formData.get("action") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const role = {
+    "confirm-outline": "editor",
+    prepare: "editor",
+    approve: "reviewer",
+    reject: "reviewer",
+    publish: "publisher",
+  }[action as "confirm-outline" | "prepare" | "approve" | "reject" | "publish"];
+  if (!user || !role || !hasRole(user.roles, role))
+    return `${returnTo}&error=forbidden`;
+  // Context is verified against the package owner and selected job before any transition.
+  if (runId) {
+    const run = await getMigrationRun(
+      runId,
+      await requireSessionBearer(),
+    ).catch(() => null);
+    if (
+      !run?.items.some(
+        (item) => item.id === itemId && item.result.jobId === jobId,
+      )
+    )
+      return `${returnTo}&error=forbidden`;
+  }
+  if (
+    ["approve", "reject"].includes(action) &&
+    (reason.length < 10 || reason.length > 2000)
+  )
+    return `${returnTo}&error=reason`;
+  if (action === "publish" && !user.stepUpFresh)
+    return `/account/step-up?returnTo=${encodeURIComponent(returnTo)}`;
   try {
-    await transitionImportJob(jobId, action as 'confirm-outline' | 'prepare' | 'approve' | 'reject' | 'publish', await requireSessionBearer(), reason);
+    await transitionImportJob(
+      jobId,
+      action as
+        | "confirm-outline"
+        | "prepare"
+        | "approve"
+        | "reject"
+        | "publish",
+      await requireSessionBearer(),
+      reason,
+    );
   } catch (error) {
     if (error instanceof ImportTransitionError) {
-      if (error.code === 'mfa') return `/account/step-up?returnTo=${encodeURIComponent(returnTo)}`;
-      if (error.code === 'session_expired') return `/login?returnTo=${encodeURIComponent(returnTo)}`;
+      if (error.code === "mfa")
+        return `/account/step-up?returnTo=${encodeURIComponent(returnTo)}`;
+      if (error.code === "session_expired")
+        return `/login?returnTo=${encodeURIComponent(returnTo)}`;
       return `${returnTo}&error=${encodeURIComponent(error.code)}`;
     }
     return `${returnTo}&error=transition`;
   }
-  return `/editor?importJobId=${encodeURIComponent(jobId)}`;
+  if (runId && action === "publish" && hasRole(user.roles, "editor")) {
+    await prepareImportPackage(runId, await requireSessionBearer()).catch(
+      () => null,
+    );
+  }
+  return returnTo;
+}
+
+export async function prepareImportPackageAction(
+  formData: FormData,
+): Promise<string> {
+  const runId = String(formData.get("runId") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+  const destination = packageReviewHref(runId, itemId, { view: "content" });
+  const user = await currentUser();
+  if (!user || !hasRole(user.roles, "editor"))
+    return `${destination}&error=forbidden`;
+  try {
+    await prepareImportPackage(runId, await requireSessionBearer(), true);
+  } catch {
+    return `${destination}&error=prepare`;
+  }
+  return destination;
 }

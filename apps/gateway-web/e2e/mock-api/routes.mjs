@@ -1,3 +1,4 @@
+import { handleImportReviewFixture } from './import-review-routes.mjs';
 import {
   handleHealth,
   handleEditorDocumentsSetup,
@@ -115,6 +116,7 @@ import { handleDocumentLibrary } from "./document-library-routes.mjs";
 /** Exact original source order, including early Catalog exceptions and scenario interception. */
 export const routes = [
   handleHealth,
+  handleImportReviewFixture,
   handleDocumentLibrary,
   handleEditorDocumentsSetup,
   handleEditorDocumentsOverride,

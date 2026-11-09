@@ -1,32 +1,74 @@
-import { loginHref } from '../../../lib/return-to';
-import { redirect } from 'next/navigation';
-import { NavigatingActionForm } from '../../components/NavigatingActionForm';
-import { Disclosure } from '../../components/Disclosure';
-import { LocalizedRegion } from '../../components/LocalizedRegion';
-import { statusMessage } from '../../../lib/ui-labels';
-import { reviewUi } from '../../../lib/ui-review-messages';
-import { T } from '../../components/TranslationProvider';
-import { ui } from '../../../lib/messages';
-import { AdminForbidden } from '../../components/AdminForbidden';
-import { Alert, Badge, Button, Card, Input, PageHeader, TextArea } from '../../components/ui';
-import { WorkspacePage } from '../../components/layout/templates';
-import { currentUser, requireSessionBearer } from '../../../lib/session';
-import { listImportJobs, type ImportJob } from '../../../lib/ingestion-api';
-import { createImportAction, createSetupProposalAction } from './actions';
-import Link from 'next/link';
-import { migrationUi } from '../../../lib/migration-messages';
+import { loginHref } from "../../../lib/return-to";
+import { redirect } from "next/navigation";
+import { NavigatingActionForm } from "../../components/NavigatingActionForm";
+import { Disclosure } from "../../components/Disclosure";
+import { LocalizedRegion } from "../../components/LocalizedRegion";
+import { statusMessage } from "../../../lib/ui-labels";
+import { reviewUi } from "../../../lib/ui-review-messages";
+import { T } from "../../components/TranslationProvider";
+import { ui } from "../../../lib/messages";
+import { AdminForbidden } from "../../components/AdminForbidden";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Input,
+  PageHeader,
+  TextArea,
+} from "../../components/ui";
+import { WorkspacePage } from "../../components/layout/templates";
+import { currentUser, requireSessionBearer } from "../../../lib/session";
+import { listImportJobs, type ImportJob } from "../../../lib/ingestion-api";
+import { createImportAction, createSetupProposalAction } from "./actions";
+import Link from "next/link";
+import {
+  getMigrationRun,
+  getMigrationRuns,
+} from "../../../lib/migration-review";
+import { importReviewUi } from "../../../lib/import-review-messages";
+import { packageReviewHref } from "../../../lib/import-review";
 
-type AdminImportPageProps = { searchParams: Promise<{ error?: string; mode?: string }> };
+type AdminImportPageProps = {
+  searchParams: Promise<{ error?: string; mode?: string }>;
+};
 
-export default async function AdminImportPage({ searchParams }: AdminImportPageProps) {
+export default async function AdminImportPage({
+  searchParams,
+}: AdminImportPageProps) {
   const params = await searchParams;
   const user = await currentUser();
-  if (!user) redirect(loginHref('/admin/import', params));
-  if (!user.roles.some((role) => ['editor', 'reviewer', 'publisher', 'admin'].includes(role)))
+  if (!user) redirect(loginHref("/admin/import", params));
+  if (
+    !user.roles.some((role) =>
+      ["editor", "reviewer", "publisher", "admin"].includes(role),
+    )
+  )
     return <AdminForbidden title={ui.forbidden.import} />;
-  const canImport = user.roles.includes('editor') || user.roles.includes('admin');
-  const jobs = await listImportJobs(await requireSessionBearer()).catch(() => null);
-  const newStructure = params.mode === 'new';
+  const canImport =
+    user.roles.includes("editor") || user.roles.includes("admin");
+  const authorization = await requireSessionBearer();
+  const [jobs, packages] = await Promise.all([
+    listImportJobs(authorization).catch(() => null),
+    getMigrationRuns(authorization).catch(() => null),
+  ]);
+  const packageJobs = new Set<string>();
+  // Resolve package membership in bounded batches, so package versions are not listed twice.
+  for (let index = 0; index < (packages?.length ?? 0); index += 6) {
+    const batch = await Promise.all(
+      packages!
+        .slice(index, index + 6)
+        .map((item) =>
+          getMigrationRun(item.id, authorization).catch(() => null),
+        ),
+    );
+    for (const run of batch)
+      for (const item of run?.items ?? [])
+        if (item.result.jobId) packageJobs.add(item.result.jobId);
+  }
+  const individualJobs =
+    jobs?.filter((job) => !packageJobs.has(job.id)) ?? null;
+  const newStructure = params.mode === "new";
 
   return (
     <WorkspacePage
@@ -38,11 +80,7 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
         />
       }
     >
-      <p>
-        <Link href="/admin/migrations">
-          <T value={migrationUi.migrations} />
-        </Link>
-      </p>
+      {recentImports(individualJobs, packages)}
       {params.error ? (
         <Alert tone="error">
           <T value={stagingError(params.error)} />
@@ -53,14 +91,24 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
           <h2 className="section-title">
             <T value={reviewUi.importChoice} />
           </h2>
-          <LocalizedRegion as="nav" className="task-choices" label={reviewUi.chooseImportPath}>
-            <a href="?mode=existing#upload" aria-current={!newStructure ? 'page' : undefined}>
+          <LocalizedRegion
+            as="nav"
+            className="task-choices"
+            label={reviewUi.chooseImportPath}
+          >
+            <a
+              href="?mode=existing#upload"
+              aria-current={!newStructure ? "page" : undefined}
+            >
               <span className="task-number" aria-hidden="true">
                 01
               </span>
               <T value={reviewUi.existingStructure} />
             </a>
-            <a href="?mode=new#structure" aria-current={newStructure ? 'page' : undefined}>
+            <a
+              href="?mode=new#structure"
+              aria-current={newStructure ? "page" : undefined}
+            >
               <span className="task-number" aria-hidden="true">
                 02
               </span>
@@ -68,12 +116,22 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
             </a>
           </LocalizedRegion>
           <div className="import-layout">
-            <Card id={newStructure ? 'structure' : 'upload'}>
+            <Card id={newStructure ? "structure" : "upload"}>
               <h2>
-                <T value={newStructure ? reviewUi.newStructure : ui.admin.import.page.uploadAVersion} />
+                <T
+                  value={
+                    newStructure
+                      ? reviewUi.newStructure
+                      : ui.admin.import.page.uploadAVersion
+                  }
+                />
               </h2>
               <p className="muted">
-                <T value={newStructure ? reviewUi.proposalHint : reviewUi.uploadHint} />
+                <T
+                  value={
+                    newStructure ? reviewUi.proposalHint : reviewUi.uploadHint
+                  }
+                />
               </p>
               {newStructure ? (
                 <NavigatingActionForm action={createSetupProposalAction}>
@@ -84,9 +142,14 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
                     type="file"
                     accept="application/json,.json"
                   />
-                  <Disclosure summary={<T value={reviewUi.pasteJson} />} open={Boolean(params.error)}>
+                  <Disclosure
+                    summary={<T value={reviewUi.pasteJson} />}
+                    open={Boolean(params.error)}
+                  >
                     <TextArea
-                      label={<T value={ui.attrs.adminImportPageTextAreaLabelSetup} />}
+                      label={
+                        <T value={ui.attrs.adminImportPageTextAreaLabelSetup} />
+                      }
                       id="proposal"
                       name="proposal"
                       rows={10}
@@ -106,9 +169,16 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
                     type="file"
                     accept="application/json,.json"
                   />
-                  <Disclosure summary={<T value={reviewUi.pasteJson} />} open={Boolean(params.error)}>
+                  <Disclosure
+                    summary={<T value={reviewUi.pasteJson} />}
+                    open={Boolean(params.error)}
+                  >
                     <TextArea
-                      label={<T value={ui.attrs.adminImportPageTextAreaLabelImport} />}
+                      label={
+                        <T
+                          value={ui.attrs.adminImportPageTextAreaLabelImport}
+                        />
+                      }
                       id="payload"
                       name="payload"
                       rows={12}
@@ -126,7 +196,12 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
                 <T value={reviewUi.importDetails} />
               </h2>
               <p>
-                <T value={ui.admin.import.page.useTheConfirmedConstitutionIdAndSettings} />
+                <T
+                  value={
+                    ui.admin.import.page
+                      .useTheConfirmedConstitutionIdAndSettings
+                  }
+                />
               </p>
               <Link href="/admin/constitutions">
                 <T value={reviewUi.backToConstitutions} />
@@ -135,44 +210,57 @@ export default async function AdminImportPage({ searchParams }: AdminImportPageP
           </div>
         </>
       ) : null}
-      {recentImports(jobs)}
     </WorkspacePage>
   );
 }
 
 /** Maps staging failures to safe localized messages without exposing upstream details. */
 function stagingError(error?: string) {
-  return error === 'forbidden'
+  return error === "forbidden"
     ? ui.admin.import.page.editorRightsRequiredForStaging
-    : error === 'json'
+    : error === "json"
       ? ui.admin.import.page.thatFileIsNotValidJson
-      : error === 'invalid'
+      : error === "invalid"
         ? ui.admin.import.page.theJsonIsMissingRequiredImportFields
         : ui.admin.import.page.theImportCouldNotBeStarted;
 }
 
-/** Preserves unavailable, empty and ordered recent-import list states. */
-function recentImports(jobs: ImportJob[] | null) {
+/** One queue, with package membership resolved before showing individual imports. */
+function recentImports(
+  jobs: ImportJob[] | null,
+  packages: Awaited<ReturnType<typeof getMigrationRuns>>,
+) {
   return (
     <Card>
       <h2>
-        <T value={ui.admin.import.page.recentImports} />
+        <T value={importReviewUi.imports} />
       </h2>
-      {!jobs ? (
+      {!jobs || !packages ? (
         <Alert tone="error">
           <T value={ui.errors.servicesUnavailable} />
         </Alert>
-      ) : jobs.length === 0 ? (
+      ) : null}
+      {!jobs?.length && !packages?.length ? (
         <p className="muted">
           <T value={ui.admin.import.page.noImportsYet} />
         </p>
       ) : (
         <ul className="task-list">
-          {jobs.map((job) => (
+          {packages?.map((item) => (
+            <li key={item.id}>
+              <Link href={packageReviewHref(item.id)}>{item.title}</Link>
+              <span className="muted">
+                <T value={importReviewUi.package} /> · {item.coverage.prepared}/
+                {item.coverage.staged} <T value={importReviewUi.prepared} />
+              </span>
+            </li>
+          ))}
+          {jobs?.map((job) => (
             <li key={job.id}>
               <a href={`/editor?importJobId=${encodeURIComponent(job.id)}`}>
-                {job.isoCode ?? <T value={ui.remainingStatus.constitution} />}{' '}
-                <span className="muted">#{job.id.slice(-6)}</span>
+                {[job.constitutionTitle ?? job.isoCode, job.versionLabel]
+                  .filter(Boolean)
+                  .join(" · ") || job.id}
               </a>
               <Badge tone="info">
                 <T value={statusMessage(job.status)} />

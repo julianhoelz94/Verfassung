@@ -25,7 +25,7 @@ export function NavigatingActionForm({ action, children, className, autoFocusNam
   return <Stack as="form" elementRef={form} method="post" className={className} aria-busy={!ready || pending} onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!ready || pending) return;
-    const data = new FormData(event.currentTarget);
+    const data = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter);
     setPending(true);
     setFailed(false);
     try { window.location.assign(await action(data)); }

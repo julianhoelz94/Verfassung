@@ -87,7 +87,7 @@ describe('prepared import reader presentation', () => {
     clients.getPreparedImportContent.mockRejectedValue(new Error('content unavailable'));
     const document = await renderedReview();
     const buttons = Array.from(document.querySelectorAll('button'), element => element.textContent);
-    expect(buttons).not.toContain('Approve prepared draft');
+    expect(document.querySelector('button[value="approve"]')?.hasAttribute('disabled')).toBe(true);
     expect(buttons).toContain('Reject import');
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('prepared');
   });

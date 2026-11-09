@@ -84,6 +84,11 @@ test('exact provision selection survives tab changes and version cancellation', 
   await expect(page).toHaveURL(/saved=1/);
   const events = await request.get(mock + `/api/catalog/constitutions/${constitution}/provision-events`).then(r => r.json());
   expect(events).toHaveLength(1); expect(events[0].logicalUnitIds).toHaveLength(1); expect(events[0].sourceVersionId).toBe(previousVersion);
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  const history = page.getByRole('tabpanel');
+  await expect(history.getByRole('link', { name: '2022', exact: true })).toHaveAttribute('href', `/countries/DE/versions/${previousVersion}`);
+  await history.getByText('Selected provisions (1)', { exact: true }).click();
+  await expect(history.locator(`[data-logical-id="${events[0].logicalUnitIds[0]}"]`)).toBeVisible();
 });
 
 

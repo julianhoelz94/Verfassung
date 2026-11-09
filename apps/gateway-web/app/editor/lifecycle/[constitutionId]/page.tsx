@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
-import { getConstitutionEvents, getConstitutionProvisionEvents, getExportedUnits } from '../../../../lib/api';
+import { getConstitutionEvents, getConstitutionProvisionEvents, getExportedUnits, type ProvisionLifecycleEvent } from '../../../../lib/api';
 import { loadConstitutionCollection } from '../../../../lib/country-directory';
-import { flattenLifecycleUnits } from '../../../../lib/lifecycle-workspace';
+import { flattenLifecycleUnits, type LifecycleUnit } from '../../../../lib/lifecycle-workspace';
 import { publicVersions } from '../../../../lib/reading';
 import { loginHref, safeReturnTo } from '../../../../lib/return-to';
 import { currentLocale } from '../../../../lib/server-locale';
@@ -29,6 +29,7 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
   const selected = versions.find(version => version.id === query.versionId || version.currentVersionId === query.versionId) ?? versions.at(-1);
   const sourceVersionId = selected?.currentVersionId ?? selected?.id;
   const units = sourceVersionId ? flattenLifecycleUnits((await getExportedUnits(sourceVersionId).catch(() => null))?.roots ?? []) : [];
+  const provisionContexts = await loadProvisionContexts(provisions ?? [], sourceVersionId, units, context.owner.href, versions.map(version => ({ id: version.currentVersionId ?? version.id, label: version.versionLabel })));
   const returnTo = `/editor/lifecycle/${constitutionId}?${new URLSearchParams({ code, ...(query.jurisdictionId ? { jurisdictionId: query.jurisdictionId } : {}), ...(sourceVersionId ? { versionId: sourceVersionId } : {}) })}`;
   const materials = Object.fromEntries([...(events ?? []), ...(provisions ?? [])].map(event => [event.id,
     <DocumentLinks key={event.id} targetType="lifecycle_material" targetId={constitutionId} scopeRevisionId={event.id} returnTo={returnTo} canEdit
@@ -37,7 +38,23 @@ export default async function LifecycleEditor({ params, searchParams }: Props) {
   return <FullWidthPage template="workspace"><LifecycleWorkspace constitutionId={constitutionId} code={code} jurisdictionId={query.jurisdictionId}
     canCreate={user.roles.includes('editor') || user.roles.includes('admin')} title={constitution.title} ownerName={context.owner.name} ownerHref={context.owner.href}
     events={events ?? []} provisions={provisions ?? []} versions={versions.map(version => ({ id: version.currentVersionId ?? version.id, label: version.versionLabel }))}
-    sourceVersionId={sourceVersionId} units={units} materials={materials} asOf={new Date().toISOString().slice(0, 10)} returnTo={safeReturnTo(query.returnTo ?? '', returnTo)}
+    sourceVersionId={sourceVersionId} units={units} provisionContexts={provisionContexts} materials={materials} asOf={new Date().toISOString().slice(0, 10)} returnTo={safeReturnTo(query.returnTo ?? '', returnTo)}
     backHref={query.returnTo ? safeReturnTo(query.returnTo, '/editor') : undefined} initialEventId={query.eventId} saved={!!query.saved} failed={!!query.error} />
   </FullWidthPage>;
+}
+
+/** Resolve labels from each event’s pinned snapshot, including retained older corrections. */
+async function loadProvisionContexts(events: ProvisionLifecycleEvent[], selectedId: string | undefined, selectedUnits: LifecycleUnit[], ownerHref: string, versions: { id: string; label: string }[]) {
+  const ids = [...new Set(events.map(event => event.sourceVersionId))];
+  const snapshots = new Map<string, LifecycleUnit[]>(selectedId ? [[selectedId, selectedUnits]] : []);
+  for (let start = 0; start < ids.length; start += 6) {
+    await Promise.all(ids.slice(start, start + 6).filter(id => !snapshots.has(id)).map(async id => {
+      snapshots.set(id, flattenLifecycleUnits((await getExportedUnits(id).catch(() => null))?.roots ?? []));
+    }));
+  }
+  return Object.fromEntries(events.map(event => [event.id, {
+    versionHref: `${ownerHref}/versions/${encodeURIComponent(event.sourceVersionId)}`,
+    versionLabel: versions.find(version => version.id === event.sourceVersionId)?.label,
+    units: (snapshots.get(event.sourceVersionId) ?? []).filter(unit => event.logicalUnitIds.includes(unit.id)).map(({ id, path }) => ({ id, path })),
+  }]));
 }

@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import type { ConstitutionLifecycleEvent } from '../../../lib/api';
-import type { LifecycleEntry, LifecycleScope } from '../../../lib/lifecycle-workspace';
+import type { LifecycleEntry, LifecycleScope, LifecycleProvisionContext } from '../../../lib/lifecycle-workspace';
 import { lifecycleDate, lifecycleEventLabels } from '../../../lib/lifecycle-workspace';
 import { lifecycleWorkspaceUi as copy } from '../../../lib/lifecycle-workspace-messages';
 import { useLocale, useTranslation } from '../../components/TranslationProvider';
@@ -12,7 +12,7 @@ import { StagedRecordForm } from './StagedRecordForm';
 import { reviseLifecycleEvidenceAction } from './actions';
 import styles from './LifecycleWorkspace.module.css';
 
-export function LifecycleHistory({ entries, materials, constitutionId, code, returnTo, initialEventId }: { entries: LifecycleEntry[]; materials: Record<string, ReactNode>; constitutionId: string; code: string; returnTo: string; initialEventId?: string }) {
+export function LifecycleHistory({ entries, provisionContexts, materials, constitutionId, code, returnTo, initialEventId }: { entries: LifecycleEntry[]; provisionContexts: Record<string, LifecycleProvisionContext>; materials: Record<string, ReactNode>; constitutionId: string; code: string; returnTo: string; initialEventId?: string }) {
   const t = useTranslation(), locale = useLocale();
   const [filter, setFilter] = useState<'all' | LifecycleScope>('all');
   const [editing, setEditing] = useState(initialEventId ?? '');
@@ -20,7 +20,8 @@ export function LifecycleHistory({ entries, materials, constitutionId, code, ret
   return <Stack gap="card"><div className={styles.heading}><h2>{t(copy.eventHistory)}</h2><Select name="historyFilter" label={t(copy.history)} value={filter} onChange={event => setFilter(event.target.value as typeof filter)}><option value="all">{t(copy.allEvents)}</option><option value="whole">{t(copy.whole)}</option><option value="passages">{t(copy.passages)}</option></Select></div>
     <ol className={styles.historyList}>{entries.map(event => <li hidden={filter !== 'all' && event.scope !== filter} key={event.id} className={styles.historyCard}>
       <div className={styles.heading}><time dateTime={event.eventDate}>{lifecycleDate(event.eventDate, locale, 'dateCertainty' in event && event.dateCertainty === 'approximate')}</time><span className={styles.badge}>{t(event.scope === 'whole' ? copy.whole : copy.passages)}{'logicalUnitIds' in event ? ` · ${event.logicalUnitIds.length}` : ''}</span></div>
-      <h3>{t(lifecycleEventLabels[event.eventType])}</h3>{event.note ? <p>{event.note}</p> : null}
+      <h3>{t(lifecycleEventLabels[event.eventType])}</h3>
+      {event.scope === 'passages' ? <ProvisionScope context={provisionContexts[event.id]} count={event.logicalUnitIds.length} /> : null}{event.note ? <p>{event.note}</p> : null}
       {event.sourceUrl ? <p className={styles.muted}>{t(copy.legacySource)}: <a href={event.sourceUrl} target="_blank" rel="noreferrer">{event.sourceUrl}</a></p> : null}
       <details><summary>{t(copy.documents)}</summary><div className={styles.materials}>{materials[event.id]}</div></details>
       {event.scope === 'whole' ? <><Button type="button" variant="ghost" aria-expanded={editing === event.id} onClick={() => setEditing(editing === event.id ? '' : event.id)}>{t(copy.editEvidence)}</Button>
@@ -39,4 +40,14 @@ function EvidenceEditor({ event, constitutionId, code, returnTo }: { event: Cons
     <TextArea name="note" id={`evidence-note-${event.id}`} label={t(copy.note)} defaultValue={event.note ?? ''} maxLength={10000} rows={3} info={{ description: t(copy.noteHelp), changeability: 'later' }} />
     <Inline><Button type="submit" variant="primary">{t(copy.saveEvidence)}</Button></Inline>
   </StagedRecordForm>;
+}
+
+function ProvisionScope({ context, count }: { context?: LifecycleProvisionContext; count: number }) {
+  const t = useTranslation();
+  return <div className={styles.muted}>
+    {context ? <p>{t(copy.sourceVersion)}: <a href={context.versionHref}>{context.versionLabel ?? t({ en: 'Open pinned source version', de: 'Verknüpfte Ausgangsversion öffnen' })}</a></p> : null}
+    <details><summary>{t(copy.selected)} ({count})</summary><ul>{context?.units.map(unit => <li key={unit.id} data-logical-id={unit.id}>{unit.path}</li>)}</ul>
+      {context?.units.length !== count ? <p>{t({ en: 'Some passage labels are unavailable. The recorded source snapshot and provision references remain unchanged.', de: 'Einige Bezeichnungen sind nicht verfügbar. Die erfasste Ausgangsversion und die Bestimmungsreferenzen bleiben unverändert.' })}</p> : null}
+    </details>
+  </div>;
 }

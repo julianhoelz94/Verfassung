@@ -3,6 +3,7 @@ import { ui, type UiMessage } from './messages';
 
 export type LifecycleScope = 'whole' | 'passages';
 export type LifecycleUnit = { id: string; label: string; path: string; depth: number; text: string };
+export type LifecycleProvisionContext = { versionHref: string; versionLabel?: string; units: { id: string; path: string }[] };
 export type LifecycleVersion = { id: string; label: string };
 export type LifecycleEntry = (ConstitutionLifecycleEvent & { scope: 'whole' }) | (ProvisionLifecycleEvent & { scope: 'passages' });
 

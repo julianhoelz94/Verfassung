@@ -3,7 +3,7 @@
 import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 import { FilePenLine, History, PanelRight } from 'lucide-react';
 import type { ConstitutionLifecycleEvent, ProvisionLifecycleEvent } from '../../../lib/api';
-import { effectiveLifecycle, lifecycleDate, lifecycleEntries, lifecycleEventLabels, nextLifecycleEvents, type LifecycleScope, type LifecycleUnit, type LifecycleVersion } from '../../../lib/lifecycle-workspace';
+import { effectiveLifecycle, lifecycleDate, lifecycleEntries, lifecycleEventLabels, nextLifecycleEvents, type LifecycleProvisionContext, type LifecycleScope, type LifecycleUnit, type LifecycleVersion } from '../../../lib/lifecycle-workspace';
 import { lifecycleWorkspaceUi as copy } from '../../../lib/lifecycle-workspace-messages';
 import { lifecycleStatusMessage } from '../../../lib/lifecycle-label';
 import { useLocale, useTranslation } from '../../components/TranslationProvider';
@@ -17,7 +17,7 @@ import { appendLifecycleAction, appendProvisionAction } from './actions';
 import chrome from '../../components/layout/PageChrome.module.css';
 import styles from './LifecycleWorkspace.module.css';
 
-type Props = LifecycleFormContext & { title: string; ownerName: string; ownerHref: string; events: ConstitutionLifecycleEvent[]; provisions: ProvisionLifecycleEvent[]; versions: LifecycleVersion[]; sourceVersionId?: string; units: LifecycleUnit[]; materials: Record<string, ReactNode>; asOf: string; returnTo: string; backHref?: string; initialEventId?: string; saved?: boolean; failed?: boolean };
+type Props = LifecycleFormContext & { title: string; ownerName: string; ownerHref: string; events: ConstitutionLifecycleEvent[]; provisions: ProvisionLifecycleEvent[]; versions: LifecycleVersion[]; sourceVersionId?: string; units: LifecycleUnit[]; materials: Record<string, ReactNode>; provisionContexts: Record<string, LifecycleProvisionContext>; asOf: string; returnTo: string; backHref?: string; initialEventId?: string; saved?: boolean; failed?: boolean };
 
 export function LifecycleWorkspace(props: Props) {
   const t = useTranslation(), locale = useLocale(), root = useRef<HTMLDivElement>(null), menu = useRef<HTMLDivElement>(null), navigation = useRef<HTMLElement>(null);
@@ -57,7 +57,7 @@ export function LifecycleWorkspace(props: Props) {
           <div hidden={scope !== 'passages'}><LifecycleEventForm {...formContext} scope="passages" allowed={['deferred', 'commenced', 'suspended', 'restored']} versions={props.versions} initialVersionId={props.sourceVersionId} initialUnits={props.units} action={appendProvisionAction} /></div>
           </div>
         </div>
-        <div id="lifecycle-history" role="tabpanel" aria-labelledby="lifecycle-tab-history" hidden={view !== 'history'}><LifecycleHistory entries={entries} materials={props.materials} constitutionId={props.constitutionId} code={props.code} returnTo={props.returnTo} initialEventId={props.initialEventId} /></div>
+        <div id="lifecycle-history" role="tabpanel" aria-labelledby="lifecycle-tab-history" hidden={view !== 'history'}><LifecycleHistory provisionContexts={props.provisionContexts} entries={entries} materials={props.materials} constitutionId={props.constitutionId} code={props.code} returnTo={props.returnTo} initialEventId={props.initialEventId} /></div>
       </div>
       <aside id="lifecycle-context" className={styles.context} hidden={!context} aria-label={t(copy.context)}>
         <section><p className={styles.eyebrow}>{t(copy.currentStatus)}</p><h2>{t(lifecycleStatusMessage(effective ? status : undefined))}</h2>{effective ? <p className={styles.muted}>{t(copy.lastEffective)}:<br />{t(lifecycleEventLabels[effective.eventType])} · {lifecycleDate(effective.eventDate, locale, effective.dateCertainty === 'approximate')}</p> : <p>{t(copy.noEvents)}</p>}</section>

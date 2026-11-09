@@ -4,22 +4,29 @@
 .surface [hidden] {
   display: none !important;
 }
+.header {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: clamp(var(--space-5), 4vw, var(--space-7)) var(--gutter) var(--space-5);
+}
 .tool {
   composes: tool from "../components/layout/PageChrome.module.css";
 }
-.tool[aria-selected="true"] {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+.toolLabel {
+  composes: menuLabel from "../components/layout/PageChrome.module.css";
 }
 .tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-shrink: 0;
+  gap: inherit;
 }
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
 }
 .layout[data-navigation="true"] {
   grid-template-columns: 228px minmax(0, 1fr);
@@ -100,6 +107,9 @@
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+}
+.primaryAction svg {
+  flex-shrink: 0;
 }
 .selected h2 {
   margin: 8px 0 0;

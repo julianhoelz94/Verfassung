@@ -7,9 +7,10 @@ import { ui } from "../../lib/messages";
 import { useTranslation } from "../components/TranslationProvider";
 import { Button, PageHeader } from "../components/ui";
 import { ReaderIcon } from "../components/ReaderIcon";
-import { WorkspacePage } from "../components/layout/templates";
 import {
+  FullWidthPage,
   PageChromeSurface,
+  PageMenuDivider,
   PageMenuFrame,
   PageMenuBar,
 } from "../components/layout/PageChrome";
@@ -79,33 +80,37 @@ export function ImportReviewWorkspace({
     setTab(next);
   }
   return (
-    <WorkspacePage
-      className="import-review"
-      header={
-        <PageHeader
-          title={t(ui.importReview.title)}
-          breadcrumbs={[
-            { href: "/admin/import", label: t(copy.imports) },
-            { label: title },
-          ]}
-          meta={summary}
-        />
-      }
-    >
+    <FullWidthPage template="workspace" className="import-review">
       <PageChromeSurface ref={root} className={styles.surface}>
+        <div className={styles.header}>
+          <PageHeader
+            title={t(ui.importReview.title)}
+            breadcrumbs={[
+              { href: "/admin/import", label: t(copy.imports) },
+              { label: title },
+            ]}
+            meta={summary}
+          />
+        </div>
         <PageMenuFrame ref={menu}>
-          <PageMenuBar label={t(ui.importReview.title)}>
+          <PageMenuBar compact role="toolbar" label={t(ui.importReview.title)}>
             {navigation ? (
-              <button
-                type="button"
-                className={styles.tool}
-                aria-expanded={expanded}
-                aria-controls="import-package-contents"
-                onClick={() => setExpanded(!expanded)}
-              >
-                <ReaderIcon name="contents" />
-                {t(expanded ? copy.hidePackage : copy.showPackage)}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={styles.tool}
+                  aria-label={t(expanded ? copy.hidePackage : copy.showPackage)}
+                  aria-expanded={expanded}
+                  aria-controls="import-package-contents"
+                  onClick={() => setExpanded(!expanded)}
+                >
+                  <ReaderIcon name="contents" />
+                  <span className={styles.toolLabel}>
+                    {t(expanded ? copy.hidePackage : copy.showPackage)}
+                  </span>
+                </button>
+                <PageMenuDivider />
+              </>
             ) : null}
             <div
               role="tablist"
@@ -119,6 +124,7 @@ export function ImportReviewWorkspace({
                   id={`import-tab-${value}`}
                   role="tab"
                   className={styles.tool}
+                  aria-label={t(copy[value])}
                   aria-selected={tab === value}
                   aria-controls={`import-panel-${value}`}
                   tabIndex={tab === value ? 0 : -1}
@@ -156,7 +162,7 @@ export function ImportReviewWorkspace({
                           : "history"
                     }
                   />
-                  {t(copy[value])}
+                  <span className={styles.toolLabel}>{t(copy[value])}</span>
                 </button>
               ))}
             </div>
@@ -263,7 +269,7 @@ export function ImportReviewWorkspace({
           </section>
         </div>
       </PageChromeSurface>
-    </WorkspacePage>
+    </FullWidthPage>
   );
 }
 
@@ -315,14 +321,22 @@ function ImportSelectedHeader({
           <Button
             type="button"
             variant="primary"
+            className={styles.primaryAction}
             onClick={() => chooseTab("review")}
           >
-            {t(jobStatus === "approved" ? copy.publish : copy.decision)} →
+            <span>
+              {t(jobStatus === "approved" ? copy.publish : copy.decision)}
+            </span>
+            <ReaderIcon name="right" />
           </Button>
         ) : null}
         {jobStatus === "completed" && nextHref ? (
-          <Link className="btn btn-primary" href={nextHref}>
-            {t(copy.next)} →
+          <Link
+            className={["btn btn-primary", styles.primaryAction].join(" ")}
+            href={nextHref}
+          >
+            <span>{t(copy.next)}</span>
+            <ReaderIcon name="right" />
           </Link>
         ) : null}
       </div>

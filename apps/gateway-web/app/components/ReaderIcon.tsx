@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type ReaderIconName = 'book' | 'contents' | 'search' | 'compare' | 'wiki' | 'history' | 'details' | 'settings' | 'up' | 'down' | 'close' | 'swap' | 'check' | 'link' | 'arrow' | 'edit' | 'external';
+export type ReaderIconName = 'book' | 'contents' | 'search' | 'compare' | 'wiki' | 'history' | 'details' | 'settings' | 'up' | 'down' | 'right' | 'close' | 'swap' | 'check' | 'link' | 'arrow' | 'edit' | 'external';
 const paths: Record<ReaderIconName, ReactNode> = {
   external: <path d="M15 3h6v6m0-6L10 14M11 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6" />,
   history: <><path d="M3 3v6h6M3 9a9 9 0 1 1 0 6M12 7v5l3 2" /></>,
@@ -13,6 +13,7 @@ const paths: Record<ReaderIconName, ReactNode> = {
   settings: <><path d="M3 6h5m6 0h7M3 12h10m6 0h2M3 18h2m6 0h10" /><path d="M8 3v6m5 0v6M5 15v6" /></>,
   up: <path d="m6 15 6-6 6 6" />,
   down: <path d="m6 9 6 6 6-6" />,
+  right: <path d="M5 12h14m-6-6 6 6-6 6" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
   swap: <path d="M3 7h18m-4-4 4 4-4 4M21 17H3m4-4-4 4 4 4" />,
   check: <path d="m4 12 5 5L20 6" />,

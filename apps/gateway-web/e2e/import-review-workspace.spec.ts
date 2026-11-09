@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures/consent";
-import { signInAdmin } from "./helpers";
+import { signInAdmin, VERSION_2022 } from "./helpers";
 import { readFileSync } from "node:fs";
 
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
@@ -67,6 +67,35 @@ for (const width of [390, 820, 1440])
               .__sourceExecuted,
         ),
       ).toBeUndefined();
+      const toolbar = page.getByRole("toolbar");
+      const appearance = await toolbarAppearance(toolbar);
+      expect(appearance.left).toBe(0);
+      expect(appearance.width).toBe(width);
+      const decision = page.getByRole("button", {
+        name: en ? "Make review decision" : "Entscheidung treffen",
+        exact: true,
+      });
+      await expect(decision.locator("svg")).toBeVisible();
+      expect(
+        await decision.evaluate((button) => {
+          const label = button.querySelector("span")!.getBoundingClientRect();
+          const icon = button.querySelector("svg")!.getBoundingClientRect();
+          return Math.abs(
+            label.y + label.height / 2 - icon.y - icon.height / 2,
+          );
+        }),
+      ).toBeLessThan(1);
+      const viewer = await page.context().newPage();
+      try {
+        await viewer.setViewportSize({ width, height: 1000 });
+        await viewer.goto(`/countries/DE/versions/${VERSION_2022}`);
+        await expect(viewer.getByRole("toolbar")).toBeVisible();
+        expect(await toolbarAppearance(viewer.getByRole("toolbar"))).toEqual(
+          appearance,
+        );
+      } finally {
+        await viewer.close();
+      }
       await review.click();
       const reason = page.getByRole("textbox", {
         name: en ? "Review reason" : "Begründung der Entscheidung",
@@ -105,12 +134,42 @@ for (const width of [390, 820, 1440])
       );
       expect(violations.map((item) => item.id)).toEqual([]);
       await content.click();
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
       await page.screenshot({
         path: info.outputPath(`import-workspace-${locale}-${width}.png`),
         fullPage: true,
       });
     });
   }
+
+async function toolbarAppearance(toolbar: import("@playwright/test").Locator) {
+  return toolbar.evaluate((element) => {
+    const bar = getComputedStyle(element);
+    const frame = getComputedStyle(element.parentElement!);
+    const active = element.querySelector(
+      '[role="tab"][aria-selected="true"], button[aria-pressed="true"]',
+    )!;
+    const button = getComputedStyle(active);
+    const bounds = element.getBoundingClientRect();
+    return {
+      left: bounds.x,
+      width: bounds.width,
+      height: bounds.height,
+      padding: bar.padding,
+      gap: bar.gap,
+      wrap: bar.flexWrap,
+      background: frame.backgroundColor,
+      border: frame.borderBottom,
+      font: button.font,
+      buttonPadding: button.padding,
+      buttonHeight: active.getBoundingClientRect().height,
+      buttonRadius: button.borderRadius,
+      buttonBackground: button.backgroundColor,
+      buttonColor: button.color,
+      labelDisplay: getComputedStyle(active.querySelector("span")!).display,
+    };
+  });
+}
 
 test("package preparation, source inspection, approval and publication share one workspace", async ({
   page,

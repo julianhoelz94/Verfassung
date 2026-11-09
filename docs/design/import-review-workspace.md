@@ -7,11 +7,15 @@ same versions appearing as separate queue entries. Upload and constitution setup
 remain available on that page. Former `/admin/migrations` links redirect into
 Imports and retain source, selection and pagination context.
 
-The shared workspace composes `WorkspacePage`, `PageHeader`, the existing
-`PageChromeSurface` and sticky menu, measured header offsets, semantic tokens,
+The shared workspace uses the constitution viewer's `FullWidthPage` shell with
+`PageHeader`, `PageChromeSurface` and sticky menu, measured header offsets, semantic tokens,
 `ReaderIcon` and the shared `ConstitutionDocument`/`OrderedContentTree` renderer.
+The menu spans the viewport while the heading and review body keep their content
+measure. Both viewers share compact menu spacing, a divider after the pane toggle,
+active button styling and labels that collapse to accessible icons on phones.
 The package pane toggle is first in the menu and uses the reader's contents icon.
-Narrow screens initially hide the package pane.
+Narrow screens initially hide the package pane. Primary workflow actions pair
+their label with a centered SVG arrow.
 
 ## Task and display views
 

@@ -20,7 +20,7 @@ import { ReaderIcon, type ReaderIconName } from './ReaderIcon';
 import { ReaderArticle } from './ReaderArticle';
 import styles from './VersionReader.module.css';
 import { WikiPanel } from './WikiPanel';
-import { PageBreadcrumbs, PageChromeSurface, PageContentsBody, PageContentsLayout, PageContentsNavigation, PageMenuBar, PageMenuFrame } from './layout/PageChrome';
+import { PageBreadcrumbs, PageChromeSurface, PageContentsBody, PageContentsLayout, PageContentsNavigation, PageMenuBar, PageMenuFrame, PageMenuDivider } from './layout/PageChrome';
 import { useKeepContentsVisible, usePageChromeMetrics } from './layout/usePageChromeMetrics';
 import { ReaderActions, ReaderDocument } from './ReaderActions';
 import { ReadingPreferenceControls } from "./DocumentViewOptions";
@@ -204,9 +204,9 @@ function renderReaderSurface(model: ReaderSurfaceModel) {
 /** Render menu controls and preference selectors using the same model callbacks and native details elements. */
 function readerToolbar(model: ReaderSurfaceModel) {
   const { historyLink, t, preferences, updatePreferences, tool, context, editorial, panel, togglePanel, details, menu, setMenu, sentenceKinds, flowing, depth, setDepth, setExpanded, labels } = model;
-  return <PageMenuBar className={styles.readerMenu} role="toolbar" label={t(ui.accessibility.readingOptions)}>
+  return <PageMenuBar compact role="toolbar" label={t(ui.accessibility.readingOptions)}>
         <button type="button" className={styles.tool} aria-label={t(preferences.navigation ? copy.hideContents : copy.showContents)} aria-expanded={preferences.navigation} aria-controls="reader-contents" onClick={() => updatePreferences({ navigation: !preferences.navigation })}><ReaderIcon name="contents" /><span className={styles.toolName}>{t(copy.contents)}</span></button>
-        <span className={styles.divider} aria-hidden="true" />
+        <PageMenuDivider />
         <button type="button" className={styles.tool} aria-pressed={!panel} aria-label={t({en:'Read',de:'Lesen'})} onClick={() => togglePanel(null)}><ReaderIcon name="book" /><span className={styles.toolName}><T value={{en:'Read',de:'Lesen'}} /></span></button>
         {context ? tool('wiki', 'wiki', t(copy.wiki)) : null}
         {historyLink ? <a className={styles.tool} href={historyLink} aria-label={t({en:'History',de:'Geschichte'})}><ReaderIcon name="history" /><span className={styles.toolName}><T value={{en:'History',de:'Geschichte'}} /></span></a> : null}

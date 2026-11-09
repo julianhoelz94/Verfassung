@@ -29,6 +29,8 @@ data class CreateLinkedDocumentRequest(
     val citationNote: String? = null,
 )
 
+data class ReplaceDocumentFileRequest(val operationId: UUID, val expectedRevision: Int)
+
 @Service
 class EditorDocumentService(
     private val operations: EditorDocumentRepository,
@@ -78,6 +80,21 @@ class EditorDocumentService(
             )
         }
         if (targetType != "library") documents.attach(targetType, targetId, LinkRequest(stored.id, stored.revision.id, request.scopeRevisionId, request.citationNote), actor, authorization)
+        operations.save(actor.id, request.operationId, hash, stored.id, stored.revision.revision)
+        return stored
+    }
+
+    /** A retried replacement must return the first uploaded revision, even after later edits. */
+    @Transactional
+    fun replaceFile(documentId: UUID, request: ReplaceDocumentFileRequest, fileName: String, contentType: String, bytes: ByteArray, actor: Actor): DocumentDto {
+        require(request.expectedRevision > 0) { "Expected revision must be positive" }
+        val hash = digest(mapper.writeValueAsBytes(listOf("replace-file", documentId, request, fileName, contentType, digest(bytes))))
+        operations.lock(actor.id, request.operationId)
+        operations.find(actor.id, request.operationId)?.let { (previous, id, revision) ->
+            if (previous != hash) throw DocumentConflictException("Operation already used for another file")
+            return documents.get(id, revision)
+        }
+        val stored = documents.upload(documentId, request.expectedRevision, fileName, contentType, bytes, actor)
         operations.save(actor.id, request.operationId, hash, stored.id, stored.revision.revision)
         return stored
     }

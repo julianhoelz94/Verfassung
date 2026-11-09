@@ -3,6 +3,7 @@ package com.constitutionatlas.document.api
 import com.constitutionatlas.document.service.CreateLinkedDocumentRequest
 import com.constitutionatlas.document.service.DocumentService
 import com.constitutionatlas.document.service.EditorDocumentService
+import com.constitutionatlas.document.service.ReplaceDocumentFileRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.PathVariable
@@ -23,6 +24,14 @@ class EditorDocumentController(private val service: EditorDocumentService, priva
         @RequestPart metadata: CreateLinkedDocumentRequest,
         @RequestPart(required = false) file: MultipartFile?,
     ): DocumentDto = service.create("library", UUID(0, 0), metadata, file?.originalFilename, file?.contentType, file?.bytes, documents.requireWriter(authorization), authorization)
+
+    @PostMapping("/library/documents/{id}/file", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun replaceFile(
+        @PathVariable id: UUID,
+        @RequestHeader(value = "Authorization", required = false) authorization: String?,
+        @RequestPart metadata: ReplaceDocumentFileRequest,
+        @RequestPart file: MultipartFile,
+    ): DocumentDto = service.replaceFile(id, metadata, file.originalFilename ?: "document", file.contentType ?: "application/octet-stream", file.bytes, documents.requireWriter(authorization))
 
     @PostMapping("/links/{targetType}/{targetId}/documents", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     @ResponseStatus(HttpStatus.CREATED)

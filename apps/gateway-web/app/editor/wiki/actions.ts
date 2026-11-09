@@ -1,8 +1,9 @@
 'use server';
 
+import { createHash } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { publishWikiPage, saveWikiDraft, type WikiImage, type WikiTargetType } from '../../../lib/api';
-import { attachDocument, getDocument, uploadDocument } from '../../../lib/document-api';
+import { attachDocument, replaceDocumentFile } from '../../../lib/document-api';
 import { requireSessionBearer } from '../../../lib/session';
 import { resolveDocumentReferences } from '../../../lib/document-reference-server';
 import { safeReturnTo } from '../../../lib/return-to';
@@ -31,6 +32,14 @@ function editHref(targetType: string, targetId: string, code: string, status: st
   return wikiEditPath({ targetType: targetType as WikiTargetType, targetId, code, jurisdictionId: String(form.get('jurisdictionId') ?? '') }, { [status]: '1' });
 }
 
+/** Derive a separate stable receipt for each image in a retried Wiki save. */
+function imageOperationId(form: FormData, documentId: string): string {
+  const operationId = String(form.get('operationId') ?? '');
+  if (!/^[0-9a-f-]{36}$/i.test(operationId)) throw new TypeError('Missing Wiki save operation');
+  const hash = createHash('sha256').update(`wiki-image:${operationId}:${documentId}`).digest('hex').slice(0, 32);
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20)}`;
+}
+
 export async function saveWikiAction(form: FormData): Promise<string> {
   const { targetType, targetId, code, jurisdictionId } = target(form);
   const authorization = await requireSessionBearer();
@@ -56,9 +65,8 @@ export async function saveWikiAction(form: FormData): Promise<string> {
     for (const image of images) {
       const replacement = form.get(`replace-${image.documentId}`);
       if (replacement instanceof File && replacement.size > 0) {
-        const document = await getDocument(image.documentId, undefined, authorization);
-        const uploaded = await uploadDocument(image.documentId, document.currentRevision, replacement, authorization);
-        image.revision = uploaded.currentRevision;
+        const uploaded = await replaceDocumentFile(image.documentId, imageOperationId(form, image.documentId), image.revision, replacement, authorization);
+        image.revision = uploaded.revision.revision;
       }
     }
     if (images.some(image => !image.alt)) throw new TypeError('Alternative text is required');

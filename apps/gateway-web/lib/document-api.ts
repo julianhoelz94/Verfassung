@@ -141,6 +141,14 @@ export function uploadDocument(id: string, expectedRevision: number, file: File,
   });
 }
 
+/** Replacement and retry receipt commit together; replay returns the original immutable pin. */
+export function replaceDocumentFile(id: string, operationId: string, expectedRevision: number, file: File, authorization: string): Promise<DocumentRecord> {
+  const body = new FormData();
+  body.set('metadata', new Blob([JSON.stringify({ operationId, expectedRevision })], { type: 'application/json' }));
+  body.set('file', file);
+  return request(`/library/documents/${encodeURIComponent(id)}/file`, { method: 'POST', headers: { Authorization: authorization }, body });
+}
+
 export function createLinkedDocument(targetType: 'constitution' | 'version' | 'amendment' | MaterialTarget | IngestionDocumentTarget, targetId: string, metadata: {
   operationId: string; title: string; description: string; sourceUrl: string; scopeRevisionId: string | null;
   citationKey?: string; bibliography?: DocumentBibliography;

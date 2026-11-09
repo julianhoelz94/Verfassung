@@ -245,8 +245,6 @@ services:
       - CONTENT_API_URL=http://content-service:8080
       - CATALOG_API_URL=http://catalog-service:8080
       - AMENDMENT_API_URL=http://amendment-service:8080
-      - INGESTION_API_URL=http://ingestion-service:8080
-      - CONTENT_API_URL=http://content-service:8080
       - SEARCH_API_URL=http://search-service:8080
       - EDITOR_SERVICE_TOKEN=${EDITOR_SERVICE_TOKEN:-}
     depends_on:
@@ -298,6 +296,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DEPLOYMENT_SETUP_GATE_ENABLED=true
+      - CONTENT_API_URL=http://content-service:8080
       - IDENTITY_API_URL=http://identity-service:8080
       - CATALOG_API_URL=http://catalog-service:8080
       - AMENDMENT_API_URL=http://amendment-service:8080

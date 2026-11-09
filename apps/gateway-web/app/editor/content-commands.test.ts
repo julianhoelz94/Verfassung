@@ -148,6 +148,34 @@ describe('contextual pages separate draft and publication', () => {
     expect(requests[0].path).toBe(`/api/document/documents/${id}?revision=2`);
     expect(requests[2]).toMatchObject({ path: `/api/document/links/constitution_wiki/${id}`, body: { documentId: id, revisionId: `${id}-r2`, scopeRevisionId: 'wiki-r2' } });
   });
+  it('retries a Wiki image replacement using the same receipt and original expected revision', async () => {
+    const data = wikiForm({ images: JSON.stringify([{ documentId: id, revision: 2, alt: 'Seal' }]), operationId: id });
+    data.set(`replace-${id}`, new File(['pixels'], 'seal.png', { type: 'image/png' }));
+    const previous = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).includes('/library/documents/')) {
+        requests.push({ path: new URL(String(input)).pathname, method: 'POST', body: init!.body, authorization: 'Bearer writer-session' });
+        return json({ ...documentRecord, id, currentRevision: 8, revision: { ...documentRecord.revision, documentId: id, id: `${id}-r3`, revision: 3 } }, 200);
+      }
+      return previous(input, init);
+    });
+    expect(await wiki.saveWikiAction(data)).toContain('saved=1');
+    expect(await wiki.saveWikiAction(data)).toContain('saved=1');
+    const uploads = requests.filter(request => request.path.includes('/library/documents/'));
+    expect(uploads).toHaveLength(2);
+    const metadata = (upload: typeof uploads[number]) => new Promise<{ operationId: string; expectedRevision: number }>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(JSON.parse(String(reader.result)));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText((upload.body as FormData).get('metadata') as Blob);
+    });
+    const first = await metadata(uploads[0]);
+    const second = await metadata(uploads[1]);
+    expect(second).toEqual(first); expect(first.expectedRevision).toBe(2); expect(first.operationId).toMatch(/^[0-9a-f-]{36}$/);
+    const saves = requests.filter(request => request.path.endsWith('/draft'));
+    expect(saves).toHaveLength(2);
+    for (const save of saves) expect(save.body).toMatchObject({ images: [expect.objectContaining({ documentId: id, revision: 3 })] });
+  });
   it('requires alternative text before creating a newly uploaded image', async () => {
     const data = wikiForm(); data.set('imageFile', new File(['pixels'], 'seal.png', { type: 'image/png' })); expect(await wiki.saveWikiAction(data)).toContain('error=1'); expect(requests).toEqual([]);
   });

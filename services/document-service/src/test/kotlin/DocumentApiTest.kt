@@ -56,6 +56,36 @@ class DocumentApiTest {
     }
 
     @Test
+    fun fileReplacementReplaysTheOriginalRevisionWithoutUploadingAgain() {
+        val created = mapper.readTree(
+            mvc.post("/documents") {
+                header("Authorization", EDITOR)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"title":"Wiki image source"}"""
+            }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+        )
+        val id = created.path("id").asText()
+        val operation = UUID.randomUUID()
+        fun upload(bytes: String = "Replacement bytes", token: String = EDITOR) = mvc.perform(
+            multipart("/library/documents/$id/file")
+                .file(MockMultipartFile("metadata", "metadata.json", "application/json", """{"operationId":"$operation","expectedRevision":1}""".toByteArray()))
+                .file(MockMultipartFile("file", "source.txt", "text/plain", bytes.toByteArray())).header("Authorization", token),
+        )
+        val first = mapper.readTree(upload().andExpect(status().isOk).andReturn().response.contentAsString)
+        val pin = first.path("revision").path("id").asText()
+        upload().andExpect(status().isOk).andExpect(jsonPath("$.revision.id").value(pin))
+        mvc.put("/documents/$id") {
+            header("Authorization", EDITOR)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"title":"Later metadata","expectedRevision":2}"""
+        }.andExpect { status { isOk() } }
+        upload().andExpect(status().isOk).andExpect(jsonPath("$.revision.id").value(pin))
+        upload("Changed bytes").andExpect(status().isConflict)
+        upload(token = VIEWER).andExpect(status().isForbidden)
+        org.junit.jupiter.api.Assertions.assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM document_revisions WHERE document_id = ?::uuid", Int::class.java, id))
+    }
+
+    @Test
     fun stagedUploadsReplayWithoutOwnerLinksAndSupplementaryEvidenceStaysPrivate() {
         val operation = UUID.randomUUID()
         val metadata = """{"operationId":"$operation","title":"Staged source","citationKey":"Staged$operation","bibliography":{"type":"report","abstract":"Source summary"}}"""

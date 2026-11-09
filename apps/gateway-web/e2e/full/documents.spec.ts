@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test } from '../fixtures/consent';
 import { signIn } from './auth';
 import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
@@ -101,4 +102,36 @@ test('document revisions link from both editors and appear on public readers wit
 
   const after = await (await request.get(`/api/catalog/constitutions/${fixture.constitutionId}/versions`, { headers })).json();
   expect(after).toHaveLength(before.length);
+});
+
+test('passage citations publish only the selected document revision through the real service wiring', async ({ request }) => {
+  test.setTimeout(120_000);
+  const fixture = await createIsolatedConstitution(request, `Citation publication ${Date.now()}`);
+  const headers = await adminHeaders(request);
+  const created = await request.post('/api/document/documents', { headers, data: { title: 'Pinned archive source', sourceUrl: 'https://example.org/cited-source' } });
+  expect(created.ok(), await created.text()).toBe(true);
+  const document = await created.json();
+  const revised = await request.put(`/api/document/documents/${document.id}`, { headers, data: { title: 'Later catalog metadata', expectedRevision: 1 } });
+  expect(revised.ok(), await revised.text()).toBe(true);
+  expect((await request.get(`/api/document/documents/${document.id}?revision=1`)).status()).toBe(404);
+  const settings = await (await request.get(`/api/catalog/constitutions/${fixture.constitutionId}/settings`, { headers })).json();
+  const successor = await request.post(`/api/catalog/constitutions/${fixture.constitutionId}/versions`, { headers, data: {
+    versionLabel: `citation-${randomUUID()}`, effectiveDate: '2024-01-01', languageCode: 'en',
+    predecessorVersionId: fixture.targetVersionId, hopKind: 'legal', structuralSettingsRevisionId: settings.id,
+  } });
+  expect(successor.ok(), await successor.text()).toBe(true);
+  const version = await successor.json();
+  const target = { type: 'document', documentId: document.id, documentRevision: 1, locator: 'Chapter 3' };
+  const stored = await request.put(`/api/content/versions/${version.id}/content`, { headers, data: {
+    expectedGeneration: 0, roots: [{ logicalId: randomUUID(), kind: 'article', label: '1', title: 'Cited provision', content: [{ type: 'text', logicalId: randomUUID(), text: 'See source.', references: [{ logicalId: randomUUID(), start: 0, end: 3, target }] }] }],
+  } });
+  expect(stored.ok(), await stored.text()).toBe(true);
+  const publication = await request.post(`/api/catalog/versions/${version.id}/publish`, { headers });
+  expect(publication.ok(), await publication.text()).toBe(true);
+  const visible = await request.get(`/api/document/documents/${document.id}?revision=1`);
+  expect(visible.ok(), await visible.text()).toBe(true);
+  expect((await visible.json()).revision.title).toBe('Pinned archive source');
+  expect((await request.get(`/api/document/documents/${document.id}`)).status()).toBe(404);
+  const snapshot = await (await request.get(`/api/content/versions/${version.id}/content`)).json();
+  expect(snapshot.roots[0].content[0].references[0].target).toMatchObject(target);
 });

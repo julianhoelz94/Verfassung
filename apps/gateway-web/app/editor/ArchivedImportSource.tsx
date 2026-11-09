@@ -73,8 +73,9 @@ export function ArchivedImportSource({
   let firstLevel = 6;
   while (queue.length) {
     const node = queue.pop()!;
-    if (!('tagName' in node) || blocked.has(node.tagName)) continue;
-    if (/^h[1-6]$/.test(node.tagName)) firstLevel = Math.min(firstLevel, Number(node.tagName[1]));
+    if (!("tagName" in node) || blocked.has(node.tagName)) continue;
+    if (/^h[1-6]$/.test(node.tagName))
+      firstLevel = Math.min(firstLevel, Number(node.tagName[1]));
     queue.push(...node.childNodes);
   }
   function render(node: Node, path: string, depth = 0): ReactNode {
@@ -86,54 +87,76 @@ export function ArchivedImportSource({
       render(child, `${path}-${index}`, depth + 1),
     );
     if (!allowed.has(node.tagName)) return children;
-    const attrs: Record<string, string | number> = {};
-    for (const { name, value } of node.attrs) {
-      if (name === "id") attrs.id = `archived-source-${value}`;
-      if (name === "lang") attrs.lang = value;
-      if (name === "dir" && ["ltr", "rtl", "auto"].includes(value))
-        attrs.dir = value;
-      if (["colspan", "rowspan"].includes(name) && /^\d{1,3}$/.test(value))
-        attrs[name === "colspan" ? "colSpan" : "rowSpan"] = Math.max(
-          1,
-          Number(value),
-        );
-      if (name === "href" && node.tagName === "a") {
-        if (value.startsWith("#"))
-          attrs.href = `#archived-source-${value.slice(1)}`;
-        else
-          try {
-            const url = new URL(value, sourceUrl);
-            if (["http:", "https:"].includes(url.protocol)) {
-              attrs.href = url.href;
-              attrs.rel = "noreferrer";
-              attrs.target = "_blank";
-            }
-          } catch {
-            /* Retain the link wording if its address is invalid. */
-          }
-      }
-    }
+    const attrs = sourceAttributes(node, sourceUrl);
     // Embed the source outline below the source panel's heading, retaining relative levels.
-    const heading = /^h[1-6]$/.test(node.tagName) ? Number(node.tagName[1]) : null;
-    if (heading) return createElement('div', { key: path, ...attrs, role: 'heading', 'aria-level': heading - firstLevel + 3, 'data-source-heading': heading }, ...children);
+    const heading = /^h[1-6]$/.test(node.tagName)
+      ? Number(node.tagName[1])
+      : null;
+    if (heading)
+      return createElement(
+        "div",
+        {
+          key: path,
+          ...attrs,
+          role: "heading",
+          "aria-level": heading - firstLevel + 3,
+          "data-source-heading": heading,
+        },
+        ...children,
+      );
     return createElement(node.tagName, { key: path, ...attrs }, ...children);
   }
   return (
     <div className={[styles.document, styles.archived].join(" ")}>
-      {fragment.childNodes.map((node, index) =>
-        render(node, String(index)),
-      )}
+      {fragment.childNodes.map((node, index) => render(node, String(index)))}
     </div>
   );
 }
 
 /** Very deeply nested legacy markup retains its wording without exhausting the rendering stack. */
 function sourceText(root: Node) {
-  const queue = [root], text: string[] = [];
+  const queue = [root],
+    text: string[] = [];
   while (queue.length) {
     const node = queue.pop()!;
-    if (node.nodeName === '#text') text.push((node as DefaultTreeAdapterMap['textNode']).value);
-    else if ('tagName' in node && !blocked.has(node.tagName)) queue.push(...[...node.childNodes].reverse());
+    if (node.nodeName === "#text")
+      text.push((node as DefaultTreeAdapterMap["textNode"]).value);
+    else if ("tagName" in node && !blocked.has(node.tagName))
+      queue.push(...[...node.childNodes].reverse());
   }
-  return text.join('');
+  return text.join("");
+}
+
+function sourceAttributes(
+  node: DefaultTreeAdapterMap["element"],
+  sourceUrl: string,
+) {
+  const attrs: Record<string, string | number> = {};
+  for (const { name, value } of node.attrs) {
+    if (name === "id") attrs.id = `archived-source-${value}`;
+    if (name === "lang") attrs.lang = value;
+    if (name === "dir" && ["ltr", "rtl", "auto"].includes(value))
+      attrs.dir = value;
+    if (["colspan", "rowspan"].includes(name) && /^\d{1,3}$/.test(value))
+      attrs[name === "colspan" ? "colSpan" : "rowSpan"] = Math.max(
+        1,
+        Number(value),
+      );
+    if (name === "href" && node.tagName === "a")
+      Object.assign(attrs, sourceLink(value, sourceUrl));
+  }
+  return attrs;
+}
+
+function sourceLink(value: string, sourceUrl: string) {
+  if (value.startsWith("#"))
+    return { href: `#archived-source-${value.slice(1)}` };
+  try {
+    const url = new URL(value, sourceUrl);
+    if (["http:", "https:"].includes(url.protocol))
+      return { href: url.href, rel: "noreferrer", target: "_blank" };
+  } catch {
+    // Retain the link wording if its address is invalid.
+  }
+  return {};
 }

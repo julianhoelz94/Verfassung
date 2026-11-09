@@ -75,14 +75,6 @@ export function ImportReviewWorkspace({
   const tabs: ImportReviewTab[] = review
     ? ["content", "review", "history"]
     : ["content", "history"];
-  const phase =
-    jobStatus === "completed"
-      ? 3
-      : jobStatus === "approved" || jobStatus === "publishing"
-        ? 2
-        : jobStatus === "prepare"
-          ? 0
-          : 1;
   function chooseTab(next: ImportReviewTab) {
     setTab(next);
   }
@@ -186,66 +178,16 @@ export function ImportReviewWorkspace({
           ) : null}
           <section className={styles.body}>
             {notice}
-            <header className={styles.selected}>
-              <div className={styles.selectedTop}>
-                <div>
-                  {status}
-                  {jobStatus && jobStatus !== "completed" ? (
-                    <span className="muted"> · {t(copy.private)}</span>
-                  ) : null}
-                  <h2>{title}</h2>
-                </div>
-                {review &&
-                tab !== "review" &&
-                jobStatus !== "completed" &&
-                jobStatus !== "rejected" ? (
-                  <Button
-                    type="button"
-                    variant="primary"
-                    onClick={() => chooseTab("review")}
-                  >
-                    {t(jobStatus === "approved" ? copy.publish : copy.decision)}{" "}
-                    →
-                  </Button>
-                ) : null}
-                {jobStatus === "completed" && nextHref ? (
-                  <Link className="btn btn-primary" href={nextHref}>
-                    {t(copy.next)} →
-                  </Link>
-                ) : null}
-              </div>
-              {jobStatus ? (
-                <ol
-                  className={styles.progress}
-                  aria-label={t(ui.importReview.title)}
-                >
-                  {[copy.prepared, copy.review, copy.publication].map(
-                    (label, index) => (
-                      <li
-                        key={label.en}
-                        data-state={
-                          index < phase
-                            ? "done"
-                            : index === phase
-                              ? "current"
-                              : "pending"
-                        }
-                        aria-current={index === phase ? "step" : undefined}
-                      >
-                        <span aria-hidden="true">
-                          {index < phase ? "✓" : index + 1}
-                        </span>
-                        {t(label)}
-                      </li>
-                    ),
-                  )}
-                </ol>
-              ) : null}
-              {jobStatus === "pending_review" ? (
-                <p className="muted">{t(copy.reviewTask)}</p>
-              ) : null}
-              {preparation}
-            </header>
+            <ImportSelectedHeader
+              title={title}
+              status={status}
+              jobStatus={jobStatus}
+              review={review}
+              tab={tab}
+              nextHref={nextHref}
+              preparation={preparation}
+              chooseTab={chooseTab}
+            />
             <section
               id="import-panel-content"
               role="tabpanel"
@@ -332,4 +274,86 @@ function subscribeDesktop(notify: () => void) {
   const media = window.matchMedia("(min-width:761px)");
   media.addEventListener("change", notify);
   return () => media.removeEventListener("change", notify);
+}
+
+function ImportSelectedHeader({
+  title,
+  status,
+  jobStatus,
+  review,
+  tab,
+  nextHref,
+  preparation,
+  chooseTab,
+}: Pick<
+  Props,
+  "title" | "status" | "jobStatus" | "review" | "nextHref" | "preparation"
+> & { tab: ImportReviewTab; chooseTab: (tab: ImportReviewTab) => void }) {
+  const t = useTranslation();
+  const phase =
+    jobStatus === "completed"
+      ? 3
+      : jobStatus === "approved" || jobStatus === "publishing"
+        ? 2
+        : jobStatus === "prepare"
+          ? 0
+          : 1;
+  return (
+    <header className={styles.selected}>
+      <div className={styles.selectedTop}>
+        <div>
+          {status}
+          {jobStatus && jobStatus !== "completed" ? (
+            <span className="muted"> · {t(copy.private)}</span>
+          ) : null}
+          <h2>{title}</h2>
+        </div>
+        {review &&
+        tab !== "review" &&
+        jobStatus !== "completed" &&
+        jobStatus !== "rejected" ? (
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => chooseTab("review")}
+          >
+            {t(jobStatus === "approved" ? copy.publish : copy.decision)} →
+          </Button>
+        ) : null}
+        {jobStatus === "completed" && nextHref ? (
+          <Link className="btn btn-primary" href={nextHref}>
+            {t(copy.next)} →
+          </Link>
+        ) : null}
+      </div>
+      {jobStatus ? (
+        <ol className={styles.progress} aria-label={t(ui.importReview.title)}>
+          {[copy.prepared, copy.review, copy.publication].map(
+            (label, index) => (
+              <li
+                key={label.en}
+                data-state={
+                  index < phase
+                    ? "done"
+                    : index === phase
+                      ? "current"
+                      : "pending"
+                }
+                aria-current={index === phase ? "step" : undefined}
+              >
+                <span aria-hidden="true">
+                  {index < phase ? "✓" : index + 1}
+                </span>
+                {t(label)}
+              </li>
+            ),
+          )}
+        </ol>
+      ) : null}
+      {jobStatus === "pending_review" ? (
+        <p className="muted">{t(copy.reviewTask)}</p>
+      ) : null}
+      {preparation}
+    </header>
+  );
 }

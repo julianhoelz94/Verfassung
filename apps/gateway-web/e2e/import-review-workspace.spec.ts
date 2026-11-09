@@ -131,11 +131,18 @@ test("package preparation, source inspection, approval and publication share one
       .first(),
   ).toBeVisible();
   const toggle = page.getByRole("button", { name: "Hide package contents" });
-  await expect(toggle.locator("svg rect")).toBeVisible();
   const firstTab = page.getByRole("tab", { name: "Content", exact: true });
-  expect((await toggle.boundingBox())!.x).toBeLessThan(
-    (await firstTab.boundingBox())!.x,
-  );
+  await expect(
+    page.getByRole("tab", { name: "Review", exact: true }),
+  ).toBeVisible();
+  await expect(toggle.locator("svg rect")).toBeVisible();
+  await expect
+    .poll(async () => {
+      const toggleBox = await toggle.boundingBox();
+      const tabBox = await firstTab.boundingBox();
+      return Boolean(toggleBox && tabBox && toggleBox.x < tabBox.x);
+    })
+    .toBe(true);
   await page.getByRole("tab", { name: "Review", exact: true }).click();
   await page
     .getByLabel("Review reason")

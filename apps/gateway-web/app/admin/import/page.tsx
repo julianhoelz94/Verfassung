@@ -52,20 +52,7 @@ export default async function AdminImportPage({
     listImportJobs(authorization).catch(() => null),
     getMigrationRuns(authorization).catch(() => null),
   ]);
-  const packageJobs = new Set<string>();
-  // Resolve package membership in bounded batches, so package versions are not listed twice.
-  for (let index = 0; index < (packages?.length ?? 0); index += 6) {
-    const batch = await Promise.all(
-      packages!
-        .slice(index, index + 6)
-        .map((item) =>
-          getMigrationRun(item.id, authorization).catch(() => null),
-        ),
-    );
-    for (const run of batch)
-      for (const item of run?.items ?? [])
-        if (item.result.jobId) packageJobs.add(item.result.jobId);
-  }
+  const packageJobs = await packageJobIds(packages ?? [], authorization);
   const individualJobs =
     jobs?.filter((job) => !packageJobs.has(job.id)) ?? null;
   const newStructure = params.mode === "new";
@@ -271,4 +258,25 @@ function recentImports(
       )}
     </Card>
   );
+}
+
+async function packageJobIds(
+  packages: NonNullable<Awaited<ReturnType<typeof getMigrationRuns>>>,
+  authorization: string,
+) {
+  const packageJobs = new Set<string>();
+  // Resolve package membership in bounded batches, so package versions are not listed twice.
+  for (let index = 0; index < packages.length; index += 6) {
+    const batch = await Promise.all(
+      packages
+        .slice(index, index + 6)
+        .map((item) =>
+          getMigrationRun(item.id, authorization).catch(() => null),
+        ),
+    );
+    for (const run of batch)
+      for (const item of run?.items ?? [])
+        if (item.result.jobId) packageJobs.add(item.result.jobId);
+  }
+  return packageJobs;
 }

@@ -15,6 +15,7 @@ import {
   readCapturedSource,
   type MigrationRun,
   type MigrationItem,
+  type MigrationSource,
 } from "../../lib/migration-review";
 import {
   packageReviewHref,
@@ -76,15 +77,13 @@ export async function ImportReview({
   )
     return <AdminForbidden title={ui.forbidden.import} />;
   const authorization = await requireSessionBearer();
-  let run: MigrationRun | null = null;
-  let job: Awaited<ReturnType<typeof getImportJob>> = null;
-  try {
-    if (runId) run = await getMigrationRun(runId, authorization);
-    const selectedId = run
-      ? selectImportEvidence(run, query).selected?.result.jobId
-      : jobId;
-    if (selectedId) job = await getImportJob(selectedId, authorization);
-  } catch {
+  const selection = await loadImportSelection(
+    jobId,
+    runId,
+    query,
+    authorization,
+  ).catch(() => null);
+  if (!selection) {
     return (
       <WorkspacePage
         header={<PageHeader title={<T value={ui.importReview.title} />} />}
@@ -95,64 +94,30 @@ export async function ImportReview({
       </WorkspacePage>
     );
   }
+  const { run, job } = selection;
   if ((jobId && !job) || (runId && !run)) notFound();
   const { selected, source, capture } = run
     ? selectImportEvidence(run, query)
     : { selected: undefined, source: undefined, capture: undefined };
-  const versionId = job?.versionId ?? selected?.result.versionId;
-  const [payload, decisions, prepared, outline, fidelity, attempts] =
-    await Promise.all([
-      job ? getImportPayload(job.id, authorization).catch(() => null) : null,
-      job
-        ? getImportReviewDecisions(job.id, authorization).catch(() => [])
-        : [],
-      versionId
-        ? getPreparedImportContent(versionId, authorization).catch(() => null)
-        : null,
-      versionId
-        ? getReaderOutline(versionId, authorization).catch(() => null)
-        : null,
-      run && job
-        ? getImportFidelity(job.id, authorization).catch(() => null)
-        : null,
-      run && selected
-        ? getMigrationAttempts(
-            run.id,
-            selected.id,
-            offset(query.attemptOffset),
-            authorization,
-          ).catch(() => null)
-        : null,
-    ]);
-  let original: string | null = null,
-    evidenceFailed = false;
-  if (capture?.state === "prepared" && source)
-    try {
-      original = await readCapturedSource(capture, source, authorization);
-    } catch {
-      evidenceFailed = true;
-    }
-  const title =
-    [
-      String(payload?.constitutionTitle ?? job?.constitutionTitle ?? ""),
-      String(payload?.versionLabel ?? job?.versionLabel ?? ""),
-    ]
-      .filter(Boolean)
-      .join(" · ") ||
-    selected?.sourceKey ||
-    run?.manifest.title ||
-    job?.id ||
-    "";
+  const data = await loadReviewData(
+    job,
+    run,
+    selected,
+    capture,
+    source,
+    query,
+    authorization,
+  );
+  const { payload, prepared, original } = data;
+  const title = importReviewTitle(job, run, selected, data.payload);
   const actions = job
     ? importActions(job, user.roles, Boolean(payload?.outline)).filter(
-        (action) =>
-          action !== "approve" || Boolean(prepared),
+        (action) => action !== "approve" || Boolean(prepared),
       )
     : [];
   const context =
     run && selected ? { runId: run.id, itemId: selected.id } : undefined;
   const phase = job ? importPhase(job) : null;
-  const statuses = job ? reviewStatus(job, prepared) : null;
   const href = (extra: Record<string, string>) =>
     run
       ? packageReviewHref(run.id, selected?.id, {
@@ -160,316 +125,7 @@ export async function ImportReview({
           ...extra,
         })
       : `/editor?importJobId=${encodeURIComponent(jobId ?? "")}`;
-  const sourceOffset = offset(query.sourceOffset),
-    sourcePage = original?.slice(sourceOffset, sourceOffset + 30000);
-  const sourceView = (
-    <>
-      <h2>
-        <T value={copy.sourceHeading} />
-      </h2>
-      {run && selected && sourcesForItem(run, selected).length > 1 ? (
-        <LocalizedRegion as="nav" label={copy.chooseSource}>
-          {sourcesForItem(run, selected).map((candidate) => (
-            <Link
-              key={candidate.sourceKey}
-              href={packageReviewHref(run!.id, selected.id, {
-                source: candidate.sourceKey,
-                display: "source",
-              })}
-              aria-current={
-                candidate.sourceKey === source?.sourceKey ? "page" : undefined
-              }
-            >
-              {candidate.sourceKey}
-            </Link>
-          ))}
-        </LocalizedRegion>
-      ) : null}
-      {sourcePage != null && source ? (
-        <ArchivedImportSource html={sourcePage} sourceUrl={source.url} />
-      ) : evidenceFailed ? (
-        <Alert tone="error">
-          <T value={migrationUi.sourceInvalid} />
-        </Alert>
-      ) : (
-        <p>
-          <T value={migrationUi.missingSource} />
-          {source?.reason ? ` · ${source.reason}` : ""}
-        </p>
-      )}
-      {source || payload ? (
-        <Disclosure summary={<T value={copy.details} />}>
-          {payload ? reviewSource(payload, job!, outline) : null}
-          {source ? (
-            <>
-              <dl>
-                <dt>URL</dt>
-                <dd>
-                  <a href={source.url} target="_blank" rel="noreferrer">
-                    {source.url}
-                  </a>
-                </dd>
-                {source.attribution ? (
-                  <>
-                    <dt>
-                      <T value={copy.attribution} />
-                    </dt>
-                    <dd>{source.attribution}</dd>
-                  </>
-                ) : null}
-                {source.sha256 ? (
-                  <>
-                    <dt>SHA-256</dt>
-                    <dd>
-                      <code>{source.sha256}</code>
-                    </dd>
-                  </>
-                ) : null}
-                {source.encoding ? (
-                  <>
-                    <dt>
-                      <T value={copy.encoding} />
-                    </dt>
-                    <dd>{source.encoding}</dd>
-                  </>
-                ) : null}
-                {source.aliases.length ? (
-                  <>
-                    <dt>
-                      <T value={copy.aliases} />
-                    </dt>
-                    <dd>{source.aliases.join("\n")}</dd>
-                  </>
-                ) : null}
-              </dl>
-            </>
-          ) : null}
-        </Disclosure>
-      ) : null}
-      {original != null ? (
-        <Disclosure summary={<T value={copy.raw} />}>
-          <pre className={styles.raw}>{sourcePage}</pre>
-        </Disclosure>
-      ) : null}
-      {capture?.result.documentId && capture.result.revision ? (
-        <p>
-          <a
-            href={`/documents/${encodeURIComponent(capture.result.documentId)}?revision=${capture.result.revision}`}
-          >
-            <T value={migrationUi.downloadSource} />
-          </a>
-        </p>
-      ) : null}
-      {original && original.length > 30000 ? (
-        <LocalizedRegion as="nav" label={copy.sourcePages}>
-          <p>
-            {sourceOffset + 1}–{Math.min(sourceOffset + 30000, original.length)}
-            /{original.length}
-          </p>
-          {sourceOffset ? (
-            <Link
-              href={href({
-                sourceOffset: String(Math.max(0, sourceOffset - 30000)),
-                display: "source",
-              })}
-            >
-              ← <T value={migrationUi.previous} />
-            </Link>
-          ) : null}
-          {sourceOffset + 30000 < original.length ? (
-            <Link
-              href={href({
-                sourceOffset: String(sourceOffset + 30000),
-                display: "source",
-              })}
-            >
-              <T value={migrationUi.next} /> →
-            </Link>
-          ) : null}
-        </LocalizedRegion>
-      ) : null}
-      {payload ? (
-        <Disclosure
-          id="import-structure"
-          summary={<T value={ui.importReview.submittedContent} />}
-        >
-          <ImportPreview payload={payload} outline={outline} />
-        </Disclosure>
-      ) : null}
-      {selected && !job ? (
-        <NativeImportItem
-          item={selected}
-          returnTo={href({ display: "source" })}
-        />
-      ) : null}
-    </>
-  );
-  const reading = (
-    <>
-      <h2>
-        <T value={copy.readingHeading} />
-      </h2>
-      {prepared ? (
-        <ConstitutionDocument className={styles.document}>
-          <OrderedContentTree
-            entries={prepared.roots.map((node) => ({
-              type: "child" as const,
-              node,
-            }))}
-            outline={outline ?? undefined}
-          />
-        </ConstitutionDocument>
-      ) : (
-        <p>
-          <T value={migrationUi.notPrepared} />
-        </p>
-      )}
-    </>
-  );
-  const review =
-    job && phase ? (
-      <>
-        {statuses?.pending}
-        {statuses?.unavailable}
-        {statuses?.failed}
-        {statuses?.published}
-        {fidelity ? (
-          <section>
-              <h2>
-              <T value={copy.checks} />
-              </h2>
-            <p>
-              <T
-                value={
-                  fidelity.fidelityComplete && fidelity.resourcesComplete
-                    ? migrationUi.fidelityPassed
-                    : migrationUi.fidelityIncomplete
-                }
-              />
-            </p>
-            {fidelity.fidelity.length ? (
-              <ul>
-                {fidelity.fidelity.map((difference, index) => (
-                  <li key={index}>
-                    {difference.path}: {difference.reason}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {!fidelity.fidelityComplete && fidelity.fidelity.length >= 100 ? (
-              <Alert>
-                <T value={migrationUi.moreMismatches} />
-              </Alert>
-            ) : null}
-          </section>
-        ) : null}
-        {reviewWorkflow(job, phase, actions, error ?? query.error, context)}
-        {job.errors.length ? (
-          <ul>
-            {job.errors.map((problem) => (
-              <li key={`${problem.code}:${problem.message}`}>
-                <code>{problem.code}</code> — {problem.message}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </>
-    ) : undefined;
-  const history = (
-    <>
-      {decisions.length ? (
-        <section>
-          <h2>
-            <T value={ui.admin.import.jobid.page.reviewDecisions} />
-          </h2>
-          <ol>
-            {decisions.map((decision) => (
-              <li key={decision.id}>
-                <strong>{decision.decision}</strong> ·{" "}
-                {new Date(decision.decidedAt).toLocaleString()}
-                <p>{decision.reason}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-      {attempts ? (
-        <section>
-          <h2>
-            <T value={migrationUi.attempts} />
-          </h2>
-          <ol>
-            {attempts.items.map((attempt) => (
-              <li key={attempt.number}>
-                {attempt.startedAt} ·{" "}
-                <T value={migrationStateMessage(attempt.state)} />
-                {attempt.error ? <p>{attempt.error}</p> : null}
-              </li>
-            ))}
-          </ol>
-          {attempts.nextOffset != null ? (
-            <Link
-              href={href({
-                attemptOffset: String(attempts.nextOffset),
-                view: "history",
-              })}
-            >
-              <T value={migrationUi.next} /> →
-            </Link>
-          ) : null}
-        </section>
-      ) : null}
-      <Disclosure summary={<T value={reviewUi.technicalDetails} />}>
-        <dl className="technical-identifiers">
-          {job ? (
-            <>
-              <dt>Import</dt>
-              <dd>
-                <code>{job.id}</code>
-              </dd>
-            </>
-          ) : null}
-          {versionId ? (
-            <>
-              <dt>
-                <T value={ui.admin.import.jobid.page.draftVersion} />
-              </dt>
-              <dd>
-                <code>{versionId}</code>
-              </dd>
-            </>
-          ) : null}
-          {prepared ? (
-            <>
-              <dt>
-                <T value={ui.admin.import.jobid.page.contentGeneration} />
-              </dt>
-              <dd>{prepared.generation}</dd>
-              <dt>
-                <T value={ui.admin.import.jobid.page.settingsRevision} />
-              </dt>
-              <dd>
-                <code>{prepared.settingsRevisionId ?? "unbound"}</code>
-              </dd>
-            </>
-          ) : null}
-          {selected ? (
-            <>
-              <dt>SHA-256</dt>
-              <dd>
-                <code>{selected.sha256}</code>
-              </dd>
-            </>
-          ) : null}
-        </dl>
-      </Disclosure>
-    </>
-  );
-  const pending = run?.items.filter(
-    (item) =>
-      !["prepared", "preparing"].includes(item.state) &&
-      !waitsForPublication(item, run!.items),
-  );
+  const model = { ...data, run, job, selected, source, capture, query, href };
   const next = run?.items.find(
     (item) =>
       item.id !== selected?.id &&
@@ -488,95 +144,37 @@ export async function ImportReview({
           </>
         ) : undefined
       }
-      status={
-        <Badge
-          tone={
-            selected && needsIntervention(selected, run!.items)
-              ? "removed"
-              : "info"
-          }
-        >
-          <T
-            value={
-              job
-                ? statusMessage(job.status)
-                : selected
-                  ? itemStatus(selected, run!.items)
-                  : copy.package
-            }
-          />
-        </Badge>
-      }
+      status={<ImportStatus model={model} />}
       jobStatus={
         job?.status === "pending_review" && !job.versionId
           ? "prepare"
           : job?.status
       }
-      reading={reading}
-      source={sourceView}
-      review={review}
-      history={history}
+      reading={<ImportReading model={model} />}
+      source={<ImportSourceView model={model} />}
+      review={
+        job && phase ? (
+          <ImportReviewPanel
+            model={model}
+            actions={actions}
+            phase={phase}
+            error={error}
+            context={context}
+          />
+        ) : undefined
+      }
+      history={<ImportHistory model={model} />}
       navigation={
         run ? (
           <PackageNavigation run={run} selected={selected} query={query} />
         ) : undefined
       }
-      initialTab={
-        ["content", "review", "history"].includes(query.view ?? "")
-          ? (query.view as ImportReviewTab)
-          : error ||
-              query.error ||
-              (job && (job.status !== "pending_review" || !job.versionId))
-            ? "review"
-            : "content"
-      }
-      initialDisplay={
-        ["reading", "source", "compare"].includes(query.display ?? "")
-          ? (query.display as ImportDisplay)
-          : original != null && job
-            ? "compare"
-            : "reading"
-      }
+      initialTab={initialReviewTab(query, job, error)}
+      initialDisplay={initialReviewDisplay(query, original, job)}
       canCompare={Boolean(original)}
       nextHref={run && next ? packageReviewHref(run.id, next.id) : undefined}
-      notice={
-        !job && query.error ? (
-          <Alert tone="error">
-            <T value={copy.unknown} />
-          </Alert>
-        ) : selected && needsIntervention(selected, run!.items) ? (
-          <Alert tone="error">
-            <T value={copy.intervention} />
-            {selected.error ? <p>{selected.error}</p> : null}
-          </Alert>
-        ) : !job && selected && selected.state !== "prepared" ? (
-          <Alert>
-            <T
-              value={
-                waitsForPublication(selected, run!.items)
-                  ? copy.publicationWait
-                  : copy.dependencyWait
-              }
-            />
-          </Alert>
-        ) : null
-      }
-      preparation={
-        run &&
-        pending?.length &&
-        user.roles.some((role) => ["editor", "admin"].includes(role)) ? (
-          <NavigatingActionForm action={prepareImportPackageAction}>
-            <input type="hidden" name="runId" value={run.id} />
-            <input type="hidden" name="itemId" value={selected?.id ?? ""} />
-            <p className="muted">
-              <T value={copy.prepareHelp} />
-            </p>
-            <Button variant="primary">
-              <T value={copy.prepare} />
-            </Button>
-          </NavigatingActionForm>
-        ) : undefined
-      }
+      notice={<ImportNotice model={model} />}
+      preparation={<PackagePreparation model={model} roles={user.roles} />}
     />
   );
 }
@@ -752,5 +350,578 @@ function NativeImportItem({
         </Link>
       ) : null}
     </div>
+  );
+}
+
+type ReviewJob = NonNullable<Awaited<ReturnType<typeof getImportJob>>>;
+type ReviewModel = Awaited<ReturnType<typeof loadReviewData>> & {
+  run: MigrationRun | null;
+  job: ReviewJob | null;
+  selected?: MigrationItem;
+  source?: MigrationSource;
+  capture?: MigrationItem;
+  query: ImportReviewQuery;
+  href: (extra: Record<string, string>) => string;
+};
+
+async function loadImportSelection(
+  jobId: string | undefined,
+  runId: string | undefined,
+  query: ImportReviewQuery,
+  authorization: string,
+) {
+  const run = runId ? await getMigrationRun(runId, authorization) : null;
+  const selectedId = run
+    ? selectImportEvidence(run, query).selected?.result.jobId
+    : jobId;
+  const job = selectedId ? await getImportJob(selectedId, authorization) : null;
+  return { run, job };
+}
+
+async function loadReviewData(
+  job: ReviewJob | null,
+  run: MigrationRun | null,
+  selected: MigrationItem | undefined,
+  capture: MigrationItem | undefined,
+  source: MigrationSource | undefined,
+  query: ImportReviewQuery,
+  authorization: string,
+) {
+  const versionId = job?.versionId ?? selected?.result.versionId;
+  const [payload, decisions, prepared, outline, fidelity, attempts] =
+    await Promise.all([
+      job ? getImportPayload(job.id, authorization).catch(() => null) : null,
+      job
+        ? getImportReviewDecisions(job.id, authorization).catch(() => [])
+        : [],
+      versionId
+        ? getPreparedImportContent(versionId, authorization).catch(() => null)
+        : null,
+      versionId
+        ? getReaderOutline(versionId, authorization).catch(() => null)
+        : null,
+      run && job
+        ? getImportFidelity(job.id, authorization).catch(() => null)
+        : null,
+      run && selected
+        ? getMigrationAttempts(
+            run.id,
+            selected.id,
+            offset(query.attemptOffset),
+            authorization,
+          ).catch(() => null)
+        : null,
+    ]);
+  let original: string | null = null,
+    evidenceFailed = false;
+  if (capture?.state === "prepared" && source)
+    try {
+      original = await readCapturedSource(capture, source, authorization);
+    } catch {
+      evidenceFailed = true;
+    }
+  return {
+    versionId,
+    payload,
+    decisions,
+    prepared,
+    outline,
+    fidelity,
+    attempts,
+    original,
+    evidenceFailed,
+  };
+}
+
+function ImportSourceView({ model }: { model: ReviewModel }) {
+  const {
+    run,
+    selected,
+    source,
+    capture,
+    original,
+    evidenceFailed,
+    payload,
+    job,
+    outline,
+    query,
+    href,
+  } = model;
+  const sourceOffset = offset(query.sourceOffset),
+    sourcePage = original?.slice(sourceOffset, sourceOffset + 30000);
+  return (
+    <>
+      <h2>
+        <T value={copy.sourceHeading} />
+      </h2>
+      {run && selected && sourcesForItem(run, selected).length > 1 ? (
+        <LocalizedRegion as="nav" label={copy.chooseSource}>
+          {sourcesForItem(run, selected).map((candidate) => (
+            <Link
+              key={candidate.sourceKey}
+              href={packageReviewHref(run!.id, selected.id, {
+                source: candidate.sourceKey,
+                display: "source",
+              })}
+              aria-current={
+                candidate.sourceKey === source?.sourceKey ? "page" : undefined
+              }
+            >
+              {candidate.sourceKey}
+            </Link>
+          ))}
+        </LocalizedRegion>
+      ) : null}
+      {sourcePage != null && source ? (
+        <ArchivedImportSource html={sourcePage} sourceUrl={source.url} />
+      ) : evidenceFailed ? (
+        <Alert tone="error">
+          <T value={migrationUi.sourceInvalid} />
+        </Alert>
+      ) : (
+        <p>
+          <T value={migrationUi.missingSource} />
+          {source?.reason ? ` · ${source.reason}` : ""}
+        </p>
+      )}
+      <ImportSourceMetadata model={model} />
+      {original != null ? (
+        <Disclosure summary={<T value={copy.raw} />}>
+          <pre className={styles.raw}>{sourcePage}</pre>
+        </Disclosure>
+      ) : null}
+      {capture?.result.documentId && capture.result.revision ? (
+        <p>
+          <a
+            href={`/documents/${encodeURIComponent(capture.result.documentId)}?revision=${capture.result.revision}`}
+          >
+            <T value={migrationUi.downloadSource} />
+          </a>
+        </p>
+      ) : null}
+      <ImportSourcePagination model={model} />
+      {payload ? (
+        <Disclosure
+          id="import-structure"
+          summary={<T value={ui.importReview.submittedContent} />}
+        >
+          <ImportPreview payload={payload} outline={outline} />
+        </Disclosure>
+      ) : null}
+      {selected && !job ? (
+        <NativeImportItem
+          item={selected}
+          returnTo={href({ display: "source" })}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ImportSourceMetadata({ model }: { model: ReviewModel }) {
+  const { source, payload, job, outline } = model;
+  return (
+    <>
+      {source || payload ? (
+        <Disclosure summary={<T value={copy.details} />}>
+          {payload ? reviewSource(payload, job!, outline) : null}
+          {source ? (
+            <>
+              <dl>
+                <dt>URL</dt>
+                <dd>
+                  <a href={source.url} target="_blank" rel="noreferrer">
+                    {source.url}
+                  </a>
+                </dd>
+                {source.attribution ? (
+                  <>
+                    <dt>
+                      <T value={copy.attribution} />
+                    </dt>
+                    <dd>{source.attribution}</dd>
+                  </>
+                ) : null}
+                {source.sha256 ? (
+                  <>
+                    <dt>SHA-256</dt>
+                    <dd>
+                      <code>{source.sha256}</code>
+                    </dd>
+                  </>
+                ) : null}
+                {source.encoding ? (
+                  <>
+                    <dt>
+                      <T value={copy.encoding} />
+                    </dt>
+                    <dd>{source.encoding}</dd>
+                  </>
+                ) : null}
+                {source.aliases.length ? (
+                  <>
+                    <dt>
+                      <T value={copy.aliases} />
+                    </dt>
+                    <dd>{source.aliases.join("\n")}</dd>
+                  </>
+                ) : null}
+              </dl>
+            </>
+          ) : null}
+        </Disclosure>
+      ) : null}
+    </>
+  );
+}
+
+function ImportSourcePagination({ model }: { model: ReviewModel }) {
+  const { original, href } = model;
+  const sourceOffset = offset(model.query.sourceOffset);
+  return (
+    <>
+      {original && original.length > 30000 ? (
+        <LocalizedRegion as="nav" label={copy.sourcePages}>
+          <p>
+            {sourceOffset + 1}–{Math.min(sourceOffset + 30000, original.length)}
+            /{original.length}
+          </p>
+          {sourceOffset ? (
+            <Link
+              href={href({
+                sourceOffset: String(Math.max(0, sourceOffset - 30000)),
+                display: "source",
+              })}
+            >
+              ← <T value={migrationUi.previous} />
+            </Link>
+          ) : null}
+          {sourceOffset + 30000 < original.length ? (
+            <Link
+              href={href({
+                sourceOffset: String(sourceOffset + 30000),
+                display: "source",
+              })}
+            >
+              <T value={migrationUi.next} /> →
+            </Link>
+          ) : null}
+        </LocalizedRegion>
+      ) : null}
+    </>
+  );
+}
+
+function ImportReading({ model }: { model: ReviewModel }) {
+  const { prepared, outline } = model;
+  return (
+    <>
+      <h2>
+        <T value={copy.readingHeading} />
+      </h2>
+      {prepared ? (
+        <ConstitutionDocument className={styles.document}>
+          <OrderedContentTree
+            entries={prepared.roots.map((node) => ({
+              type: "child" as const,
+              node,
+            }))}
+            outline={outline ?? undefined}
+          />
+        </ConstitutionDocument>
+      ) : (
+        <p>
+          <T value={migrationUi.notPrepared} />
+        </p>
+      )}
+    </>
+  );
+}
+
+function ImportReviewPanel({
+  model,
+  actions,
+  phase,
+  error,
+  context,
+}: {
+  model: ReviewModel;
+  actions: ReturnType<typeof importActions>;
+  phase: ReturnType<typeof importPhase>;
+  error?: string;
+  context?: { runId: string; itemId: string };
+}) {
+  const { job, prepared, query } = model;
+  const statuses = job ? reviewStatus(job, prepared) : null;
+  return job && phase ? (
+    <>
+      {statuses?.pending}
+      {statuses?.unavailable}
+      {statuses?.failed}
+      {statuses?.published}
+      <ImportChecks fidelity={model.fidelity} />
+      {reviewWorkflow(job, phase, actions, error ?? query.error, context)}
+      {job.errors.length ? (
+        <ul>
+          {job.errors.map((problem) => (
+            <li key={`${problem.code}:${problem.message}`}>
+              <code>{problem.code}</code> — {problem.message}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  ) : undefined;
+}
+
+function ImportChecks({ fidelity }: { fidelity: ReviewModel["fidelity"] }) {
+  return (
+    <>
+      {fidelity ? (
+        <section>
+          <h2>
+            <T value={copy.checks} />
+          </h2>
+          <p>
+            <T
+              value={
+                fidelity.fidelityComplete && fidelity.resourcesComplete
+                  ? migrationUi.fidelityPassed
+                  : migrationUi.fidelityIncomplete
+              }
+            />
+          </p>
+          {fidelity.fidelity.length ? (
+            <ul>
+              {fidelity.fidelity.map((difference, index) => (
+                <li key={index}>
+                  {difference.path}: {difference.reason}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {!fidelity.fidelityComplete && fidelity.fidelity.length >= 100 ? (
+            <Alert>
+              <T value={migrationUi.moreMismatches} />
+            </Alert>
+          ) : null}
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+function ImportHistory({ model }: { model: ReviewModel }) {
+  const { decisions, attempts, job, versionId, prepared, selected, href } =
+    model;
+  return (
+    <>
+      {decisions.length ? (
+        <section>
+          <h2>
+            <T value={ui.admin.import.jobid.page.reviewDecisions} />
+          </h2>
+          <ol>
+            {decisions.map((decision) => (
+              <li key={decision.id}>
+                <strong>{decision.decision}</strong> ·{" "}
+                {new Date(decision.decidedAt).toLocaleString()}
+                <p>{decision.reason}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+      {attempts ? (
+        <section>
+          <h2>
+            <T value={migrationUi.attempts} />
+          </h2>
+          <ol>
+            {attempts.items.map((attempt) => (
+              <li key={attempt.number}>
+                {attempt.startedAt} ·{" "}
+                <T value={migrationStateMessage(attempt.state)} />
+                {attempt.error ? <p>{attempt.error}</p> : null}
+              </li>
+            ))}
+          </ol>
+          {attempts.nextOffset != null ? (
+            <Link
+              href={href({
+                attemptOffset: String(attempts.nextOffset),
+                view: "history",
+              })}
+            >
+              <T value={migrationUi.next} /> →
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
+      <Disclosure summary={<T value={reviewUi.technicalDetails} />}>
+        <dl className="technical-identifiers">
+          {job ? (
+            <>
+              <dt>Import</dt>
+              <dd>
+                <code>{job.id}</code>
+              </dd>
+            </>
+          ) : null}
+          {versionId ? (
+            <>
+              <dt>
+                <T value={ui.admin.import.jobid.page.draftVersion} />
+              </dt>
+              <dd>
+                <code>{versionId}</code>
+              </dd>
+            </>
+          ) : null}
+          {prepared ? (
+            <>
+              <dt>
+                <T value={ui.admin.import.jobid.page.contentGeneration} />
+              </dt>
+              <dd>{prepared.generation}</dd>
+              <dt>
+                <T value={ui.admin.import.jobid.page.settingsRevision} />
+              </dt>
+              <dd>
+                <code>{prepared.settingsRevisionId ?? "unbound"}</code>
+              </dd>
+            </>
+          ) : null}
+          {selected ? (
+            <>
+              <dt>SHA-256</dt>
+              <dd>
+                <code>{selected.sha256}</code>
+              </dd>
+            </>
+          ) : null}
+        </dl>
+      </Disclosure>
+    </>
+  );
+}
+
+function ImportNotice({ model }: { model: ReviewModel }) {
+  const { job, query, selected, run } = model;
+  return !job && query.error ? (
+    <Alert tone="error">
+      <T value={copy.unknown} />
+    </Alert>
+  ) : selected && needsIntervention(selected, run!.items) ? (
+    <Alert tone="error">
+      <T value={copy.intervention} />
+      {selected.error ? <p>{selected.error}</p> : null}
+    </Alert>
+  ) : !job && selected && selected.state !== "prepared" ? (
+    <Alert>
+      <T
+        value={
+          waitsForPublication(selected, run!.items)
+            ? copy.publicationWait
+            : copy.dependencyWait
+        }
+      />
+    </Alert>
+  ) : null;
+}
+
+function PackagePreparation({
+  model,
+  roles,
+}: {
+  model: ReviewModel;
+  roles: string[];
+}) {
+  const { run, selected } = model;
+  const pending = run?.items.filter(
+    (item) =>
+      !["prepared", "preparing"].includes(item.state) &&
+      !waitsForPublication(item, run!.items),
+  );
+  return run &&
+    pending?.length &&
+    roles.some((role) => ["editor", "admin"].includes(role)) ? (
+    <NavigatingActionForm action={prepareImportPackageAction}>
+      <input type="hidden" name="runId" value={run.id} />
+      <input type="hidden" name="itemId" value={selected?.id ?? ""} />
+      <p className="muted">
+        <T value={copy.prepareHelp} />
+      </p>
+      <Button variant="primary">
+        <T value={copy.prepare} />
+      </Button>
+    </NavigatingActionForm>
+  ) : undefined;
+}
+
+function initialReviewTab(
+  query: ImportReviewQuery,
+  job: ReviewJob | null,
+  error?: string,
+): ImportReviewTab {
+  return ["content", "review", "history"].includes(query.view ?? "")
+    ? (query.view as ImportReviewTab)
+    : error ||
+        query.error ||
+        (job && (job.status !== "pending_review" || !job.versionId))
+      ? "review"
+      : "content";
+}
+
+function initialReviewDisplay(
+  query: ImportReviewQuery,
+  original: string | null,
+  job: ReviewJob | null,
+): ImportDisplay {
+  return ["reading", "source", "compare"].includes(query.display ?? "")
+    ? (query.display as ImportDisplay)
+    : original != null && job
+      ? "compare"
+      : "reading";
+}
+
+function importReviewTitle(
+  job: ReviewJob | null,
+  run: MigrationRun | null,
+  selected: MigrationItem | undefined,
+  payload: ReviewModel["payload"],
+) {
+  return (
+    [
+      String(payload?.constitutionTitle ?? job?.constitutionTitle ?? ""),
+      String(payload?.versionLabel ?? job?.versionLabel ?? ""),
+    ]
+      .filter(Boolean)
+      .join(" · ") ||
+    selected?.sourceKey ||
+    run?.manifest.title ||
+    job?.id ||
+    ""
+  );
+}
+
+function ImportStatus({ model }: { model: ReviewModel }) {
+  const { selected, run, job } = model;
+  return (
+    <Badge
+      tone={
+        selected && needsIntervention(selected, run!.items) ? "removed" : "info"
+      }
+    >
+      <T
+        value={
+          job
+            ? statusMessage(job.status)
+            : selected
+              ? itemStatus(selected, run!.items)
+              : copy.package
+        }
+      />
+    </Badge>
   );
 }

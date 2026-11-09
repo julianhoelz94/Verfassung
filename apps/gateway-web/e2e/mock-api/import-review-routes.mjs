@@ -26,100 +26,111 @@ export async function handleImportReviewFixture({
   }
   if (method === "POST" && pathname === "/__import_review") {
     const options = await readBody(req);
-    const items = [],
-      sources = [];
-    for (const [index, year] of [1946, 1953].entries()) {
-      const id = ids[index];
-      const prepared = !options.submitted;
-      sources.push({
-        sourceKey: `archive-${year}.html`,
-        captureKey: `source-${year}`,
-        targetKeys: [`version-${year}`],
-        url: `https://archive.example/${year}`,
-        sha256: createHash("sha256").update(source(year)).digest("hex"),
-        encoding: "utf-8",
-        aliases: [],
-        disposition: "included",
-      });
-      items.push({
-        id: `source-${year}`,
-        sourceKey: `source-${year}`,
-        kind: "document",
-        sha256: sources[index].sha256,
-        dependencies: [],
-        state: prepared ? "prepared" : "staged",
-        attempts: prepared ? 1 : 0,
-        error: null,
-        result: prepared ? { documentId: id.document, revision: 1 } : {},
-      });
-      items.push({
-        id: `version-${year}`,
-        sourceKey: `version-${year}`,
-        kind: "snapshot",
-        sha256: "a".repeat(64),
-        dependencies: [`source-${year}`],
-        state: prepared ? "prepared" : "staged",
-        attempts: prepared ? 1 : 0,
-        error: null,
-        result: {
-          jobId: id.job,
-          ...(prepared ? { versionId: id.version } : {}),
-        },
-      });
-      mockState.importJobs.set(id.job, {
-        id: id.job,
-        status: "pending_review",
-        versionId: prepared ? id.version : null,
-        isoCode: "DE",
-        constitutionTitle: "Archive charter",
-        versionLabel: String(year),
-        errors: [],
-        submittedBy: mockState.currentUser?.id,
-        decisions: [],
-        payload: {
-          isoCode: "DE",
-          countryName: "Germany",
-          constitutionTitle: "Archive charter",
-          constitutionSlug: "archive-charter",
-          versionLabel: String(year),
-          sourceUrl: sources[index].url,
-          articles: [
-            {
-              articleNumber: "1",
-              title: "Rights",
-              body: "Human dignity is inviolable.\nAll people are equal before the law.",
-            },
-          ],
-        },
-      });
-    }
-    items.push({
-      id: "comparison",
-      sourceKey: "comparison",
-      kind: "comparison",
-      sha256: "b".repeat(64),
-      dependencies: ["version-1946", "version-1953"],
-      state: "staged",
-      result: {},
-      attempts: 0,
-      error: null,
-    });
-    run = {
-      id: runId,
-      ownerId: mockState.currentUser?.id,
-      manifest: {
-        runKey: "review-fixture",
-        title: "Constitution archive · 1946–1953",
-        sources,
-      },
-      items,
-      coverage: {},
-    };
-    attempts = [];
+    initializeFixture(options);
     json(res, 200, { runId, ids });
     return true;
   }
   if (!run) return false;
+  return (
+    handlePackageRoute(method, pathname, res) ||
+    handleRecordRoute(method, pathname, res)
+  );
+}
+
+function initializeFixture(options) {
+  const items = [],
+    sources = [];
+  for (const [index, year] of [1946, 1953].entries()) {
+    const id = ids[index];
+    const prepared = !options.submitted;
+    sources.push({
+      sourceKey: `archive-${year}.html`,
+      captureKey: `source-${year}`,
+      targetKeys: [`version-${year}`],
+      url: `https://archive.example/${year}`,
+      sha256: createHash("sha256").update(source(year)).digest("hex"),
+      encoding: "utf-8",
+      aliases: [],
+      disposition: "included",
+    });
+    items.push({
+      id: `source-${year}`,
+      sourceKey: `source-${year}`,
+      kind: "document",
+      sha256: sources[index].sha256,
+      dependencies: [],
+      state: prepared ? "prepared" : "staged",
+      attempts: prepared ? 1 : 0,
+      error: null,
+      result: prepared ? { documentId: id.document, revision: 1 } : {},
+    });
+    items.push({
+      id: `version-${year}`,
+      sourceKey: `version-${year}`,
+      kind: "snapshot",
+      sha256: "a".repeat(64),
+      dependencies: [`source-${year}`],
+      state: prepared ? "prepared" : "staged",
+      attempts: prepared ? 1 : 0,
+      error: null,
+      result: {
+        jobId: id.job,
+        ...(prepared ? { versionId: id.version } : {}),
+      },
+    });
+    mockState.importJobs.set(id.job, {
+      id: id.job,
+      status: "pending_review",
+      versionId: prepared ? id.version : null,
+      isoCode: "DE",
+      constitutionTitle: "Archive charter",
+      versionLabel: String(year),
+      errors: [],
+      submittedBy: mockState.currentUser?.id,
+      decisions: [],
+      payload: {
+        isoCode: "DE",
+        countryName: "Germany",
+        constitutionTitle: "Archive charter",
+        constitutionSlug: "archive-charter",
+        versionLabel: String(year),
+        sourceUrl: sources[index].url,
+        articles: [
+          {
+            articleNumber: "1",
+            title: "Rights",
+            body: "Human dignity is inviolable.\nAll people are equal before the law.",
+          },
+        ],
+      },
+    });
+  }
+  items.push({
+    id: "comparison",
+    sourceKey: "comparison",
+    kind: "comparison",
+    sha256: "b".repeat(64),
+    dependencies: ["version-1946", "version-1953"],
+    state: "staged",
+    result: {},
+    attempts: 0,
+    error: null,
+  });
+  run = {
+    id: runId,
+    ownerId: mockState.currentUser?.id,
+    manifest: {
+      runKey: "review-fixture",
+      title: "Constitution archive · 1946–1953",
+      sources,
+    },
+    items,
+    coverage: {},
+  };
+  attempts = [];
+}
+
+function handlePackageRoute(method, pathname, res) {
   if (method === "GET" && pathname === "/api/ingestion/migration-runs") {
     json(res, 200, [
       {
@@ -164,42 +175,51 @@ export async function handleImportReviewFixture({
         nextOffset: null,
       });
     else {
-      if (
-        item.dependencies.some(
-          (key) =>
-            run.items.find((candidate) => candidate.sourceKey === key)
-              ?.state !== "prepared",
-        )
-      ) {
-        json(res, 409, { code: "dependency" });
-        return true;
-      }
-      item.state = "prepared";
-      item.attempts++;
-      if (item.kind === "document")
-        item.result = {
-          documentId: ids[item.sourceKey.endsWith("1953") ? 1 : 0].document,
-          revision: 1,
-        };
-      if (item.kind === "snapshot") {
-        const id = ids[item.sourceKey.endsWith("1953") ? 1 : 0];
-        mockState.importJobs.get(id.job).versionId = id.version;
-        item.result.versionId = id.version;
-      }
-      if (item.kind === "comparison")
-        item.result.comparisonId = "01900000-0000-4000-8000-000000008640";
-      attempts.push({
-        itemId: item.id,
-        number: item.attempts,
-        state: item.state,
-        startedAt: "2026-11-09T10:00:00Z",
-        finishedAt: "2026-11-09T10:00:01Z",
-        error: null,
-      });
+      if (!prepareFixtureItem(item, res)) return true;
       json(res, 200, item);
     }
     return true;
   }
+  return false;
+}
+
+function prepareFixtureItem(item, res) {
+  if (
+    item.dependencies.some(
+      (key) =>
+        run.items.find((candidate) => candidate.sourceKey === key)?.state !==
+        "prepared",
+    )
+  ) {
+    json(res, 409, { code: "dependency" });
+    return false;
+  }
+  item.state = "prepared";
+  item.attempts++;
+  if (item.kind === "document")
+    item.result = {
+      documentId: ids[item.sourceKey.endsWith("1953") ? 1 : 0].document,
+      revision: 1,
+    };
+  if (item.kind === "snapshot") {
+    const id = ids[item.sourceKey.endsWith("1953") ? 1 : 0];
+    mockState.importJobs.get(id.job).versionId = id.version;
+    item.result.versionId = id.version;
+  }
+  if (item.kind === "comparison")
+    item.result.comparisonId = "01900000-0000-4000-8000-000000008640";
+  attempts.push({
+    itemId: item.id,
+    number: item.attempts,
+    state: item.state,
+    startedAt: "2026-11-09T10:00:00Z",
+    finishedAt: "2026-11-09T10:00:01Z",
+    error: null,
+  });
+  return true;
+}
+
+function handleRecordRoute(method, pathname, res) {
   for (const [index, id] of ids.entries()) {
     if (
       method === "GET" &&

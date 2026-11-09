@@ -715,7 +715,7 @@ export const ui = {
     users: { en: 'Users', de: 'Nutzer' },
     anonymousBrowsing: { en: 'Anonymous browsing', de: 'Anonymes Lesen' },
     outlines: { en: 'Constitutions', de: 'Verfassungen' },
-    import: { en: 'Import', de: 'Import' },
+    import: { en: 'Imports', de: 'Importe' },
     navigate: { en: 'Navigate', de: 'Navigieren' },
     editorial: { en: 'Editorial', de: 'Redaktion' },
     account: { en: 'Account', de: 'Konto' },

@@ -25,6 +25,20 @@ for (const width of [390, 820, 1440])
       await page.setExtraHTTPHeaders({ "Accept-Language": locale });
       await page.goto(href);
       const en = locale === "en";
+      const primary = page.locator('.nav-primary');
+      const imports = primary.locator('a[href="/admin/import"]');
+      await expect(imports).toHaveText(en ? 'Imports' : 'Importe');
+      await expect(imports).toHaveAttribute('aria-current', 'page');
+      await expect(primary.locator('[aria-current="page"]')).toHaveCount(1);
+      const destinations = await primary.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')));
+      expect(destinations.slice(destinations.indexOf('/editor'), destinations.indexOf('/documents') + 1)).toEqual(['/editor', '/admin/import', '/documents']);
+      if (width === 390) {
+        await page.getByRole('button', { name: en ? 'Account menu' : 'Kontomenü', exact: true }).click();
+        const mobileImports = page.locator('.menu-panel').getByRole('link', { name: en ? 'Imports' : 'Importe', exact: true });
+        await expect(mobileImports).toBeVisible();
+        await expect(mobileImports).toHaveAttribute('aria-current', 'page');
+        await page.keyboard.press('Escape');
+      }
       const content = page.getByRole("tab", {
         name: en ? "Content" : "Inhalt",
         exact: true,
@@ -168,6 +182,26 @@ async function toolbarAppearance(toolbar: import("@playwright/test").Locator) {
       buttonColor: button.color,
       labelDisplay: getComputedStyle(active.querySelector("span")!).display,
     };
+  });
+}
+
+for (const width of [1024, 1152]) {
+  test(`Imports remains reachable without header overflow at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await signInAdmin(page);
+    await request.put(`${mock}/api/identity/me/language`, {
+      headers: { Authorization: 'Bearer e2e-session-token' },
+      data: { languagePreference: 'de' },
+    });
+    await page.goto('/admin/import');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const primary = page.locator('.nav-primary');
+    if (await primary.isVisible()) {
+      await expect(primary.getByRole('link', { name: 'Importe', exact: true })).toBeVisible();
+    } else {
+      await page.getByRole('button', { name: 'Kontomenü', exact: true }).click();
+      await expect(page.locator('.menu-panel').getByRole('link', { name: 'Importe', exact: true })).toBeVisible();
+    }
   });
 }
 

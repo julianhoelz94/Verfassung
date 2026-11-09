@@ -12,6 +12,7 @@ import {
   avatarInitial,
   countryFromPath,
   isCurrentNavHref,
+  isImportPage,
   menuSections,
   primaryNavLinks,
   versionIdFromPath,
@@ -52,6 +53,7 @@ function MenuSectionList({
 export function SiteHeader({ user, identityUnavailable = false, needsReviewCount = 0, anonymousBrowsingAllowed = true, setupInProgress = false }: SiteHeaderProps) {
   const t = useTranslation();
   const pathname = usePathname();
+  const query = useSearchParams().toString();
   const links = setupInProgress ? [] : primaryNavLinks(user, false, anonymousBrowsingAllowed);
   const sections: MenuSection[] = setupInProgress ? user ? [
     { id: 'identity', identity: user, links: [] },
@@ -74,7 +76,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
             <a
               key={link.href}
               href={link.href}
-              aria-current={isCurrentNavHref(pathname, link.href) ? 'page' : undefined}
+              aria-current={isCurrentNavHref(pathname, link.href, query) ? 'page' : undefined}
             >
               {link.message ? t(link.message) : link.label}
             </a>
@@ -133,7 +135,8 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
 }
 
 /** Keeps the existing disclosure groups active for their route family. */
-function sectionActive(id: string, pathname: string): boolean {
+function sectionActive(id: string, pathname: string, query: string): boolean {
+  if (isImportPage(pathname, query)) return id === 'primary';
   if (id === 'editorial') return pathname.startsWith('/editor');
   if (id === 'admin') return pathname.startsWith('/admin');
   return !pathname.startsWith('/editor') && !pathname.startsWith('/admin') && !pathname.startsWith('/account');
@@ -149,7 +152,7 @@ function renderMenuSection(section: MenuSection, pathname: string, user: NavUser
         ))}</>;
         const className = section.phoneOnly ? 'menu-group nav-dup' : 'menu-group';
         if (section.id === 'editorial' || section.id === 'admin' || section.id === 'primary') {
-          const active = sectionActive(section.id, pathname);
+          const active = sectionActive(section.id, pathname, query);
           const count = section.links.reduce((sum, link) => sum + (link.badgeCount ?? 0), 0);
           return <details key={section.id} className={`${className} menu-section`} open={active}>
             <summary>{section.id === 'primary' ? t(usability.browse) : section.headingMessage ? t(section.headingMessage) : section.heading}{count ? <Badge tone="changed">{count}</Badge> : null}</summary>

@@ -5,6 +5,7 @@ import {
   canReadDocuments,
   countryFromPath,
   isCurrentNavHref,
+  isImportPage,
   menuSections,
   primaryNavLinks,
   versionIdFromPath,
@@ -41,16 +42,16 @@ describe('primaryNavLinks', () => {
     expect(hrefs({ email: 'viewer@example.local', roles: ['viewer'] })).toEqual(['/', '/search', '/about']);
   });
 
-  it('shows Editor and Documents for editor, reviewer, and publisher', () => {
+  it('shows Editor, Imports, and Documents for editor, reviewer, and publisher', () => {
     for (const role of ['editor', 'reviewer', 'publisher']) {
-      expect(hrefs({ email: `${role}@example.local`, roles: [role] })).toEqual(['/', '/search', '/about', '/editor', '/documents']);
+      expect(hrefs({ email: `${role}@example.local`, roles: [role] })).toEqual(['/', '/search', '/about', '/editor', '/admin/import', '/documents']);
     }
   });
 
-  it('shows Editor, Admin, and API docs for admin when that page exists', () => {
+  it('shows editorial destinations, Admin, and optional API docs for admin', () => {
     const admin = { email: 'admin@example.local', roles: ['admin'] };
-    expect(hrefs(admin)).toEqual(['/', '/search', '/about', '/editor', '/documents', '/admin']);
-    expect(hrefs(admin, true)).toEqual(['/', '/search', '/about', '/editor', '/documents', '/admin', '/api-docs']);
+    expect(hrefs(admin)).toEqual(['/', '/search', '/about', '/editor', '/admin/import', '/documents', '/admin']);
+    expect(hrefs(admin, true)).toEqual(['/', '/search', '/about', '/editor', '/admin/import', '/documents', '/admin', '/api-docs']);
   });
 });
 
@@ -119,15 +120,34 @@ describe('menuSections', () => {
       '/admin/settings',
       '/admin/anonymous-browsing',
       '/admin/constitutions',
-      '/admin/import',
       '/admin/legal/impressum',
       '/api-docs',
     ]);
-    expect(sectionHrefs(admin, 'primary', true)).toEqual(['/', '/search', '/about', '/editor', '/documents', '/admin']);
+    expect(sectionHrefs(admin, 'primary', true)).toEqual(['/', '/search', '/about', '/editor', '/admin/import', '/documents', '/admin']);
   });
 });
 
 describe('isCurrentNavHref', () => {
+  it('keeps Imports current throughout setup, package and individual review', () => {
+    const destinations = [
+      ['/admin/import', ''],
+      ['/admin/import/setup/proposal', ''],
+      ['/admin/import/packages/package', 'item=version'],
+      ['/admin/migrations/package', ''],
+      ['/editor', 'importJobId=job'],
+    ];
+    for (const [pathname, query] of destinations) {
+      expect(isImportPage(pathname, query)).toBe(true);
+      expect(isCurrentNavHref(pathname, '/admin/import', query)).toBe(true);
+      expect(isCurrentNavHref(pathname, '/editor', query)).toBe(false);
+      expect(isCurrentNavHref(pathname, '/admin', query)).toBe(false);
+      expect(isCurrentNavHref(pathname, '/editor?status=reviewing', query)).toBe(false);
+    }
+    for (const [pathname, query] of [['/editor', 'sessionId=session'], ['/editor', 'importJobId='], ['/admin/constitutions', ''], ['/admin/imported', '']]) {
+      expect(isCurrentNavHref(pathname, '/admin/import', query)).toBe(false);
+    }
+  });
+
   it('marks only the countries home as current for /', () => {
     expect(isCurrentNavHref('/', '/')).toBe(true);
     expect(isCurrentNavHref('/search', '/')).toBe(false);

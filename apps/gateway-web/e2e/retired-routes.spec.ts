@@ -27,6 +27,8 @@ test('an MCP import opens its prepared text and review decision in the shared ed
   await signInReviewer(page);
   await page.goto('/editor?importJobId=01900000-0000-4000-8000-000000000701');
   await expect(page.locator('.import-review')).toBeVisible();
+  await expect(page.locator('.nav-primary').getByRole('link', { name: 'Imports', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.nav-primary').getByRole('link', { name: 'Editor', exact: true })).not.toHaveAttribute('aria-current', 'page');
   await page.getByRole('tab', { name: 'Review', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Approve prepared draft', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish approved version', exact: true })).toHaveCount(0);

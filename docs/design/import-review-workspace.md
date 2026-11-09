@@ -7,6 +7,12 @@ same versions appearing as separate queue entries. Upload and constitution setup
 remain available on that page. Former `/admin/migrations` links redirect into
 Imports and retain source, selection and pagination context.
 
+Imports has its own primary navigation entry between Editor and Documents for
+editors, reviewers, publishers and administrators. The same entry appears in the
+phone menu. It stays selected throughout the import queue, constitution setup,
+package review and individual import review; these views share one navigation
+section regardless of their existing URL family.
+
 The shared workspace uses the constitution viewer's `FullWidthPage` shell with
 `PageHeader`, `PageChromeSurface` and sticky menu, measured header offsets, semantic tokens,
 `ReaderIcon` and the shared `ConstitutionDocument`/`OrderedContentTree` renderer.

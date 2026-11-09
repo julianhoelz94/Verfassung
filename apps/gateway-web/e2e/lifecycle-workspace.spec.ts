@@ -27,6 +27,8 @@ for (const width of [390, 1440]) test(`lifecycle drafts, disclosures, review and
   await whole.getByLabel('Publisher', { exact: true }).fill('Parliamentary Council');
   await whole.getByText('Library note', { exact: true }).click();
   await whole.getByLabel('Description', { exact: true }).fill('Retained upload draft');
+  await page.getByRole('radio', { name: /Selected provisions/ }).check();
+  await page.getByRole('radio', { name: /Whole constitution/ }).check();
   await page.getByRole('tab', { name: 'History', exact: true }).click();
   await page.getByRole('tab', { name: 'Record event', exact: true }).focus(); await page.keyboard.press('Enter');
   await expect(whole.getByLabel('Publisher', { exact: true })).toHaveValue('Parliamentary Council');
@@ -82,4 +84,35 @@ test('exact provision selection survives tab changes and version cancellation', 
   await expect(page).toHaveURL(/saved=1/);
   const events = await request.get(mock + `/api/catalog/constitutions/${constitution}/provision-events`).then(r => r.json());
   expect(events).toHaveLength(1); expect(events[0].logicalUnitIds).toHaveLength(1); expect(events[0].sourceVersionId).toBe(previousVersion);
+});
+
+
+test('version loading failures and history filters preserve unsaved entries', async ({ page, request }) => {
+  const event = await request.post(mock + `/api/catalog/constitutions/${constitution}/lifecycle-events`, { data: { operationId: 'seed', eventType: 'adopted', eventDate: '1949-05-08', dateCertainty: 'exact', sourceUrl: 'https://example.org/old-source' } }).then(response => response.json());
+  await signInAdmin(page); await page.goto(route + '&eventId=' + event.id);
+  await page.getByLabel('Event note', { exact: true }).fill('Unsaved evidence note');
+  await page.getByRole('combobox', { name: 'History', exact: true }).selectOption('passages');
+  await page.getByRole('combobox', { name: 'History', exact: true }).selectOption('all');
+  await expect(page.getByLabel('Event note', { exact: true })).toHaveValue('Unsaved evidence note');
+  await page.getByRole('tab', { name: 'Record event', exact: true }).click();
+  await page.getByRole('radio', { name: /Selected provisions/ }).check();
+  const source = page.locator('#scope-version'), original = await source.inputValue();
+  const form = page.locator('form').filter({ has: page.locator('#provision-event-date') });
+  await form.getByLabel('Effective date', { exact: true }).fill('2030-01-01');
+  await page.getByRole('button', { name: 'Select provisions', exact: true }).click();
+  await page.getByRole('dialog').getByRole('checkbox').first().check();
+  await page.getByRole('button', { name: 'Use selection', exact: true }).click();
+  await page.route('**/editor/lifecycle/units?**', route => route.fulfill({ status: 502, json: { error: 'unavailable' } }));
+  await source.selectOption(VERSION_1949);
+  await page.getByRole('dialog').getByRole('button', { name: 'Change source version?', exact: true }).click();
+  await expect(form.getByRole('alert')).toContainText('Your current selection');
+  await expect(source).toHaveValue(original);
+  await expect(form.locator('[name=logicalUnitIds]')).toHaveCount(1);
+  await expect(form.getByLabel('Effective date', { exact: true })).toHaveValue('2030-01-01');
+  await page.unroute('**/editor/lifecycle/units?**');
+  await source.selectOption(VERSION_1949);
+  await page.getByRole('dialog').getByRole('button', { name: 'Change source version?', exact: true }).click();
+  await expect(source).toHaveValue(VERSION_1949);
+  await expect(form.locator('[name=logicalUnitIds]')).toHaveCount(0);
+  await expect(form.getByLabel('Effective date', { exact: true })).toHaveValue('2030-01-01');
 });

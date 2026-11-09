@@ -24,7 +24,7 @@ export function LifecycleHistory({ entries, materials, constitutionId, code, ret
       {event.sourceUrl ? <p className={styles.muted}>{t(copy.legacySource)}: <a href={event.sourceUrl} target="_blank" rel="noreferrer">{event.sourceUrl}</a></p> : null}
       <details><summary>{t(copy.documents)}</summary><div className={styles.materials}>{materials[event.id]}</div></details>
       {event.scope === 'whole' ? <><Button type="button" variant="ghost" aria-expanded={editing === event.id} onClick={() => setEditing(editing === event.id ? '' : event.id)}>{t(copy.editEvidence)}</Button>
-        <div hidden={editing !== event.id}><EvidenceEditor event={event as ConstitutionLifecycleEvent} constitutionId={constitutionId} code={code} returnTo={returnTo} /></div></> : null}
+        <div hidden={editing !== event.id}><EvidenceEditor event={event} constitutionId={constitutionId} code={code} returnTo={returnTo} /></div></> : null}
     </li>)}</ol>{!visible ? <p className={styles.muted}>{t(copy.noEvents)}</p> : null}
   </Stack>;
 }
@@ -32,6 +32,7 @@ export function LifecycleHistory({ entries, materials, constitutionId, code, ret
 function EvidenceEditor({ event, constitutionId, code, returnTo }: { event: ConstitutionLifecycleEvent; constitutionId: string; code: string; returnTo: string }) {
   const t = useTranslation();
   return <StagedRecordForm action={reviseLifecycleEvidenceAction} className={styles.evidenceEditor}>
+    <h4>{t({ en: 'Edit event evidence', de: 'Ereignisbelege bearbeiten' })}</h4>
     <input type="hidden" name="constitutionId" value={constitutionId} /><input type="hidden" name="code" value={code} /><input type="hidden" name="eventId" value={event.id} /><input type="hidden" name="expectedRevisionId" value={event.evidenceRevisionId ?? ''} /><input type="hidden" name="returnTo" value={returnTo} />
     {event.sourceUrl ? <details><summary>{t(copy.legacySource)}</summary><Input name="sourceUrl" id={`evidence-source-${event.id}`} label={t(copy.legacySource)} type="url" maxLength={2048} defaultValue={event.sourceUrl} /></details> : <input type="hidden" name="sourceUrl" value="" />}
     <p className={styles.muted}>{t(copy.fixedEvent)}</p>

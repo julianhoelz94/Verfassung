@@ -4,7 +4,7 @@ import { ui, type UiMessage } from './messages';
 export type LifecycleScope = 'whole' | 'passages';
 export type LifecycleUnit = { id: string; label: string; path: string; depth: number; text: string };
 export type LifecycleVersion = { id: string; label: string };
-export type LifecycleEntry = (ConstitutionLifecycleEvent | ProvisionLifecycleEvent) & { scope: LifecycleScope };
+export type LifecycleEntry = (ConstitutionLifecycleEvent & { scope: 'whole' }) | (ProvisionLifecycleEvent & { scope: 'passages' });
 
 export const lifecycleEventLabels: Record<string, UiMessage> = {
   adopted: ui.lifecycleEvents.adopted, commenced: ui.lifecycleEvents.commenced,
@@ -33,7 +33,7 @@ export function flattenLifecycleUnits(roots: ExportedUnit[]): LifecycleUnit[] {
 }
 
 export function lifecycleEntries(events: ConstitutionLifecycleEvent[], provisions: ProvisionLifecycleEvent[]): LifecycleEntry[] {
-  return [...events.map(event => ({ ...event, scope: 'whole' as const })), ...provisions.map(event => ({ ...event, scope: 'passages' as const }))]
+  return [...[...events].reverse().map(event => ({ ...event, scope: 'whole' as const })), ...[...provisions].reverse().map(event => ({ ...event, scope: 'passages' as const }))]
     .sort((left, right) => right.eventDate.localeCompare(left.eventDate));
 }
 

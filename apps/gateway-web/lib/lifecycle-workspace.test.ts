@@ -11,6 +11,7 @@ describe('lifecycle workspace legal history', () => {
     expect(nextLifecycleEvents({ ...adopted, eventType: 'commenced' })).toEqual(['suspended', 'repealed']);
     expect(nextLifecycleEvents({ ...adopted, eventType: 'suspended' })).toEqual(['restored', 'repealed']);
     expect(nextLifecycleEvents({ ...adopted, eventType: 'repealed' })).toEqual([]);
+    expect(lifecycleEntries([adopted, { ...adopted, id: 'commenced', eventType: 'commenced' }], []).map(event => event.id)).toEqual(['commenced', 'adopted']);
   });
   it('keeps future status changes out of the current status while retaining them in history', () => {
     const future = { ...adopted, id: 'future', eventType: 'repealed' as const, eventDate: '2099-01-01' };

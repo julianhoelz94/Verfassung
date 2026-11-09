@@ -50,7 +50,7 @@ export const lifecycleWorkspaceUi = {
   changeVersionHelp: { en: 'The existing provision selection will be reset. Choose the affected provisions in the new version.', de: 'Die bestehende Auswahl wird zurückgesetzt. Wähle die betroffenen Bestimmungen anschließend in der neuen Fassung.' },
   versionFailed: { en: 'The version could not be loaded. Your current selection and other entries are preserved.', de: 'Die Fassung konnte nicht geladen werden. Deine aktuelle Auswahl und die übrigen Eingaben bleiben erhalten.' },
   loading: { en: 'Loading provisions…', de: 'Bestimmungen werden geladen …' },
-  statusOn: { en: 'Status on', de: 'Stand' },
+  currentStatus: { en: 'Current legal status', de: 'Aktueller Rechtsstatus' },
   lastEffective: { en: 'Last effective event', de: 'Letztes wirksames Ereignis' },
   existingHistory: { en: 'Existing history', de: 'Bisheriger Verlauf' },
   allHistory: { en: 'View full history', de: 'Gesamten Verlauf ansehen' },

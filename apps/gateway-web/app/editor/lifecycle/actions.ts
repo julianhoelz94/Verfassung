@@ -84,5 +84,5 @@ export async function reviseLifecycleEvidenceAction(form:FormData) {
     await reviseLifecycleEvidence(constitutionId,eventId,{note:String(form.get('note')??''),sourceUrl:String(form.get('sourceUrl')??''),expectedRevisionId:String(form.get('expectedRevisionId')??'')||null},await requireSessionBearer());
     revalidatePath(destination.pathname);destination.searchParams.set('saved','1');
   } catch { destination.searchParams.set('error','1'); }
-  redirect(destination.pathname+destination.search+destination.hash);
+  return finish(form,destination.pathname+destination.search+destination.hash);
 }

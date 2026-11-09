@@ -16,10 +16,11 @@ async function read<T>(parameters: Record<string, string>): Promise<T> {
 }
 
 /** Local selection state. Uploads enter the library once; only the host commits relationships. */
-export function StagedDocumentPicker({ name, form, heading, headingLevel = 'h2', initialReferences = [], canCreate = true, kind, onChoose, onChange }: {
+export function StagedDocumentPicker({ name, form, heading, headingLevel = 'h2', initialReferences = [], canCreate = true, kind, onChoose, onChange, onLinksChange }: {
   name?: string; form?: string; heading?: string; headingLevel?: 'h2' | 'h3' | 'h4'; initialReferences?: DocumentReference[]; canCreate?: boolean; kind?: 'image';
   onChoose?: (link: DocumentLink) => boolean | Promise<boolean>;
   onChange?: (references: DocumentReference[]) => void;
+  onLinksChange?: (links: DocumentLink[]) => void;
 }) {
   const t = useTranslation(), id = useId();
   const [references, setReferences] = useState(initialReferences), [links, setLinks] = useState<DocumentLink[]>([]);
@@ -27,6 +28,7 @@ export function StagedDocumentPicker({ name, form, heading, headingLevel = 'h2',
   const [folders, setFolders] = useState<DocumentFolder[]>([]), [total, setTotal] = useState(0), [offset, setOffset] = useState(0);
   const browsing = useRef(false);
   const [pending, setPending] = useState(false), [error, setError] = useState(''), [note, setNote] = useState('');
+  useEffect(() => { onLinksChange?.(links); }, [links, onLinksChange]);
   const selectedReferences = useRef(initialReferences);
   const request = useRef(0), cache = useRef(new Map<string, DocumentRecord>()), operation = useRef({ key: '', id: '' }), busy = useRef(false);
   const fail = useCallback(() => setError(t({ en: 'Documents could not be loaded or saved. Your selections and text are preserved; please retry.', de: 'Dokumente konnten nicht geladen oder gespeichert werden. Deine Auswahl und Texte bleiben erhalten; bitte erneut versuchen.' })), [t]);

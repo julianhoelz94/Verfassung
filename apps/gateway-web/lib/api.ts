@@ -137,7 +137,7 @@ export type ExportedUnit = {
   kind?: string | null;
   label?: string | null;
   title?: string | null;
-  content?: Array<{ type: string; node?: ExportedUnit | null }>;
+  content?: Array<{ type: string; text?: string | null; node?: ExportedUnit | null }>;
 };
 
 export type WikiImage = {

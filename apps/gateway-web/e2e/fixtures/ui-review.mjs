@@ -85,6 +85,7 @@ export function reviewFixtures(germany) {
 
   /** Expose the pinned document revision and its unchanged synthetic event history. */
   function documentResponse(pathname) {
+    if (/^\/api\/document\/links\/(import_job|setup_proposal|migration_run)\/[0-9a-f-]+(?:\/events)?$/.test(pathname)) return [];
     if (pathname === '/api/document/documents') return [document];
     if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}`) return document;
     if (pathname === `/api/document/documents/${REVIEW_DOCUMENT}/revisions`) return [revision];

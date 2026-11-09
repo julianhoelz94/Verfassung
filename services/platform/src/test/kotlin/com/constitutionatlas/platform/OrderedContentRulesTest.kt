@@ -11,6 +11,19 @@ class OrderedContentRulesTest {
     private fun root(vararg entries: OrderedEntryWrite) = OrderedNodeWrite(logicalId = UUID.randomUUID(), kind = "article", content = entries.toList())
 
     @Test
+    fun `document citations validate exact pins and may occur in note text without nested note markers`() {
+        val document = UUID.randomUUID()
+        val target = OrderedReferenceTarget("document", documentId = document, documentRevision = 2, locator = "Chapter 3, p. 42")
+        val reference = OrderedInlineReference(UUID.randomUUID(), 0, 3, target)
+        assertTrue(OrderedContentRules.referenceErrors("Law", "footnote", listOf(reference), emptySet(), "note").isEmpty())
+        for (invalid in listOf(target.copy(documentRevision = null), target.copy(documentRevision = 0), target.copy(documentId = null), target.copy(url = "https://example.org"), target.copy(locator = "x".repeat(4001)), target.copy(type = "external", url = "https://example.org"))) {
+            assertEquals(1, OrderedContentRules.referenceErrors("Law", "plain", listOf(reference.copy(target = invalid)), emptySet(), "body").size)
+        }
+        val nested = reference.copy(target = OrderedReferenceTarget("footnote", footnoteId = document))
+        assertEquals(1, OrderedContentRules.referenceErrors("Law", "footnote", listOf(nested), setOf(document), "note").size)
+    }
+
+    @Test
     fun `complete reference identities are unique across nested roots for every reference type`() {
         for (type in listOf("footnote", "unit", "external")) {
             val note = UUID.randomUUID()

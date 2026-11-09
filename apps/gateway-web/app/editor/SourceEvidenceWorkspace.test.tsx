@@ -1,10 +1,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { fireEvent } from '@testing-library/dom';
+import { fireEvent, getByRole, getByLabelText, getByText } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DraftPreview } from '../../lib/editor-api';
 import { TranslationProvider } from '../components/TranslationProvider';
 import { SourceEvidenceWorkspace } from './SourceEvidenceWorkspace';
+import { DocumentManager } from './documents/DocumentManager';
+import type { DocumentRecord } from '../../lib/document-api';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 const original = { datePrecision: 'unknown' as const, coverage: 'Articles 1–10' };
@@ -69,5 +71,26 @@ describe('source evidence workflow', () => {
   it('keeps editors from approving their own source correction', async () => {
     await mount({ ...preview, session: { ...preview.session, status: 'reviewing' } }, 'owner', ['editor', 'reviewer']);
     expect(button('Quellenkorrektur freigeben')).toBeUndefined();
+  });
+
+  it('attaches an exact version source and passage note without losing an unsaved narrative correction', async () => {
+    const source: DocumentRecord = {id:'source',currentRevision:1,status:'active',createdAt:'2026-01-01',revision:{id:'pin',documentId:'source',revision:1,title:'Original gazette',description:null,sourceUrl:'https://example.org/gazette',fileName:null,contentType:null,createdAt:'2026-01-01',createdBy:'editor'}};
+    const send = vi.fn().mockResolvedValue(Response.json({links:[{documentId:'source',revisionId:'pin',document:source,citationNote:'Chapter 3'}]}));
+    vi.stubGlobal('fetch',send);
+    await act(async () => root.render(<TranslationProvider locale="en"><SourceEvidenceWorkspace preview={preview} publishedEvidence={original} userId="owner" roles={['editor']}
+      documentsPanel={<DocumentManager targetType="version" targetId="version" canEdit links={[]} documents={[source]} revisions={{}} />} /></TranslationProvider>));
+    const narrative = host.querySelector<HTMLTextAreaElement>('#source-description')!;
+    await act(async () => fireEvent.change(narrative,{target:{value:'Unsaved source correction'}}));
+    await act(async () => fireEvent.click(getByRole(host,'button',{name:'Choose existing document',exact:true})));
+    await act(async () => fireEvent.change(getByLabelText(host,'Search documents'),{target:{value:'gazette'}}));
+    await act(async () => fireEvent.click(getByRole(host,'option',{name:/Original gazette/})));
+    await act(async () => fireEvent.click(getByText(host,'Citation note / relevant passage',{selector:'summary'})));
+    await act(async () => fireEvent.change(getByLabelText(host,'Note for this attachment'),{target:{value:'Chapter 3'}}));
+    await act(async () => fireEvent.click(getByRole(host,'button',{name:'Attach document',exact:true})));
+    const submitted = send.mock.calls[0][1].body as FormData;
+    expect(Object.fromEntries(submitted)).toMatchObject({targetType:'version',targetId:'version',documentId:'source',revisionId:'pin',citationNote:'Chapter 3'});
+    expect(narrative.value).toBe('Unsaved source correction');
+    expect(getByText(host,'Chapter 3',{selector:'p'})).toBeTruthy();
+    expect(getByRole<HTMLButtonElement>(host,'button',{name:'Submit for review',exact:true}).disabled).toBe(true);
   });
 });

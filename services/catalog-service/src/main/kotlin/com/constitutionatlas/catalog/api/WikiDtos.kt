@@ -3,6 +3,8 @@ package com.constitutionatlas.catalog.api
 import java.time.OffsetDateTime
 import java.util.UUID
 
+data class WikiCitation(val documentId: UUID, val revision: Int, val title: String, val citationNote: String? = null)
+
 data class WikiImage(
     val documentId: UUID,
     val revision: Int,
@@ -26,6 +28,7 @@ data class WikiPageRevision(
     val createdAt: OffsetDateTime? = null,
     val createdBy: UUID? = null,
     val publishedAt: OffsetDateTime? = null,
+    val citations: List<WikiCitation> = emptyList(),
 )
 
 data class SaveWikiPage(
@@ -34,6 +37,8 @@ data class SaveWikiPage(
     val body: String,
     val images: List<WikiImage> = emptyList(),
     val sourceUrls: List<String> = emptyList(),
+    val citations: List<WikiCitation> = emptyList(),
+    val operationId: UUID? = null,
 )
 
 data class PublishWikiPage(val revisionId: UUID)

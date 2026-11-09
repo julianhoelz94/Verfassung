@@ -1,5 +1,6 @@
 package com.constitutionatlas.catalog.repo
 
+import com.constitutionatlas.catalog.api.WikiCitation
 import com.constitutionatlas.catalog.api.WikiImage
 import com.constitutionatlas.catalog.api.WikiPageRevision
 import org.springframework.jdbc.core.JdbcTemplate
@@ -46,7 +47,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun published(targetType: String, targetId: UUID): WikiPageRevision? =
         jdbc.query(
             """
-            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.created_at, r.created_by, r.published_at
+            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.citations, r.created_at, r.created_by, r.published_at
             FROM wiki_pages p
             JOIN wiki_page_revisions r ON r.id = p.published_revision_id
             WHERE p.target_type = ? AND p.target_id = ?
@@ -59,7 +60,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun latest(targetType: String, targetId: UUID): WikiPageRevision? =
         jdbc.query(
             """
-            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.created_at, r.created_by, r.published_at
+            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.citations, r.created_at, r.created_by, r.published_at
             FROM wiki_pages p
             JOIN wiki_page_revisions r ON r.page_id = p.id
             WHERE p.target_type = ? AND p.target_id = ?
@@ -74,7 +75,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun revision(targetType: String, targetId: UUID, revisionId: UUID): WikiPageRevision? =
         jdbc.query(
             """
-            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.created_at, r.created_by, r.published_at
+            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.citations, r.created_at, r.created_by, r.published_at
             FROM wiki_pages p
             JOIN wiki_page_revisions r ON r.page_id = p.id
             WHERE p.target_type = ? AND p.target_id = ? AND r.id = ?
@@ -88,7 +89,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun publishedRevision(targetType: String, targetId: UUID, revisionId: UUID): WikiPageRevision? =
         jdbc.query(
             """
-            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.created_at, r.created_by, r.published_at
+            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.citations, r.created_at, r.created_by, r.published_at
             FROM wiki_pages p
             JOIN wiki_page_revisions r ON r.page_id = p.id
             WHERE p.target_type = ? AND p.target_id = ? AND r.id = ? AND r.published_at IS NOT NULL
@@ -102,7 +103,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
     fun history(targetType: String, targetId: UUID, limit: Int, offset: Int): List<WikiPageRevision> =
         jdbc.query(
             """
-            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.created_at, r.created_by, r.published_at
+            SELECT r.id, p.target_type, p.target_id, r.predecessor_id, r.summary, r.body, r.images, r.source_urls, r.citations, r.created_at, r.created_by, r.published_at
             FROM wiki_pages p
             JOIN wiki_page_revisions r ON r.page_id = p.id
             WHERE p.target_type = ? AND p.target_id = ?
@@ -116,10 +117,10 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             offset,
         )
 
-    fun append(pageId: UUID, predecessorId: UUID?, summary: String, body: String, images: List<WikiImage>, sourceUrls: List<String>, actorId: UUID): UUID {
-        val id = UUID.randomUUID()
+    fun append(pageId: UUID, predecessorId: UUID?, summary: String, body: String, images: List<WikiImage>, sourceUrls: List<String>, actorId: UUID, citations: List<WikiCitation> = emptyList(), operationId: UUID? = null): UUID {
+        val id = operationId ?: UUID.randomUUID()
         jdbc.update(
-            "INSERT INTO wiki_page_revisions (id, page_id, predecessor_id, summary, body, images, source_urls, created_by) VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?)",
+            "INSERT INTO wiki_page_revisions (id, page_id, predecessor_id, summary, body, images, source_urls, created_by, citations) VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?::jsonb)",
             id,
             pageId,
             predecessorId,
@@ -128,6 +129,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             mapper.writeValueAsString(images),
             mapper.writeValueAsString(sourceUrls),
             actorId,
+            mapper.writeValueAsString(citations),
         )
         return id
     }
@@ -150,6 +152,7 @@ class WikiRepository(private val jdbc: JdbcTemplate, private val mapper: ObjectM
             rs.getTimestamp("created_at").toInstant().atOffset(java.time.ZoneOffset.UTC),
             rs.getObject("created_by", UUID::class.java),
             rs.getTimestamp("published_at")?.toInstant()?.atOffset(java.time.ZoneOffset.UTC),
+            mapper.readValue(rs.getString("citations"), object : TypeReference<List<WikiCitation>>() {}),
         )
     }
 }

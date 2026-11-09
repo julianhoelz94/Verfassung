@@ -94,6 +94,9 @@ The amendment route uses WorkspacePage and shared PageChrome with task views. It
 
 `editor/documents/DocumentManagerTemplate` is shared by the continuous constitution editor, constitution settings and amendment editor. It owns the peer upload/select actions and forms. The server DocumentLinks loader and client DocumentManager adapter retain target/scope and command ownership. Attachments update in place without refreshing the text editor. The gateway command route retains authentication and trusted-origin checks; document-service atomically creates, uploads, attaches and records an idempotent operation receipt in its own database.
 
+## Embedded document evidence
+
+Use `components/documents/DocumentAttachmentTemplate` for compact browsing and uploads; existing constitution/amendment adapters use it automatically. File and title are immediate; optional bibliography is progressively disclosed. Historical revision choice lives under Citation options. Shared creator fields also serve the central inspector. The component does not render nested forms or add its controls to a host form's native validation. See `document-attachment-template.md` and `$verfassung-document-attachments` for callback contracts, pins and future lifecycle adapters.
 ## Constitution structure workspace
 
 `admin/constitutions/StructureWorkspaceTemplate` owns the shared task bar, hierarchy navigation, selected-level fields, modular preview and five data-driven presets. `OutlineEditor` retains creation and Catalog impact/save commands; `SetupProposalReview` supplies read-only structural permissions and Ingestion review commands. Source/identity, documents and history are workflow slots. Add common controls here rather than a third route-specific form. See [the workspace contract](constitution-structure-workspace.md).

@@ -346,6 +346,9 @@ function editorDocumentBody(state: EditorSessionState) {
           <ConstitutionDetailsWorkspace
             constitutionId={selectedConstitution.id}
             versionId={versionId}
+            sourceDocuments={<DocumentLinks targetType="version" targetId={versionId}
+              returnTo={editorReturnTo} canEdit={canEdit}
+              heading={message(state.locale, { en: 'Sources for this text version', de: 'Quellen dieser Textversion' })} />}
             code={selectedCountry?.isoCode}
             canEdit={canEdit}
             canManageStructure={user.roles.includes('admin')}

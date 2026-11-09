@@ -38,3 +38,10 @@ test('authored separators roundtrip outside text and reject fractional or unboun
   const legacy = { kind: 'clause', content: [{ type: 'text', text: 'Exact wording.' }] };
   assert.deepEqual(orderedNode.parse(legacy), legacy);
 });
+
+test('document citations preserve exact snapshot identity and locator through the import contract', () => {
+  const citation = { logicalId: '01900000-0000-4000-8000-000000000001', start: 0, end: 3, target: { type: 'document', documentId: '01900000-0000-4000-8000-000000000002', documentRevision: 2, locator: 'Chapter 3' } };
+  const node = { kind: 'article', content: [{ type: 'text', text: 'Law', references: [citation] }] };
+  assert.deepEqual(orderedNode.parse(node), node);
+  assert.equal(orderedNode.safeParse({ ...node, content: [{ ...node.content[0], references: [{ ...citation, target: { ...citation.target, documentRevision: 0 } }] }] }).success, false);
+});

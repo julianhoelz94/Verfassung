@@ -76,6 +76,7 @@ export type NoteDraft = {
   label: string;
   text: string;
   marks?: OrderedTextMark[];
+  references?: OrderedInlineReference[];
   anchor?: ReturnType<CanvasController["selection"]>;
 };
 
@@ -1175,6 +1176,7 @@ export function useStructuredEditorModel({
           text: noteEdit.text,
           footnoteLabel: noteEdit.label,
           marks: noteEdit.marks ?? [],
+          references: noteEdit.references ?? [],
         });
       } else {
         const anchor = noteEdit.anchor,
@@ -1213,6 +1215,7 @@ export function useStructuredEditorModel({
                 format: "footnote",
                 footnoteLabel: noteEdit.label,
                 marks: noteEdit.marks ?? [],
+          references: noteEdit.references ?? [],
               },
             ],
           });
@@ -1511,7 +1514,7 @@ export function useStructuredEditorModel({
   }
 
   /** Adds a reference through the live canvas and preserves the existing overlap/selection feedback. */
-  function link(target: OrderedInlineReference["target"]) {
+  function link(target: OrderedInlineReference["target"]): boolean {
     if (!activeCanvas?.isAlive()) {
       setMessage(
         copy(
@@ -1519,7 +1522,7 @@ export function useStructuredEditorModel({
           "Setzen Sie zuerst den Cursor in den Verfassungstext.",
         ),
       );
-      return;
+      return false;
     }
     if (!activeCanvas.addReference(target)) {
       setMessage(
@@ -1533,9 +1536,10 @@ export function useStructuredEditorModel({
               "Wählen Sie Text aus, der noch nicht verlinkt ist.",
             ),
       );
-      return;
+      return false;
     }
-    setPanel("");
+    if (!noteEdit) setPanel("");
+    return true;
   }
 
   const scopeLevel = outline.kinds.find((level) => level.kindCode === scope),

@@ -295,6 +295,7 @@ export async function AmendmentViewerPage({
                 >
                   {d.document.revision.title}
                 </a>
+                {d.citationNote ? <p>{d.citationNote}</p> : null}
               </li>
             ))}
             {amendment.documents

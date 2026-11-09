@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { requireSessionBearer } from '../../../lib/session';
+import { resolveDocumentReferences, pinDocumentReferences } from '../../../lib/document-reference-server';
 import { readWriteBody } from '../../../lib/amendment-form';
 import { appendRevision, confirmAmendmentQuotes, createAmendment, publishAmendment, withdrawAmendment } from '../../../lib/amendment-editor-api';
 import { redirectTo, value, type CommandContext } from './request';
@@ -8,13 +10,22 @@ export async function saveAmendment({ request, form }: CommandContext): Promise<
   const id = value(form, 'amendmentId');
   const constitutionId = value(form, 'constitutionId');
   const body = readWriteBody(form);
-  if (!id || id === 'new') {
-    if (!constitutionId) return redirectTo(request, '/editor/amendments?error=invalid');
-    const created = await createAmendment(constitutionId, body);
-    return savedAmendmentResponse(request, created.id);
+  const isNew = !id || id === 'new';
+  if (isNew && !constitutionId) return redirectTo(request, '/editor/amendments?error=invalid');
+  const selection = String(form.get('stagedDocuments') ?? '[]');
+  const authorization = selection === '[]' ? '' : await requireSessionBearer();
+  const links = await resolveDocumentReferences(selection, authorization);
+  const attempt = value(form, 'creationAttemptId');
+  const saved = isNew ? await createAmendment(constitutionId, { ...body, ...(attempt ? { publishAttemptId: attempt } : {}) }) : await appendRevision(id, body);
+  const savedId = isNew ? saved.id : id;
+  try {
+    if (links.length && !saved.revisionId) throw new Error('Missing saved amendment revision');
+    await pinDocumentReferences(links, 'amendment', savedId, authorization, saved.revisionId);
+  } catch {
+    if (request.headers.get('accept')?.includes('application/json')) return NextResponse.json({ key: 'documents', savedId }, { status: 502 });
+    return redirectTo(request, `/editor/amendments/${encodeURIComponent(savedId)}?error=document`);
   }
-  await appendRevision(id, body);
-  return savedAmendmentResponse(request, id);
+  return savedAmendmentResponse(request, savedId);
 }
 
 /** JSON saves keep the mounted form on errors; native submissions retain their redirect destination. */

@@ -73,6 +73,12 @@ data class OrderedReferenceTarget(
     val logicalId: UUID? = null,
     val url: String? = null,
     val footnoteId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val documentId: UUID? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val documentRevision: Int? = null,
+    @get:JsonInclude(JsonInclude.Include.NON_NULL)
+    val locator: String? = null,
 ) : StrictOrderedWrite()
 
 data class OrderedInlineReference(val logicalId: UUID, val start: Int, val end: Int, val target: OrderedReferenceTarget) : StrictOrderedWrite()

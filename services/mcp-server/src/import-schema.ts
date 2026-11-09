@@ -36,7 +36,7 @@ const textMark = z.strictObject({
 
 const reference = z.strictObject({
   logicalId: uuid, start: z.number().int().min(0), end: z.number().int().min(0),
-  target: z.strictObject({ type: z.enum(['unit', 'footnote', 'external']), logicalId: uuid.nullable().optional(), url: z.string().url().startsWith('https://').nullable().optional(), footnoteId: uuid.nullable().optional() }),
+  target: z.strictObject({ type: z.enum(['unit', 'footnote', 'external', 'document']), logicalId: uuid.nullable().optional(), url: z.string().url().startsWith('https://').nullable().optional(), footnoteId: uuid.nullable().optional(), documentId: uuid.nullable().optional(), documentRevision: z.number().int().positive().nullable().optional(), locator: z.string().max(4000).nullable().optional() }),
 });
 const table = z.strictObject({
   caption: nullableText,

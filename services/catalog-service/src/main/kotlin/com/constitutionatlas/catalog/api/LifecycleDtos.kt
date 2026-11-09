@@ -19,6 +19,7 @@ data class CreateLifecycleEvent(
     val eventDate: LocalDate,
     val sourceUrl: String? = null,
     val note: String? = null,
+    val operationId: UUID? = null,
     val dateCertainty: String = "exact",
 )
 

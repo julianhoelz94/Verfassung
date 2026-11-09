@@ -517,6 +517,7 @@ export function OrderedContentTree({
       ? (crossRefs?.unitsByLogicalId?.[target.logicalId] ??
         targets.get(target.logicalId))
       : undefined;
+    if (target.type === "document" && target.documentId && target.documentRevision) return `/documents/${target.documentId}?revision=${target.documentRevision}`;
     if (target.type === "external") return target.url ?? undefined;
     if (
       target.type === "footnote" &&
@@ -602,6 +603,7 @@ export function OrderedContentTree({
           key={ref.logicalId}
           id={idPrefix + "ref-" + ref.logicalId}
           className="xref"
+          title={ref.target.type === "document" ? ref.target.locator ?? undefined : undefined}
           href={href}
         >
           {formatted}

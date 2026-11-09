@@ -12,15 +12,18 @@ export function WikiDraftForm({ children, embedded, action, className }: {
 }) {
   const { dirty } = useDraftState(), t = useTranslation(), ready = useHydrated();
   const [changed, setChanged] = useState(false), [pending, setPending] = useState(false), [failed, setFailed] = useState(false);
-  const navigating = useRef(false);
+  const navigating = useRef(false), operation = useRef({ key: '', id: '' });
   useEffect(() => {
     const guard = (event: BeforeUnloadEvent) => { if (changed && !navigating.current) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard);
   }, [changed]);
-  return <Stack as="form" method="post" className={className} aria-busy={!ready || pending} onChange={() => setChanged(true)} onSubmit={async (event: FormEvent<HTMLFormElement>) => {
+  return <Stack as="form" method="post" className={className} aria-busy={!ready || pending} onChange={() => setChanged(true)} onInput={() => setChanged(true)} onSubmit={async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!ready || pending || embedded && dirty) return;
-    const data = new FormData(event.currentTarget); setPending(true); setFailed(false);
+    const data = new FormData(event.currentTarget);
+    const key = JSON.stringify([...data.entries()].map(([name, value]) => [name, typeof value === 'string' ? value : [value.name, value.size, value.lastModified]]));
+    if (operation.current.key !== key) operation.current = { key, id: crypto.randomUUID() };
+    data.set('operationId', operation.current.id); setPending(true); setFailed(false);
     try {
       const destination = await action(data), query = new URL(destination, window.location.origin).searchParams;
       if (query.has('error') || query.get('wikiStatus') === 'error') { setFailed(true); setPending(false); return; }

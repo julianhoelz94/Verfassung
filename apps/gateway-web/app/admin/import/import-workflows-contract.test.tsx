@@ -22,6 +22,7 @@ const clients = vi.hoisted(() => ({
   getImportFidelity: vi.fn(),
   readCapturedSource: vi.fn(),
 }));
+vi.mock('../../editor/documents/DocumentLinks', () => ({ DocumentLinks: (props: { targetType: string; targetId: string }) => <section data-document-target={props.targetType} data-document-owner={props.targetId}>Supplementary evidence</section> }));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw new Error(`redirect:${url}`);

@@ -34,7 +34,7 @@ describe('embedded constitution Wiki', () => {
     expect(host.querySelector('[name=summary]')?.closest('details')).toBeNull();
     expect(host.querySelector('[name=body]')?.closest('details')).toBeNull();
     expect(host.querySelector('[name=sourceUrls]')?.closest('details')?.open).toBe(false);
-    expect(host.querySelector('[name=imageFile]')?.closest('details')?.open).toBe(false);
+    expect(host.querySelector('[name=newImages]')?.closest('details')?.open).toBe(false);
     expect(html).toContain('Save Wiki draft'); expect(html).toContain('Draft saved');
     expect(host.querySelectorAll('form form')).toHaveLength(0);
   });

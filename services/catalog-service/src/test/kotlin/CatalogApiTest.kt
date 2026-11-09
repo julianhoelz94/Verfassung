@@ -80,6 +80,39 @@ class CatalogApiTest {
         .first { catalogRepository.findCountrySummary(it) == null }
 
     @Test
+    fun wikiDocumentCitationsRemainPinnedAndFailedPinSavesCanReplayTheSameDraft() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Cited wiki"))
+        val citation = com.constitutionatlas.catalog.api.WikiCitation(UUID.randomUUID(), 2, "Archive report", "Chapter 3")
+        val request = com.constitutionatlas.catalog.api.SaveWikiPage(summary = "Context", body = "Original text", citations = listOf(citation), operationId = UUID.randomUUID())
+        val first = wiki.save("country", country.id, request, editor.id)
+        assertThat(wiki.save("country", country.id, request, editor.id).id).isEqualTo(first.id)
+        assertThat(wiki.history("country", country.id)).hasSize(1)
+        assertThat(wiki.published("country", country.id)).isNull()
+        Mockito.doThrow(com.constitutionatlas.catalog.ConflictException("Unpinned citation")).`when`(wikiMedia).requirePinnedCitations("country", country.id, first.id, listOf(citation), PUBLISHER_TOKEN)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { wiki.publish("country", country.id, first.id, PUBLISHER_TOKEN) }
+        assertThat(wiki.published("country", country.id)).isNull()
+        Mockito.reset(wikiMedia)
+        wiki.publish("country", country.id, first.id, PUBLISHER_TOKEN)
+        val next = wiki.save("country", country.id, request.copy(expectedRevisionId = first.id, citations = listOf(citation.copy(revision = 3)), operationId = UUID.randomUUID()), editor.id)
+        assertThat(next.citations.single().revision).isEqualTo(3)
+        assertThat(wiki.publishedRevision("country", country.id, first.id)?.citations).containsExactly(citation)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { wiki.save("country", country.id, request, editor.id) }
+    }
+
+    @Test
+    fun eventCreationReceiptsPreventDuplicateEventsAfterAttachmentFailures() {
+        val code = uniqueCountryCode()
+        writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(code, "Receipt country"))
+        val constitution = writes.createConstitution(code, com.constitutionatlas.catalog.api.CreateConstitutionRequest("receipt", "Receipt constitution"))
+        val request = com.constitutionatlas.catalog.api.CreateLifecycleEvent("adopted", java.time.LocalDate.of(1949, 5, 23), note = "Original event", operationId = UUID.randomUUID())
+        val first = lifecycle.append(constitution.id, request, publisher.id)
+        assertThat(lifecycle.append(constitution.id, request, publisher.id).id).isEqualTo(first.id)
+        assertThat(lifecycle.events(constitution.id)).hasSize(1)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { lifecycle.append(constitution.id, request.copy(note = "Different intent"), publisher.id) }
+        assertThat(lifecycle.events(constitution.id)).hasSize(1)
+    }
+
+    @Test
     fun constitutionCreationRetriesReturnTheOriginalReviewedSettingsAndRejectDifferentPayloads() {
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Setup receipt"))
         val attempt = UUID.randomUUID()

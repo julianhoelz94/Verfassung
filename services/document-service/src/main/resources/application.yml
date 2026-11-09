@@ -30,3 +30,7 @@ amendment:
 ingestion:
   api:
     url: ${INGESTION_API_URL:http://localhost/api/ingestion}
+
+content:
+  api:
+    url: ${CONTENT_API_URL:http://localhost/api/content}

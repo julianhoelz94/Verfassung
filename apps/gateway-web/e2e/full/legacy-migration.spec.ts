@@ -173,10 +173,12 @@ test('offline archive package preserves evidence through review, publication and
     expect(records.find(record => record.path === notePath + '/annotation/anchorLogicalIds/0')?.value).toBe(id('wording'));
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto(`/admin/migrations/${run.id}?item=${snapshot.id}&source=annotated.htm`);
-    await expect(page.locator('pre')).toHaveText(new TextDecoder('windows-1252').decode(captured.find(source => source.file === 'annotated.htm').bytes));
-    await expect(page.locator('pre')).toContainText('window.__legacySourceExecuted = true');
+    const originalSource = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Original source text and download' }) });
+    await originalSource.locator('summary').click();
+    await expect(originalSource.locator('pre')).toHaveText(new TextDecoder('windows-1252').decode(captured.find(source => source.file === 'annotated.htm').bytes));
+    await expect(originalSource.locator('pre')).toContainText('window.__legacySourceExecuted = true');
     expect(await page.evaluate(() => (window as any).__legacySourceExecuted)).toBeUndefined();
-    await expect(page.getByText('jedes Bürgers ist unverletzlich.', { exact: false }).last()).toBeVisible();
+    await expect(page.locator('[data-constitution-document]')).toContainText('jedes Bürgers ist unverletzlich.');
     await json(await request.post(`/api/ingestion/import-jobs/${jobId}/approve`, { headers: reviewer, data: { reason: 'Compared exact source wording, structures, dates and linked evidence.' } }));
     await json(await request.post(`/api/ingestion/import-jobs/${jobId}/publish`, { headers: publisher }));
     const published = await json(await request.get(`/api/catalog/versions/${versionId}`));

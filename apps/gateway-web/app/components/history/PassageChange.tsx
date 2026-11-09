@@ -11,10 +11,12 @@ export function PassageChange({
   change: AmendmentChange;
   compact?: boolean;
 }) {
-  const segments = diffText(
-    change.beforeRef?.text ?? "",
-    change.afterRef?.text ?? "",
+  const complete = [change.beforeRef, change.afterRef].every(
+    (ref) => !ref || ref.text != null,
   );
+  const segments = complete
+    ? diffText(change.beforeRef?.text ?? "", change.afterRef?.text ?? "")
+    : [];
   return (
     <section className={styles.change} id={"change-" + change.id}>
       {!compact ? (
@@ -40,8 +42,8 @@ export function PassageChange({
         <p role="status">
           <T
             value={{
-              en: "The exact passage mapping is unavailable. The recorded wording is shown below.",
-              de: "Die genaue Passagenzuordnung ist nicht verfügbar. Unten steht der dokumentierte Wortlaut.",
+              en: "The exact passage mapping is unavailable. Any available wording is shown below.",
+              de: "Die genaue Passagenzuordnung ist nicht verfügbar. Verfügbarer Wortlaut steht unten.",
             }}
           />
         </p>
@@ -49,7 +51,7 @@ export function PassageChange({
       {change.beforeRef || change.afterRef ? (
         <div className={styles.columns}>
           {(["before", "after"] as const).map((side) => (
-            <section key={side}>
+            <section key={side} data-passage-side={side}>
               <p className={styles.eyebrow}>
                 <T
                   value={
@@ -77,6 +79,21 @@ export function PassageChange({
                 ) : null}
               </p>
               <div className={styles.words}>
+                {!complete &&
+                  (side === "before" ? change.beforeRef : change.afterRef)
+                    ?.text}
+                {(side === "before" ? change.beforeRef : change.afterRef) &&
+                (side === "before" ? change.beforeRef : change.afterRef)
+                  ?.text == null ? (
+                  <p role="status">
+                    <T
+                      value={{
+                        en: "Passage text is temporarily unavailable.",
+                        de: "Der Passagentext ist vorübergehend nicht verfügbar.",
+                      }}
+                    />
+                  </p>
+                ) : null}
                 {segments
                   .filter((s) =>
                     side === "before" ? s.type !== "add" : s.type !== "remove",

@@ -17,6 +17,18 @@ export type ConstitutionHistoryItem = {
   amendment?: Amendment;
   version?: VersionSummary;
 };
+
+/** Keep each year's chronological events together, including records without a known date. */
+export function historyYearGroups(items: ConstitutionHistoryItem[]) {
+  const groups = new Map<string, ConstitutionHistoryItem[]>();
+  for (const item of items) {
+    const year = item.date.slice(0, 4);
+    const group = groups.get(year) ?? [];
+    group.push(item);
+    groups.set(year, group);
+  }
+  return [...groups].map(([year, events]) => ({ year, events }));
+}
 export function passageMatches(
   change: AmendmentChange,
   scope: ReadonlySet<string>,

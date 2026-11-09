@@ -120,6 +120,11 @@ export type ProvisionLifecycleEvent = {
 
 export type ResolvedUnit = {
   logicalId: string;
+  versionId?: string;
+  constitutionId?: string | null;
+  revisionId?: string;
+  kind?: string;
+  text?: string;
   pathLabels: string[];
   deepLink: string;
   breadcrumbs?: string[];

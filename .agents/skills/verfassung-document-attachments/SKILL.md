@@ -27,6 +27,14 @@ Paths are relative to the repository root.
 
 `editor/documents/DocumentManagerTemplate.tsx` is a compatibility export. Extend the canonical shared component, not a copy of the old template or an independent host-specific form.
 
+### Confirm the canonical picker before editing
+
+The picker from the **Plan the document service** chat is `components/documents/DocumentAttachmentTemplate.tsx`, composed with `DocumentLibraryPicker` and `DocumentUploadForm`. Its reference preview is https://document-attachment-studio.sillycurlew.chatgpt.site/. PR #248 merged this implementation and this skill into `main` on 9 November 2026. A checkout before that merge can still contain the old management form with a manual search button and separate document dropdown. Do not treat that older form as the requested picker.
+
+Resolve the source from the current checkout first. If the canonical files are missing, inspect the requested source chat, current `main` and relevant PR status before implementing a substitute. Update or merge the authorized branch while preserving unrelated changes. Import the canonical component directly in new integrations; keep the compatibility export for existing callers. Do not copy picker markup into the host or add another management dialog solely to recreate its browse/upload controls.
+
+For standalone mocks, bundle that same source with sample-data callbacks, following `docs/design/prototype/document-attachment/build.mjs`. Keep the canonical component mounted when the host switches tabs, scopes or panes; preserving only the selected document IDs does not preserve unfinished file/metadata entry. Carry all submitted bibliography, citation-key, source and catalog-note fields through the mock adapter. Verify the live combobox, secondary **Citation options**, collapsed optional metadata and distinct **Image/Bild** type to distinguish the intended implementation from the legacy form.
+
 ## Integration workflow
 
 1. Identify the host, its saved/draft identity, publication scope, document permissions, and whether selection is staged or immediately attached. Inspect the owning API and current component props before changing a caller.

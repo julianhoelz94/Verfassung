@@ -26,6 +26,14 @@ async function render(props: Partial<Parameters<typeof DocumentManager>[0]> = {}
 }
 
 describe('shared document attachment contract', () => {
+  it.each(['book', 'commentary'])('limits publishers to commentary when a metadata-only %s is attached', async type => {
+    const record = { ...documentRecord, revision: { ...revision, sourceUrl: null, bibliography: { type } } };
+    await render({ targetType: 'lifecycle_material', canCreate: false, links: [{ documentId: record.id, revisionId: revision.id, document: record }] });
+    expect(host.textContent?.includes('Edit material details')).toBe(type === 'commentary');
+    expect(getByRole(host, 'button', { name: 'Choose existing document' })).toBeTruthy();
+    expect(queryByRole(host, 'button', { name: 'Upload new document' })).toBeNull();
+  });
+
   it('retains external-law input after a lost response and retries the same operation in place', async () => {
     send.mockRejectedValueOnce(new Error('response lost')).mockResolvedValueOnce(response({ document: documentRecord }));
     await render(); await click('Upload new document');

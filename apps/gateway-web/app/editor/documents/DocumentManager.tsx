@@ -10,6 +10,12 @@ import { isMaterialTarget, type EditableDocumentTarget } from '../../../lib/docu
 import { TextArea } from '../../components/ui';
 import { MaterialContext } from './MaterialContext';
 
+function canEditMaterial(revision: DocumentRevision, canWriteLibrary: boolean): boolean {
+  const commentary = revision.bibliography?.type === 'commentary';
+  if (canWriteLibrary) return commentary || (!revision.fileName && !revision.sourceUrl);
+  return commentary && !revision.fileName && !revision.attachments?.length;
+}
+
 export function DocumentManager(props: {
   heading?: string;
   headingLevel?: 'h2' | 'h3' | 'h4'; canCreate?: boolean;
@@ -87,7 +93,7 @@ export function DocumentManager(props: {
         placeholder={t({ en: 'For example: Chapter 3, pp. 42–45.', de: 'Zum Beispiel: Kapitel 3, S. 42–45.' })} />
     </details>}
     renderAttachmentContext={link => isMaterialTarget(props.targetType)
-      ? <MaterialContext key={link.revisionId} link={link} pending={pending} canEdit={props.canEdit && (link.document.revision.bibliography?.type === 'commentary' || (!link.document.revision.fileName && !link.document.revision.sourceUrl))} onSave={data => mutate('revise-material', data)} />
+      ? <MaterialContext key={link.revisionId} link={link} pending={pending} canEdit={props.canEdit && canEditMaterial(link.document.revision, props.canCreate ?? props.canEdit)} onSave={data => mutate('revise-material', data)} />
       : link.citationNote ? <p>{link.citationNote}</p> : null}
     onSearch={props.remoteSearch ? search : undefined} onSelect={props.remoteSearch ? select : undefined}
     onCreate={data => {

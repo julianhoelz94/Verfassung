@@ -212,7 +212,7 @@ class DocumentService(
         val link = currentLinks(targetType, targetId, request.scopeRevisionId, authorization).find { it.documentId == documentId }
             ?: throw NotFoundException("Material not found")
         if (actor.roles.none { it == "editor" || it == "admin" }) {
-            if (link.document.revision.fileName != null || link.document.revision.attachments.isNotEmpty() || (link.document.revision.bibliography.type != "commentary" && !link.document.revision.sourceUrl.isNullOrBlank())) throw ForbiddenException("Library metadata requires editor or admin")
+            if (link.document.revision.fileName != null || link.document.revision.attachments.isNotEmpty() || link.document.revision.bibliography.type != "commentary") throw ForbiddenException("Library metadata requires editor or admin")
         }
         if (link.revisionId != request.expectedLinkedRevisionId) throw DocumentConflictException("Material changed; reload before saving")
         require((request.description?.length ?: 0) <= 10000) { "Commentary is too long" }

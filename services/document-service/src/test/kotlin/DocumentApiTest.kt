@@ -433,6 +433,40 @@ class DocumentApiTest {
     }
 
     @Test
+    fun publisherCannotReviseMetadataOnlyLibrarySourcesThroughAnEvent() {
+        val token = "Bearer metadata-publisher"
+        Mockito.`when`(identity.authenticate(token)).thenReturn(Actor(UUID.randomUUID(), "publisher@example.test", listOf("publisher")))
+        val target = UUID.randomUUID()
+        val scope = UUID.randomUUID()
+        Mockito.`when`(targets.isPublic("lifecycle_material", target, scope)).thenReturn(true)
+        listOf("book", "commentary").forEach { type ->
+            val created = mapper.readTree(
+                mvc.post("/documents") {
+                    header("Authorization", EDITOR)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"title":"Original $type","bibliography":{"type":"$type"}}"""
+                }.andExpect { status { isCreated() } }.andReturn().response.contentAsString,
+            )
+            val id = created.path("id").asText()
+            val pin = created.path("revision").path("id").asText()
+            mvc.post("/links/lifecycle_material/$target") {
+                header("Authorization", token)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"documentId":"$id","revisionId":"$pin","scopeRevisionId":"$scope"}"""
+            }.andExpect { status { isOk() } }
+            mvc.put("/links/lifecycle_material/$target/$id/material") {
+                header("Authorization", token)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"title":"Changed $type","expectedRevision":1,"expectedLinkedRevisionId":"$pin","scopeRevisionId":"$scope"}"""
+            }.andExpect { status { if (type == "commentary") isOk() else isForbidden() } }
+            mvc.get("/documents/$id") { header("Authorization", EDITOR) }.andExpect {
+                jsonPath("$.revision.title") { value(if (type == "commentary") "Changed $type" else "Original $type") }
+                jsonPath("$.currentRevision") { value(if (type == "commentary") 2 else 1) }
+            }
+        }
+    }
+
+    @Test
     fun wikiPictureFormatsValidateRealFilesAndRejectMismatches() {
         val formats = listOf(
             "sample.jpg" to "image/jpeg",

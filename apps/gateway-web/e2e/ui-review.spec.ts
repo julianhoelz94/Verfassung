@@ -119,7 +119,7 @@ async function assertReviewControls(page: Page, route: ReviewRoute, locale: stri
   }
   if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
   if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.getByRole('heading', { name: locale === 'en' ? 'Your confirmation is required' : 'Ihre Bestätigung ist erforderlich' })).toBeVisible();
-  if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.locator('input[name="logicalUnitIds"]').first()).toBeVisible();
+  if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.getByRole('radio', { name: locale === 'en' ? /Whole constitution/ : /Gesamte Verfassung/ })).toBeChecked();
   if (route.entry === '/setup') {
     await expect(page.getByRole('button', { name: locale === 'en' ? 'Finish setup and open the site' : 'Einrichtung abschließen und Website öffnen' })).toBeDisabled();
     await expect(page.getByRole('button', { name: locale === 'en' ? 'Account menu' : 'Kontomenü' })).toBeVisible();

@@ -1,3 +1,4 @@
+import { handleLifecycleWorkspace } from './lifecycle-workspace-routes.mjs';
 import { handleImportReviewFixture } from './import-review-routes.mjs';
 import {
   handleHealth,
@@ -116,6 +117,7 @@ import { handleDocumentLibrary } from "./document-library-routes.mjs";
 /** Exact original source order, including early Catalog exceptions and scenario interception. */
 export const routes = [
   handleHealth,
+  handleLifecycleWorkspace,
   handleImportReviewFixture,
   handleDocumentLibrary,
   handleEditorDocumentsSetup,

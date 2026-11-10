@@ -276,6 +276,7 @@ const editorState = {
 /** Mutable replacements remain request-visible after every reset, login and write. */
 export const mockState = {
   editorDocumentScenario: undefined,
+  lifecycleWorkspace: undefined,
   pendingMfaEmail: identityMe.email,
   currentUser: { ...identityMe },
   importJobs: new Map(),
@@ -360,6 +361,7 @@ function resetMockState() {
   mockState.enrolledMfaEmails = new Set();
   mockState.recoveryCodes = new Map();
   mockState.uiReview = undefined;
+  mockState.lifecycleWorkspace = undefined;
   mockState.forceEnrollment = false;
   mockState.stepUpFresh = true;
   mockState.visualRoles = false;

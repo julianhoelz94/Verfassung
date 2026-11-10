@@ -80,6 +80,7 @@ export async function reviseLifecycleEvidenceAction(form:FormData) {
   if(!user?.roles.some(role=>role==='publisher'||role==='admin'))redirect('/editor');
   const constitutionId=String(form.get('constitutionId')??''),eventId=String(form.get('eventId')??'');
   const destination=new URL(safeReturnTo(String(form.get('returnTo')??''),'/editor'),'https://atlas.invalid');
+  destination.searchParams.delete('error'); destination.searchParams.delete('saved');
   try {
     await reviseLifecycleEvidence(constitutionId,eventId,{note:String(form.get('note')??''),sourceUrl:String(form.get('sourceUrl')??''),expectedRevisionId:String(form.get('expectedRevisionId')??'')||null},await requireSessionBearer());
     revalidatePath(destination.pathname);destination.searchParams.set('saved','1');

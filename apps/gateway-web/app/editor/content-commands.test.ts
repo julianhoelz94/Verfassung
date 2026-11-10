@@ -224,6 +224,15 @@ describe('lifecycle records require publication capability', () => {
     await expect(lifecycle.appendLifecycleAction(form({ constitutionId: id, code: 'XA', eventType: 'adopted', eventDate: '1949-01-01', dateCertainty: 'approximate', note: ' Archival wording ', sourceUrl: ' https://archive.example/record ' }))).rejects.toThrow('saved=1');
     expect(requests[0].body).toEqual({ eventType: 'adopted', eventDate: '1949-01-01', dateCertainty: 'approximate', note: 'Archival wording', sourceUrl: 'https://archive.example/record' }); expect(requests).toHaveLength(1);
   });
+  it('clears stale outcome flags while retaining evidence revision guards and return context', async () => {
+    const data = form({ constitutionId: id, eventId: 'event', expectedRevisionId: 'evidence-r1', note: 'Corrected context', sourceUrl: 'https://archive.example/source', returnTo: '/event?error=old&saved=old&on=1949-05-08#sources', stagedForm: '1' });
+    expect(await lifecycle.reviseLifecycleEvidenceAction(data)).toBe('/event?on=1949-05-08&saved=1#sources');
+    expect(requests[0]).toMatchObject({ method: 'PUT', body: { note: 'Corrected context', sourceUrl: 'https://archive.example/source', expectedRevisionId: 'evidence-r1' }, authorization: 'Bearer writer-session' });
+    status = 409;
+    expect(await lifecycle.reviseLifecycleEvidenceAction(data)).toBe('/event?on=1949-05-08&error=1#sources');
+    status = 200; data.delete('stagedForm');
+    await expect(lifecycle.reviseLifecycleEvidenceAction(data)).rejects.toThrow('redirect:/event?on=1949-05-08&saved=1#sources');
+  });
   it('records scoped provision events with the selected source snapshot and unit identities', async () => {
     await expect(lifecycle.appendProvisionAction(form({ constitutionId: id, code: 'XA', sourceVersionId: 'snapshot', eventType: 'deferred', eventDate: '1949-01-01', logicalUnitIds: ['unit-1', 'unit-2'] }))).rejects.toThrow('saved=1'); expect(requests[0].body).toMatchObject({ sourceVersionId: 'snapshot', logicalUnitIds: ['unit-1', 'unit-2'] });
     status = 409; await expect(lifecycle.appendProvisionAction(form({ constitutionId: id, code: 'XA', sourceVersionId: 'snapshot' }))).rejects.toThrow('error=1');

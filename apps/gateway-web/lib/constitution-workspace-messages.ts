@@ -47,6 +47,14 @@ export const constitutionWorkspaceUi = {
     en: "Structural corrections need a revised proposal. Display settings can be adjusted here.",
     de: "Strukturkorrekturen benötigen einen überarbeiteten Vorschlag. Die Darstellung kann hier angepasst werden.",
   },
+  requestStructure: {
+    en: "Request structural changes",
+    de: "Strukturänderung anfordern",
+  },
+  proposalReadOnly: {
+    en: "This proposal's reviewed structure and display are read-only.",
+    de: "Die geprüfte Struktur und Darstellung dieses Vorschlags sind schreibgeschützt.",
+  },
   migration: {
     en: "Direct saving is blocked. This change requires a reviewed successor migration.",
     de: "Direktes Speichern ist gesperrt. Diese Änderung benötigt eine geprüfte Nachfolgemigration.",

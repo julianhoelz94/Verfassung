@@ -280,7 +280,7 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     await expect(page.locator('input[name="revision"]')).toHaveValue('2');
     await page.reload();
     await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
-    await page.getByRole('button', { name: 'Request changes', exact: true }).click();
+    await page.getByRole('button', { name: 'Request structural changes', exact: true }).click();
     await page.getByLabel('Requested changes', { exact: true }).fill('Add sentence units without changing the original German wording.');
     await page.getByRole('button', { name: 'Record requested changes' }).click();
     await expect(page.getByText('Waiting for a revised proposal', { exact: true }).filter({ visible: true })).toBeVisible();

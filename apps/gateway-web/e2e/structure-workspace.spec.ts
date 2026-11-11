@@ -88,7 +88,7 @@ for (const locale of ['en', 'de']) test(`creation and import share the responsiv
   await page.keyboard.press('Escape');
   await request.post(`${mock}/__sprint59_content`);
   await page.goto(`/admin/import/setup/${proposal}`);
-  await expect(page.getByRole('button', { name: de ? 'Änderungen anfordern' : 'Request changes', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: de ? 'Strukturänderung anfordern' : 'Request structural changes', exact: true })).toBeVisible();
   await page.getByRole('region', { name: 'Article ' + (de ? 'Struktur' : 'Structure'), exact: true }).getByRole('button', { name: de ? 'Struktur' : 'Structure', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: de ? 'Kann auf der obersten Ebene stehen' : 'May appear at the top level', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: de ? 'Änderungen anfordern' : 'Request changes', exact: true }).click();

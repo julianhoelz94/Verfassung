@@ -161,12 +161,16 @@ export function SetupProposalReview({
             <StructurePanel id="identity" active={view}>
               <Stack gap="card">
                 {identity}
-                <p className="muted">{t(m.proposalHelp)}</p>
+                <p className="muted">
+                  {t(editable ? m.proposalHelp : m.proposalReadOnly)}
+                </p>
               </Stack>
             </StructurePanel>
             <StructurePanel id="structure" active={view}>
               <Stack gap="card">
-                <p className="muted">{t(m.proposalHelp)}</p>
+                <p className="muted">
+                  {t(editable ? m.proposalHelp : m.proposalReadOnly)}
+                </p>
                 {content}
                 {editable ? (
                   <div className={styles.actions}>
@@ -174,7 +178,7 @@ export function SetupProposalReview({
                       {t(ui.setupReview.save)}
                     </Button>
                     <Button type="button" onClick={requestChanges}>
-                      {t(ui.setupReview.feedbackButton)}
+                      {t(m.requestStructure)}
                       <ReaderIcon name="right" />
                     </Button>
                   </div>

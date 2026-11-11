@@ -33,9 +33,10 @@ for (const { language, width } of [{ language: 'en', width: 1440 }, { language: 
     await expect(page.locator('[data-preview-kind="article"]').first()).toContainText('Art. 1');
     await page.getByRole('button', { name: de ? 'Darstellung speichern' : 'Save display settings' }).click();
     await expect.poll(async () => (await (await request.get(`${mockOrigin}${proposalPath}`)).json()).revision).toBe(2);
+    await expect(page.locator('input[name=revision]')).toHaveValue('2');
     await page.reload();
     await expect(page.locator('[data-preview-kind="article"]').first()).toContainText('Art. 1');
-    await page.getByRole('button', { name: de ? 'Änderungen anfordern' : 'Request changes', exact: true }).click();
+    await page.getByRole('button', { name: de ? 'Strukturänderung anfordern' : 'Request structural changes', exact: true }).click();
     await page.getByLabel(de ? 'Gewünschte Änderungen' : 'Requested changes', { exact: true }).fill('Bitte eine Satzebene einfügen und den Wortlaut bewahren.');
     await page.getByRole('button', { name: de ? 'Änderungswünsche speichern' : 'Record requested changes' }).click();
     await expect(page.getByText(de ? 'Wartet auf einen überarbeiteten Vorschlag' : 'Waiting for a revised proposal', { exact: true }).filter({ visible: true })).toBeVisible();

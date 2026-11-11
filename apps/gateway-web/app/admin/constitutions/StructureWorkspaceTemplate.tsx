@@ -331,7 +331,7 @@ export function OutlineWorkspace({
                 update={update}
                 removeLayer={structural ? remove : undefined}
               />
-              {!structural && onRequestChanges ? (
+              {!structural && onRequestChanges && section !== "display" ? (
                 <Button type="button" onClick={onRequestChanges}>
                   {t(copy.request)}
                 </Button>

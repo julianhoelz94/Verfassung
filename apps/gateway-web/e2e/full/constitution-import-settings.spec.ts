@@ -263,6 +263,7 @@ test('constitution configuration governs MCP imports, review previews and the pu
       await page.goto(configurationUrl);
       await selectStructureLevel(page, 'Clause', 'Editing');
       await fields.getByRole('checkbox', { name: 'Allow text alongside child units', exact: true }).uncheck();
+      await openStructureTask(page, 'Review');
       await page.getByRole('button', { name: 'Preview change impact', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Reviewed migration required', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Save outline', exact: true })).toBeDisabled();
@@ -272,6 +273,7 @@ test('constitution configuration governs MCP imports, review previews and the pu
 
       await selectStructureLevel(page, 'Preamble', 'Structure');
       await fields.getByRole('button', { name: 'Remove level', exact: true }).click();
+      await openStructureTask(page, 'Review');
       await page.getByRole('button', { name: 'Preview change impact', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Reviewed migration required', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Save outline', exact: true })).toBeDisabled();

@@ -38,6 +38,10 @@ for (const { language, width } of [{ language: 'en', width: 1440 }, { language: 
     await expect(page.locator('[data-preview-kind="article"]').first()).toContainText('Art. 1');
     await page.getByRole('button', { name: de ? 'Strukturänderung anfordern' : 'Request structural changes', exact: true }).click();
     await page.getByLabel(de ? 'Gewünschte Änderungen' : 'Requested changes', { exact: true }).fill('Bitte eine Satzebene einfügen und den Wortlaut bewahren.');
+    await openTask(page, de, 'Details', 'Angaben');
+    await page.getByRole('button', { name: de ? 'Struktur prüfen' : 'Inspect structure', exact: true }).click();
+    await openTask(page, de, 'Review', 'Prüfung');
+    await expect(page.getByLabel(de ? 'Gewünschte Änderungen' : 'Requested changes', { exact: true })).toHaveValue('Bitte eine Satzebene einfügen und den Wortlaut bewahren.');
     await page.getByRole('button', { name: de ? 'Änderungswünsche speichern' : 'Record requested changes' }).click();
     await expect(page.getByText(de ? 'Wartet auf einen überarbeiteten Vorschlag' : 'Waiting for a revised proposal', { exact: true }).filter({ visible: true })).toBeVisible();
     await openTask(page, de, 'Review', 'Prüfung');

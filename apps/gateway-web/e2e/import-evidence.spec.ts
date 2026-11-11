@@ -156,6 +156,7 @@ for (const width of [390, 1440]) {
       ).json(),
     ).toEqual(captured);
     await page.goto(`/admin/import/setup/${proposal}`);
+    await page.getByRole("tab", { name: "Documents", exact: true }).click();
     const setupEvidence = page.getByRole("region", {
       name: "Supplementary evidence",
       exact: true,

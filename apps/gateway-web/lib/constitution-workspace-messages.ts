@@ -16,6 +16,17 @@ export const constitutionWorkspaceUi = {
   unsaved: { en: "Unsaved changes", de: "Ungespeicherte Änderungen" },
   review: { en: "Review and confirm", de: "Zur Prüfung" },
   identity: { en: "Identity and ownership", de: "Identität und Zuordnung" },
+  atAGlance: { en: "Structure at a glance", de: "Aufbau im Überblick" },
+  inspectStructure: { en: "Inspect structure", de: "Struktur prüfen" },
+  technical: { en: "Technical identifiers", de: "Technische Kennungen" },
+  textVersions: { en: "Text versions", de: "Textfassungen" },
+  proposalSource: { en: "Source of the proposal", de: "Quelle des Vorschlags" },
+  evidenceHelp: {
+    en: "Supplementary documents remain separate from these submitted source details.",
+    de: "Ergänzende Dokumente bleiben von diesen eingereichten Quellenangaben getrennt.",
+  },
+  viewChanges: { en: "View changes", de: "Änderungen ansehen" },
+  viewEvidence: { en: "View evidence", de: "Belege ansehen" },
   hierarchy: {
     en: "Structure and reading display",
     de: "Struktur und Lesedarstellung",

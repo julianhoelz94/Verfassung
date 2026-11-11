@@ -13,6 +13,10 @@ import {
 import { requireAdminPage } from "../../../../lib/admin";
 import { toOutlineKindWrite } from "../../../../lib/outline";
 import { OutlineEditor } from "../OutlineEditor";
+import {
+  ConstitutionFacts,
+  ConstitutionIdentityLayout,
+} from "../ConstitutionIdentity";
 import { DocumentLinks } from "../../../editor/documents/DocumentLinks";
 import { requireSessionBearer } from "../../../../lib/session";
 import { structureUi } from "../../../../lib/structure-workspace";
@@ -68,19 +72,33 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
       title={match.constitution.title}
       context={<p>{match.country?.name}</p>}
       identity={
-        <>
-          <h3>{match.constitution.title}</h3>
-          <p>{match.country?.name}</p>
-          <p>
-            <T
-              value={
-                ui.attrs
-                  .adminConstitutionsConstitutionbasicsfieldsInputLabelCatalog
-              }
-            />
-            : {match.constitution.slug}
-          </p>
-        </>
+        <ConstitutionIdentityLayout>
+          <ConstitutionFacts
+            title={m.identity}
+            fields={[
+              { label: ui.remainingStatus.country, value: match.country?.name },
+              {
+                label: ui.remainingStatus.title,
+                value: match.constitution.title,
+              },
+            ]}
+            technical={<code>{match.constitution.slug}</code>}
+          />
+          <ConstitutionFacts
+            title={m.saved}
+            fields={[
+              {
+                label: m.textVersions,
+                value: (match.constitution.versions ?? []).length,
+              },
+            ]}
+            technical={<code>{settings.id}</code>}
+          >
+            <p className="muted">
+              <T value={m.settingsHelp} />
+            </p>
+          </ConstitutionFacts>
+        </ConstitutionIdentityLayout>
       }
       header={
         <PageHeader

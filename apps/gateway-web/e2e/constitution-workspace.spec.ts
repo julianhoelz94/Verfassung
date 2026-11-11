@@ -75,11 +75,13 @@ async function auditOwner(
         () => document.documentElement.scrollWidth <= innerWidth + 1,
       ),
     ).toBe(true);
-    // @ts-expect-error axe is injected into the real page
-    const violations = await page.evaluate(
-      async () => (await window.axe.run(document)).violations,
-    );
+    const violations = await page.evaluate(async () => {
+      // @ts-expect-error axe is injected into the real page
+      return (await window.axe.run(document)).violations;
+    });
     expect(violations, `${owner.name} ${locale} ${width} ${label}`).toEqual([]);
+    if (label === labels[0])
+      await auditIdentity(page, owner, width, locale, testInfo);
     if (label === labels[1]) {
       const field = page.getByRole("textbox", {
         name: de ? "Name in der Leseansicht" : "Reader-facing name",
@@ -106,6 +108,27 @@ async function auditOwner(
       });
     }
   }
+}
+
+async function auditIdentity(
+  page: Page,
+  owner: (typeof owners)[number],
+  width: number,
+  locale: string,
+  testInfo: TestInfo,
+) {
+  if (owner.name === "create") return;
+  await expect(
+    page.getByRole("button", {
+      name: locale === "de" ? "Struktur prüfen" : "Inspect structure",
+      exact: true,
+    }),
+  ).toBeVisible();
+  if (width === 1440)
+    await page.screenshot({
+      path: testInfo.outputPath(`${owner.name}-${locale}-${width}-details.png`),
+      fullPage: true,
+    });
 }
 
 test("document uploads retain their file and title while settings, history and overview change", async ({

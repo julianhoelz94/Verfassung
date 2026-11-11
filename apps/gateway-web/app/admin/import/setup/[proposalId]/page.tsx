@@ -4,11 +4,16 @@ import { T } from "../../../../components/TranslationProvider";
 import { ui } from "../../../../../lib/messages";
 import { notFound, redirect } from "next/navigation";
 import { AdminForbidden } from "../../../../components/AdminForbidden";
-import { Card, PageHeader } from "../../../../components/ui";
+import { PageHeader } from "../../../../components/ui";
 import { SetupProposalReview } from "../SetupProposalReview";
 import { currentUser, requireSessionBearer } from "../../../../../lib/session";
 import { getSetupProposal } from "../../../../../lib/ingestion-api";
 import { getJurisdiction } from "../../../../../lib/migration-api";
+import {
+  ConstitutionFacts,
+  ConstitutionIdentityLayout,
+} from "../../../constitutions/ConstitutionIdentity";
+import { constitutionWorkspaceUi as m } from "../../../../../lib/constitution-workspace-messages";
 import { migrationUi } from "../../../../../lib/migration-messages";
 
 type Props = {
@@ -66,51 +71,72 @@ export default async function SetupProposalPage({
       proposal={proposal}
       error={error}
       identity={
-        <Card>
-          <h2>
-            <T
-              value={ui.admin.import.setup.proposalid.page.sourceAndIdentity}
-            />
-          </h2>
-          <p>
-            {jurisdiction ? (
-              <>
-                <a href={`/jurisdictions/${jurisdiction.jurisdiction.id}`}>
-                  {jurisdiction.jurisdiction.name}
-                </a>
-                {jurisdiction.jurisdiction.historical ? (
+        <ConstitutionIdentityLayout>
+          <ConstitutionFacts
+            title={ui.admin.import.setup.proposalid.page.sourceAndIdentity}
+            fields={[
+              {
+                label: ui.remainingStatus.country,
+                value: jurisdiction ? (
                   <>
-                    {" "}
-                    · <T value={migrationUi.historical} />
+                    <a href={`/jurisdictions/${jurisdiction.jurisdiction.id}`}>
+                      {jurisdiction.jurisdiction.name}
+                    </a>
+                    {jurisdiction.jurisdiction.historical ? (
+                      <>
+                        {" "}
+                        · <T value={migrationUi.historical} />
+                      </>
+                    ) : null}
                   </>
-                ) : null}
-              </>
-            ) : (
-              <>
-                {String(payload.countryName ?? "")} (
-                {String(payload.isoCode ?? "")})
-              </>
-            )}{" "}
-            · {String(payload.constitutionTitle ?? "")}
-          </p>
-          <p>
-            <T value={ui.admin.import.setup.proposalid.page.slug} />{" "}
-            <code>{String(payload.constitutionSlug ?? "")}</code>{" "}
-            <T value={ui.admin.import.setup.proposalid.page.language} />{" "}
-            {String(payload.languageCode ?? "")}
-          </p>
-          <p>
-            <T value={ui.admin.import.setup.proposalid.page.source} />{" "}
-            {typeof payload.sourceUrl === "string" &&
-            payload.sourceUrl.startsWith("https://") ? (
-              <a href={payload.sourceUrl} rel="noreferrer" target="_blank">
-                {payload.sourceUrl}
-              </a>
-            ) : (
-              String(payload.gazetteReference || "")
-            )}
-          </p>
-        </Card>
+                ) : (
+                  <>
+                    {String(payload.countryName ?? "")} (
+                    {String(payload.isoCode ?? "")})
+                  </>
+                ),
+              },
+              {
+                label: ui.remainingStatus.title,
+                value: String(payload.constitutionTitle ?? ""),
+              },
+              {
+                label: ui.admin.import.setup.proposalid.page.language,
+                value: String(payload.languageCode ?? ""),
+              },
+            ]}
+            technical={<code>{String(payload.constitutionSlug ?? "")}</code>}
+          />
+          <ConstitutionFacts
+            title={m.proposalSource}
+            fields={[
+              {
+                label: ui.admin.import.setup.proposalid.page.source,
+                value:
+                  typeof payload.sourceUrl === "string" &&
+                  payload.sourceUrl.startsWith("https://") ? (
+                    <a
+                      href={payload.sourceUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {payload.sourceUrl}
+                    </a>
+                  ) : (
+                    String(payload.sourceUrl || payload.gazetteReference || "—")
+                  ),
+              },
+              ...(payload.sourceUrl && payload.gazetteReference
+                ? [
+                    {
+                      label: ui.admin.import.setup.proposalid.page.source,
+                      value: String(payload.gazetteReference),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </ConstitutionIdentityLayout>
       }
     />
   );

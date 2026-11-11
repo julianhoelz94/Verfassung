@@ -22,6 +22,7 @@ import {
   withoutExisting,
 } from "../../constitutions/outline-editor-model";
 import { constitutionWorkspaceUi as m } from "../../../../lib/constitution-workspace-messages";
+import { StructureOverview } from "../../constitutions/StructureOverview";
 import { constitutionTasks } from "../../constitutions/StructureWorkspaceFrame";
 import { ReaderIcon } from "../../../components/ReaderIcon";
 import { OutlineReaderPreview } from "../../constitutions/OutlineReaderPreview";
@@ -160,10 +161,33 @@ export function SetupProposalReview({
             />
             <StructurePanel id="identity" active={view}>
               <Stack gap="card">
+                {proposal.previousPayload ? (
+                  <div className={styles.actions}>
+                    <p>{t(ui.setupReview.revised)}</p>
+                    <Button type="button" onClick={() => setView("history")}>
+                      {t(m.viewChanges)}
+                      <ReaderIcon name="right" />
+                    </Button>
+                  </div>
+                ) : null}
                 {identity}
-                <p className="muted">
-                  {t(editable ? m.proposalHelp : m.proposalReadOnly)}
-                </p>
+                <p className="muted">{t(m.evidenceHelp)}</p>
+                <Button type="button" onClick={() => setView("documents")}>
+                  {t(m.viewEvidence)}
+                  <ReaderIcon name="right" />
+                </Button>
+                <StructureOverview
+                  layers={layers}
+                  onInspect={() => setView("structure")}
+                >
+                  {sample.length ? (
+                    <OutlineReaderPreview
+                      roots={sample}
+                      outline={setupOutline(kinds)}
+                      label={t(ui.setupReview.current)}
+                    />
+                  ) : null}
+                </StructureOverview>
               </Stack>
             </StructurePanel>
             <StructurePanel id="structure" active={view}>

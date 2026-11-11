@@ -25,3 +25,9 @@ Golden snapshots are maintained only with the repository's pinned Playwright 1.5
 | Import proposal | [1440px](proposal-de-1440.png) | [390px](proposal-de-390.png) |
 
 Local verification: 42 Node contract tests and 1,586 Vitest tests passed; typecheck, lint, production build and TypeScript complexity gate passed. The focused browser run passed all 24 journeys, including the 90-tab accessibility/reflow audit.
+
+The 15 affected golden images were reviewed from CI run [43011811871](https://github.com/julianhoelz94/Verfassung/actions/runs/43011811871), artifact `13850499412`, produced by `mcr.microsoft.com/playwright:v1.55.1-jammy` at commit `2e4cdf082cef226cb33e04a548e0489e4654b6c4`. Only `outlines-*`, `review-admin-constitutions-id-*` and `review-admin-import-setup-proposalId-*` baselines changed. All other pinned visual comparisons passed in that run. The subsequent Details additions keep the same initial screenshot views and receive the full bilingual tab audit.
+
+Details uses shared read-only fact groups, a projection of every allowed hierarchy path and an Inspect structure action. Setup proposals also show their literal submitted sample and a View evidence action; revised proposals link to their exact comparison. Saved settings display available version counts and revision identifiers from Catalog, without simulated draft counts.
+
+Details captures: [settings](settings-de-1440-details.png) · [setup proposal](proposal-de-1440-details.png). Additional local browser checks passed for the shared help/spacing, scoped import evidence and complete package approval/publication journeys. Correction reasons retain their values through Details → Structure → Review.

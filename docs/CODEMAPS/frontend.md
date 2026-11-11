@@ -98,7 +98,7 @@ redirects, JSON modes and trusted-origin guards.
 and Details / Structure / Documents / Review / History tabs for creation,
 settings and import setup review. `OutlineWorkspace` supplies hierarchy and
 selected-level editor/preview slots. `OutlineEditorPanels` provides
-creation/settings presentation. Routes supply headers/notices instead of nested
+creation/settings presentation; `ConstitutionIdentity` and `StructureOverview` share read-only facts and actual hierarchy paths. Routes supply headers/notices instead of nested
 page templates; `DocumentLinks` stays mounted outside native owner forms.
 `OutlineEditor.tsx` retains creation and Catalog impact/save commands and
 invalidates pending impact checks when their draft changes.

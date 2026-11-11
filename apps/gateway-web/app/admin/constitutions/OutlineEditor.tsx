@@ -15,6 +15,7 @@ import {
   StructurePanel,
 } from "./StructureWorkspaceTemplate";
 import { constitutionTasks } from "./StructureWorkspaceFrame";
+import { StructureOverview } from "./StructureOverview";
 import type {
   OutlineKindWrite,
   SettingsImpact,
@@ -292,15 +293,23 @@ export function OutlineEditor({
               value={JSON.stringify(withoutExisting(layers))}
             />
             <StructurePanel id="identity" active={view}>
-              <OutlineIdentityPanel
-                identity={identity}
-                title={title}
-                creation={guidedCreation}
-                existing={existing}
-                advance={advance}
-              >
-                {children}
-              </OutlineIdentityPanel>
+              <Stack gap="section">
+                <OutlineIdentityPanel
+                  identity={identity}
+                  title={title}
+                  creation={guidedCreation}
+                  existing={existing}
+                  advance={advance}
+                >
+                  {children}
+                </OutlineIdentityPanel>
+                {!guidedCreation ? (
+                  <StructureOverview
+                    layers={layers}
+                    onInspect={() => setView("structure")}
+                  />
+                ) : null}
+              </Stack>
             </StructurePanel>
             <StructurePanel id="structure" active={view}>
               <OutlineStructurePanel

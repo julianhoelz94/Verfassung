@@ -155,6 +155,9 @@ export function WikiCitationComposer({
                 documentId: link.documentId,
                 revision: link.document.revision.revision,
                 title: link.document.revision.title,
+                ...(link.citationNote
+                  ? { citationNote: link.citationNote }
+                  : {}),
               })
             }
           />

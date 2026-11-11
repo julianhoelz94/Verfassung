@@ -247,7 +247,12 @@ export function useWikiWorkspace(props: Inputs) {
         ...draft.citations.filter(
           (item) => item.documentId !== citation.documentId,
         ),
-        citation,
+        {
+          ...draft.citations.find(
+            (item) => item.documentId === citation.documentId,
+          ),
+          ...citation,
+        },
       ],
     });
     return true;
@@ -258,7 +263,7 @@ export function useWikiWorkspace(props: Inputs) {
       documentId: link.documentId,
       revision: link.document.revision.revision,
       title: link.document.revision.title,
-      ...(link.citationNote ? { citationNote: link.citationNote } : {}),
+      citationNote: link.citationNote || undefined,
     });
   }
   function removeSource(documentId: string) {

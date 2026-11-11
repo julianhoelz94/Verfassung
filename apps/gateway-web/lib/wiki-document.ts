@@ -1,6 +1,9 @@
 import type { DocumentReference } from "./document-reference";
 
-export type WikiInlineReference = DocumentReference & {
+export type WikiInlineReference = Pick<
+  DocumentReference,
+  "documentId" | "revision"
+> & {
   id: string;
   locator: string;
 };

@@ -20,7 +20,12 @@ const owner = {
   code: "DE",
 };
 const documentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-const citation = { documentId, revision: 2, title: "Archive report" };
+const citation = {
+  documentId,
+  revision: 2,
+  title: "Archive report",
+  citationNote: "Chapter 3",
+};
 const initial: WikiPageRevision = {
   id: "wiki-one",
   targetType: "country",
@@ -162,34 +167,30 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  save
-    .mockReset()
-    .mockImplementation(async (form: FormData) => ({
-      ok: true,
-      page: {
-        ...initial,
-        id: "wiki-two",
-        predecessorId: initial.id,
-        summary: form.get("summary"),
-        body: form.get("body"),
-        bodyDocument: JSON.parse(String(form.get("bodyDocument"))),
-        citations: [citation],
-        images: JSON.parse(String(form.get("images"))),
-        sourceUrls: [],
-      },
-    }));
-  publish
-    .mockReset()
-    .mockImplementation(async () => ({
-      ok: true,
-      page: {
-        ...(save.mock.results.at(-1)
-          ? (await save.mock.results.at(-1)!.value).page
-          : initial),
-        id: "wiki-two",
-        publishedAt: "2026-01-02T00:00:00Z",
-      },
-    }));
+  save.mockReset().mockImplementation(async (form: FormData) => ({
+    ok: true,
+    page: {
+      ...initial,
+      id: "wiki-two",
+      predecessorId: initial.id,
+      summary: form.get("summary"),
+      body: form.get("body"),
+      bodyDocument: JSON.parse(String(form.get("bodyDocument"))),
+      citations: [citation],
+      images: JSON.parse(String(form.get("images"))),
+      sourceUrls: [],
+    },
+  }));
+  publish.mockReset().mockImplementation(async () => ({
+    ok: true,
+    page: {
+      ...(save.mock.results.at(-1)
+        ? (await save.mock.results.at(-1)!.value).page
+        : initial),
+      id: "wiki-two",
+      publishedAt: "2026-01-02T00:00:00Z",
+    },
+  }));
   props = {
     owner,
     ownerName: "Germany",
@@ -310,8 +311,15 @@ describe("Wiki workspace", () => {
     await click("Bold");
     await click("Cite source");
     const dialog = getByRole(host, "dialog", { name: "Cite a source" });
+    await act(async () => dialog.querySelector(".citation-library")!.setAttribute("open", ""));
+    await click("Choose existing document", dialog);
+    const search = getByRole(dialog, "combobox", { name: "Search documents" });
+    await act(async () => { fireEvent.focus(search); fireEvent.change(search, { target: { value: "Archive" } }); });
+    await act(async () => fireEvent.keyDown(search, { key: "ArrowDown" }));
+    await act(async () => fireEvent.keyDown(search, { key: "Enter" }));
+    await act(async () => fireEvent.change(getByLabelText(dialog, "Note for this attachment"), { target: { value: "New source note" } }));
+    await click("Attach document", dialog);
     await act(async () => {
-      fireEvent.click(getByRole(dialog, "button", { name: /Archive report/ }));
       fireEvent.change(getByLabelText(dialog, "Page / passage (optional)"), {
         target: { value: "pp. 12–14" },
       });
@@ -339,6 +347,10 @@ describe("Wiki workspace", () => {
     ).toBe(`/documents/${documentId}?revision=2`);
     await click("Close", viewer);
     await click("Save draft");
+    expect(
+      JSON.parse(String(save.mock.calls[0][0].get("citations")))[0]
+        .citationNote,
+    ).toBe("New source note");
     expect(
       JSON.parse(String(save.mock.calls[0][0].get("bodyDocument"))).content[0]
         .content[1].attrs.reference,

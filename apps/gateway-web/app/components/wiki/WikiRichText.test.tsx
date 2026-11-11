@@ -16,7 +16,7 @@ const reference = {
   locator: "p. 42",
 };
 const citations = [
-  { documentId: reference.documentId, revision: 2, title: "Archival source" },
+  { documentId: reference.documentId, revision: 2, title: "Archival source", citationNote: "Original source note" },
 ];
 let host: HTMLDivElement, root: Root;
 beforeEach(() => {
@@ -162,6 +162,7 @@ it("shares inline numbering and supplementary bibliography in the final content 
   expect(host.querySelectorAll("ol li")).toHaveLength(1);
   expect(html).toContain("Additional source");
   expect(html).toContain("Chapter 1");
+  expect(html).toContain("Original source note");
   expect(html).toContain("Page sources");
   expect(html).not.toContain("Legacy");
 });

@@ -220,12 +220,14 @@ for (const viewport of [
 
       await workspace.getByRole('button', { name: 'Wiki', exact: true }).click();
       const wiki = workspace.locator('[data-editor-panel=wiki]');
-      await expect(workspace.getByRole('button', { name: 'Undo', exact: true }), 'Wiki must not show unrelated constitutional-text history controls').toHaveCount(0);
-      await expect(workspace.getByRole('button', { name: 'Redo', exact: true })).toHaveCount(0);
+      await expect(wiki.getByRole('button', { name: 'Undo', exact: true }), 'Wiki keeps its own writing history').toHaveCount(1);
+      await expect(workspace.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(1);
+      await expect(wiki.getByRole('button', { name: 'Redo', exact: true })).toHaveCount(1);
       await expect(wiki.getByLabel('Short description', { exact: true })).toBeVisible();
       await expect(wiki.getByLabel('Page text', { exact: true })).toBeVisible();
-      expect(await wiki.locator('#wiki-sources').evaluate(element => element.closest('details')!.open)).toBe(false);
-      expect(await wiki.locator('[name=newImages]').evaluate(element => element.closest('details')!.open)).toBe(false);
+      await expect(wiki.getByRole('tab', { name: 'Sources & media' })).toBeVisible();
+      await expect(wiki.locator('#wiki-sources')).toBeHidden();
+      await expect(wiki.getByRole('tab', { name: 'Content', exact: true })).toHaveAttribute('aria-selected', 'true');
       await expect(wiki.getByRole('button', { name: 'Save draft', exact: true })).toBeVisible();
       await noHorizontalOverflow(page); await screenshot(page, testInfo, `editor-${viewport.width}-wiki`);
       await workspace.getByRole('button', { name: 'Details', exact: true }).click();

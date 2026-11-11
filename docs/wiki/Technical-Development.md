@@ -271,3 +271,5 @@ Use `--base <revision>` in place of `--event` for a local aggregate. See the
 [Sprint 67 measurement policy](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/sprint-67-ci-code-coverage.md)
 for the original measurement scope; the specification test inventory defines the
 follow-up regression and overall-floor policy.
+
+Wiki rich-text storage, citation pins, retained draft behavior and shared viewer rules are documented in [`docs/design/wiki-editor-workspace.md`](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/wiki-editor-workspace.md). The same workspace serves country, jurisdiction and constitution Wikis.

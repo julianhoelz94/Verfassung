@@ -176,6 +176,35 @@ describe('contextual pages separate draft and publication', () => {
     expect(saves).toHaveLength(2);
     for (const save of saves) expect(save.body).toMatchObject({ images: [expect.objectContaining({ documentId: id, revision: 3 })] });
   });
+  it('resolves inline citations to canonical titles and pins the saved rich snapshot', async () => {
+    const reference = { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', documentId: id, revision: 2, locator: 'p. 42' };
+    const bodyDocument = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dignity', marks: [{ type: 'strong' }] }, { type: 'citation', attrs: { reference } }] }] };
+    const result = await wiki.saveWikiWorkspaceAction(wikiForm({ bodyDocument: JSON.stringify(bodyDocument), body: 'Untrusted mirror', citations: JSON.stringify([{ documentId: id, revision: 2, citationNote: 'Original note' }]), operationId: id }));
+    expect(result).toMatchObject({ ok: true, page: { id: 'wiki-r2' } });
+    const saved = requests.find(request => request.path.endsWith('/draft'))!;
+    expect(saved.body).toMatchObject({ body: 'Dignity', bodyDocument, citations: [{ documentId: id, revision: 2, title: 'Official source', citationNote: 'Original note' }], operationId: id });
+    expect(requests.at(-1)).toMatchObject({ path: `/api/document/links/constitution_wiki/${id}`, body: { revisionId: `${id}-r2`, scopeRevisionId: 'wiki-r2' } });
+  });
+  it('retains a saved operation for retry when the document relationship fails', async () => {
+    const previous = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => String(input).includes('/links/') ? json({ error: 'unavailable' }, 503) : previous(input, init));
+    const data = wikiForm({ operationId: id, citations: JSON.stringify([{ documentId: id, revision: 2 }]) });
+    expect(await wiki.saveWikiWorkspaceAction(data)).toEqual({ ok: false, error: 'documents' });
+    expect(requests.find(request => request.path.endsWith('/draft'))?.body).toMatchObject({ operationId: id });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+  it('rejects malformed rich documents and incompatible source pins before saving or uploading', async () => {
+    const reference = { id, documentId: id, revision: 2, locator: '' };
+    const bodyDocument = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'citation', attrs: { reference } }] }] };
+    const malformed = wikiForm({ bodyDocument: JSON.stringify({ type: 'script', text: 'bad' }) });
+    expect(await wiki.saveWikiWorkspaceAction(malformed)).toEqual({ ok: false, error: 'save' }); expect(requests).toEqual([]);
+    const conflict = wikiForm({ bodyDocument: JSON.stringify(bodyDocument), citations: JSON.stringify([{ documentId: id, revision: 3 }]) });
+    expect(await wiki.saveWikiWorkspaceAction(conflict)).toEqual({ ok: false, error: 'save' }); expect(requests).toEqual([]);
+    const replacement = wikiForm({ bodyDocument: JSON.stringify(bodyDocument), images: JSON.stringify([{ documentId: id, revision: 2, alt: 'Map' }]), operationId: id });
+    replacement.set(`replace-${id}`, new File(['pixels'], 'map.png', { type: 'image/png' }));
+    expect(await wiki.saveWikiWorkspaceAction(replacement)).toEqual({ ok: false, error: 'save' });
+    expect(requests.every(request => request.method === 'GET')).toBe(true);
+  });
   it('requires alternative text before creating a newly uploaded image', async () => {
     const data = wikiForm(); data.set('imageFile', new File(['pixels'], 'seal.png', { type: 'image/png' })); expect(await wiki.saveWikiAction(data)).toContain('error=1'); expect(requests).toEqual([]);
   });

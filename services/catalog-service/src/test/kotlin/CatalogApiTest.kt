@@ -80,6 +80,31 @@ class CatalogApiTest {
         .first { catalogRepository.findCountrySummary(it) == null }
 
     @Test
+    fun richWikiDocumentsPersistAcrossRetriesPublicationAndHistory() {
+        val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Rich Wiki"))
+        val mapper = JsonMapper.builder().build()
+        val sourceId = UUID.randomUUID()
+        val referenceId = UUID.randomUUID()
+        val document = mapper.readTree("""{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Dignity","marks":[{"type":"text_color","attrs":{"color":"#355a47"}}]},{"type":"citation","attrs":{"reference":{"id":"$referenceId","documentId":"$sourceId","revision":2,"locator":"p. 12"}}}]}]}""")
+        val citation = com.constitutionatlas.catalog.api.WikiCitation(sourceId, 2, "Pinned report")
+        val request = com.constitutionatlas.catalog.api.SaveWikiPage(summary = "Context", body = "Legacy mirror is derived by Catalog", citations = listOf(citation), operationId = UUID.randomUUID(), bodyDocument = document)
+        val first = wiki.save("country", country.id, request, editor.id)
+        assertThat(first.body).isEqualTo("Dignity")
+        assertThat(first.bodyDocument).isEqualTo(document)
+        assertThat(wiki.save("country", country.id, request, editor.id).id).isEqualTo(first.id)
+        assertThat(wiki.history("country", country.id)).hasSize(1)
+        assertThat(wiki.published("country", country.id)).isNull()
+        wiki.publish("country", country.id, first.id, PUBLISHER_TOKEN)
+        val nextDocument = mapper.readTree(document.toString().replace("#355a47", "#824b45").replace("p. 12", "p. 14"))
+        val next = wiki.save("country", country.id, request.copy(expectedRevisionId = first.id, operationId = UUID.randomUUID(), bodyDocument = nextDocument), editor.id)
+        assertThat(next.bodyDocument).isEqualTo(nextDocument)
+        assertThat(wiki.published("country", country.id)?.bodyDocument).isEqualTo(document)
+        assertThat(wiki.publishedRevision("country", country.id, first.id)?.bodyDocument).isEqualTo(document)
+        assertThat(wiki.history("country", country.id).map { it.bodyDocument }).containsExactly(nextDocument, document)
+        org.junit.jupiter.api.Assertions.assertThrows(com.constitutionatlas.catalog.ConflictException::class.java) { wiki.save("country", country.id, request.copy(operationId = UUID.randomUUID()), editor.id) }
+    }
+
+    @Test
     fun wikiDocumentCitationsRemainPinnedAndFailedPinSavesCanReplayTheSameDraft() {
         val country = writes.createCountry(com.constitutionatlas.catalog.api.CreateCountryRequest(uniqueCountryCode(), "Cited wiki"))
         val citation = com.constitutionatlas.catalog.api.WikiCitation(UUID.randomUUID(), 2, "Archive report", "Chapter 3")

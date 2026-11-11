@@ -19,7 +19,7 @@ test('country links open context editors before a wiki page exists and save a pr
   await expect(page.getByRole('heading', { name: 'Edit the background story', exact: true })).toBeVisible();
   await expect(page.getByLabel('Short description')).toHaveValue('');
   await page.getByLabel('Short description').fill(title);
-  await page.getByLabel('Page text').fill('Private context draft for the new constitution.');
+  await page.getByRole('textbox', { name: 'Page text', exact: true }).fill('Private context draft for the new constitution.');
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Draft saved.');
   const headers = await adminHeaders(request);

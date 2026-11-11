@@ -56,3 +56,21 @@ it('reuses the upload operation after a failed request and keeps required upload
   expect(operations[0]).toBeTruthy(); expect(operations[1]).toBe(operations[0]);
   expect(JSON.parse(String(new FormData(host.querySelector('form')!).get('documents')))).toMatchObject([{ documentId: doc.id, revision: 2 }]);
 });
+
+
+it('updates controlled source pins without remounting unfinished optional upload fields', async () => {
+  const onChange = vi.fn(), onDetach = vi.fn().mockReturnValue(false);
+  const render = (references: { documentId: string; revision: number }[]) => root.render(<StagedDocumentPicker references={references} onChange={onChange} onDetach={onDetach} />);
+  await act(async () => render([]));
+  await click('Upload new document');
+  await act(async () => fireEvent.change(getByLabelText(host, 'Title', { exact: true }), { target: { value: 'Unfinished upload' } }));
+  const optional = Array.from(host.querySelectorAll('summary')).find(element => element.textContent === 'Optional details')!;
+  await act(async () => { optional.parentElement!.setAttribute('open', ''); fireEvent.change(getByLabelText(host, 'Source URL'), { target: { value: 'https://example.org/retained' } }); });
+  await act(async () => render([{ documentId: doc.id, revision: 2 }]));
+  expect((getByLabelText(host, 'Title', { exact: true }) as HTMLInputElement).value).toBe('Unfinished upload');
+  expect((getByLabelText(host, 'Source URL') as HTMLInputElement).value).toBe('https://example.org/retained');
+  expect(optional.parentElement!.hasAttribute('open')).toBe(true);
+  expect(getByRole(host, 'link', { name: 'Official source' }).getAttribute('href')).toContain('revision=2');
+  await click('Detach: Official source'); expect(onChange).not.toHaveBeenCalled();
+  onDetach.mockReturnValue(true); await click('Detach: Official source'); expect(onChange).toHaveBeenCalledWith([]);
+});

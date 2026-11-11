@@ -1,2 +1,5 @@
 .article { max-width:900px;min-width:0;overflow-wrap:anywhere; }
 .article p,.article li { font:400 var(--text-base)/1.8 var(--font-text); }
+.article blockquote { margin:var(--space-4) 0;padding:4px 0 4px 18px;border-left:3px solid var(--color-line-strong);color:var(--color-ink-2); }
+.article :is(ul,ol) p { margin:0; }
+.sources { margin-top:var(--space-5); }

@@ -20,6 +20,7 @@ Pinned versions we actually use. Validate one consumer first, then the complete 
 | Frontend / MCP | Node | 22 LTS | CI, gateway and MCP Dockerfiles (`node:22-alpine`) |
 | Frontend | Next.js | 16.4.3 | `apps/gateway-web/package.json` |
 | Frontend | React / react-dom | 19.3.1 | `apps/gateway-web/package.json` |
+| Frontend | ProseMirror history / schema-list | 1.5.1 / 1.6.0 | Wiki rich text undo/redo and list commands; existing ProseMirror model/state/view pins retained |
 | Frontend | TypeScript | 5.5.4 | `apps/gateway-web/package.json`; compiler API compatibility retained |
 | MCP | TypeScript | 7.0.2 | Native CLI compiler in `services/mcp-server/package.json` |
 | Frontend / MCP | Node types | 22.20.5 | Matched to Node 22 runtime |

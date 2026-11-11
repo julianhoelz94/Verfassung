@@ -56,14 +56,16 @@ class WikiService(private val repo: WikiRepository, private val media: WikiMedia
             require(image.rights == null || image.rights.length <= 500) { "Image rights text is too long" }
             require(image.sourceUrl == null || image.sourceUrl.startsWith("https://") || image.sourceUrl.startsWith("http://")) { "Image source URL must be HTTP(S)" }
         }
+        val bodyDocument = request.bodyDocument?.takeUnless { it.isNull }
+        val body = WikiRichText.body(bodyDocument, request.citations) ?: request.body.trim()
         val pageId = repo.ensurePage(kind, targetId)
         repo.lockPage(pageId)
         val current = repo.latest(kind, targetId)
-        if (request.operationId != null && current?.id == request.operationId && current.publishedAt == null && current.createdBy == actorId && current.predecessorId == request.expectedRevisionId && current.summary == request.summary.trim() && current.body == request.body.trim() && current.images == request.images && current.citations == request.citations && current.sourceUrls == request.sourceUrls.distinct()) return current
+        if (request.operationId != null && current?.id == request.operationId && current.publishedAt == null && current.createdBy == actorId && current.predecessorId == request.expectedRevisionId && current.summary == request.summary.trim() && current.body == body && current.bodyDocument == bodyDocument && current.images == request.images && current.citations == request.citations && current.sourceUrls == request.sourceUrls.distinct()) return current
         if (current?.id != request.expectedRevisionId) {
             throw ConflictException("Wiki page changed; reload before saving", "wiki_revision_conflict")
         }
-        val id = repo.append(pageId, current?.id, request.summary.trim(), request.body.trim(), request.images, request.sourceUrls.distinct(), actorId, request.citations, request.operationId)
+        val id = repo.append(pageId, current?.id, request.summary.trim(), body, request.images, request.sourceUrls.distinct(), actorId, request.citations, request.operationId, bodyDocument)
         return repo.revision(kind, targetId, id)!!
     }
 

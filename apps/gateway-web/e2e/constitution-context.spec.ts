@@ -35,9 +35,9 @@ test('visitor reads sourced country and constitution context with dated lifecycl
 test('staff can review a structured wiki draft, picture, and revision history', async ({ page }) => {
   await signInAdmin(page);
   await page.goto('/editor/wiki/country/01900000-0000-4000-8000-000000000001?code=DE');
-  await expect(page.getByRole('heading', { name: 'Review draft' })).toBeVisible();
-  await expect(page.getByRole('listitem').filter({ hasText: /^First era$/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Edit the background story' })).toBeVisible();
+  await expect(page.locator('#wiki-preview').getByRole('listitem').filter({ hasText: /^First era$/ })).toBeVisible();
   await expect(page.getByRole('img', { name: 'A historic flag' }).first()).toBeVisible();
-  await page.getByText('Page revision history', { exact: true }).click();
-  await expect(page.getByText(/2022-01-01 · Published/)).toBeVisible();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: 'History' })).toContainText('Published page');
 });

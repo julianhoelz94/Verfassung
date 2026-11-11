@@ -19,7 +19,9 @@ export const constitutionWorkspaceUi = {
   atAGlance: { en: "Structure at a glance", de: "Aufbau im Überblick" },
   inspectStructure: { en: "Inspect structure", de: "Struktur prüfen" },
   technical: { en: "Technical identifiers", de: "Technische Kennungen" },
-  textVersions: { en: "Text versions", de: "Textfassungen" },
+  textVersions: { en: "Text versions", de: "Textversionen" },
+  language: { en: "Language", de: "Sprache" },
+  source: { en: "Source", de: "Quelle" },
   proposalSource: { en: "Source of the proposal", de: "Quelle des Vorschlags" },
   evidenceHelp: {
     en: "Supplementary documents remain separate from these submitted source details.",

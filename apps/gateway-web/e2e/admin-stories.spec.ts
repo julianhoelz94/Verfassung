@@ -314,7 +314,7 @@ test('administrator previews a structure proposal uploaded as a JSON file', asyn
   await page.getByRole('button', { name: 'Preview proposed structure' }).click();
   await expect(page).toHaveURL(/\/admin\/import\/setup\/[^/?]+$/);
   await page.getByRole('tab', { name: 'Details', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Source and identity' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Identity and ownership' })).toBeVisible();
   await expect(page.locator('#structure-panel-identity dl').getByText('Germany (DE)', { exact: true })).toBeVisible();
   await expect(page.locator('#structure-panel-identity dl').getByText('Uploaded structure proposal', { exact: true })).toBeVisible();
 });

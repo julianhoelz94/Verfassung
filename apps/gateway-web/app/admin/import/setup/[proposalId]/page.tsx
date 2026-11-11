@@ -73,7 +73,7 @@ export default async function SetupProposalPage({
       identity={
         <ConstitutionIdentityLayout>
           <ConstitutionFacts
-            title={ui.admin.import.setup.proposalid.page.sourceAndIdentity}
+            title={m.identity}
             fields={[
               {
                 label: ui.remainingStatus.country,
@@ -101,7 +101,7 @@ export default async function SetupProposalPage({
                 value: String(payload.constitutionTitle ?? ""),
               },
               {
-                label: ui.admin.import.setup.proposalid.page.language,
+                label: m.language,
                 value: String(payload.languageCode ?? ""),
               },
             ]}
@@ -111,7 +111,7 @@ export default async function SetupProposalPage({
             title={m.proposalSource}
             fields={[
               {
-                label: ui.admin.import.setup.proposalid.page.source,
+                label: m.source,
                 value:
                   typeof payload.sourceUrl === "string" &&
                   payload.sourceUrl.startsWith("https://") ? (
@@ -129,7 +129,7 @@ export default async function SetupProposalPage({
               ...(payload.sourceUrl && payload.gazetteReference
                 ? [
                     {
-                      label: ui.admin.import.setup.proposalid.page.source,
+                      label: m.source,
                       value: String(payload.gazetteReference),
                     },
                   ]

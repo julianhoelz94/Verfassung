@@ -1,0 +1,48 @@
+{
+  "environment": "Current application build served locally with synthetic API fixtures. No live application data.",
+  "language": "de-DE",
+  "records": [
+    {
+      "mode": "create",
+      "width": 1440,
+      "path": "/admin/constitutions",
+      "heading": "Verfassungen",
+      "screenshot": "create-de-1440.png"
+    },
+    {
+      "mode": "create",
+      "width": 390,
+      "path": "/admin/constitutions",
+      "heading": "Verfassungen",
+      "screenshot": "create-de-390.png"
+    },
+    {
+      "mode": "settings",
+      "width": 1440,
+      "path": "/admin/constitutions/01900000-0000-4000-8000-000000000002",
+      "heading": "Basic Law for the Federal Republic of Germany",
+      "screenshot": "settings-de-1440.png"
+    },
+    {
+      "mode": "settings",
+      "width": 390,
+      "path": "/admin/constitutions/01900000-0000-4000-8000-000000000002",
+      "heading": "Basic Law for the Federal Republic of Germany",
+      "screenshot": "settings-de-390.png"
+    },
+    {
+      "mode": "proposal",
+      "width": 1440,
+      "path": "/admin/import/setup/01900000-0000-4000-8000-000000000802",
+      "heading": "Verfassungsvorschlag prüfen",
+      "screenshot": "proposal-de-1440.png"
+    },
+    {
+      "mode": "proposal",
+      "width": 390,
+      "path": "/admin/import/setup/01900000-0000-4000-8000-000000000802",
+      "heading": "Verfassungsvorschlag prüfen",
+      "screenshot": "proposal-de-390.png"
+    }
+  ]
+}

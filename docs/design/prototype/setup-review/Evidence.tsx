@@ -1,4 +1,12 @@
-import { useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { DocumentAttachmentTemplate } from "../../../../apps/gateway-web/app/components/documents/DocumentAttachmentTemplate";
 import { useTranslation } from "../../../../apps/gateway-web/app/components/TranslationProvider";
 import type {
@@ -17,18 +25,39 @@ function pin(record: DocumentRecord, note: string): DocumentLink {
     document: record,
   };
 }
+const Library = createContext<{
+  library: DocumentRecord[];
+  setLibrary: Dispatch<SetStateAction<DocumentRecord[]>>;
+} | null>(null);
+export function EvidenceLibrary({ children }: { children: ReactNode }) {
+  const [library, setLibrary] = useState(initial);
+  return (
+    <Library.Provider value={{ library, setLibrary }}>
+      {children}
+    </Library.Provider>
+  );
+}
 export function Evidence({
   onInspect,
+  context,
 }: {
   onInspect: (document: DocumentRecord) => void;
+  context: "constitution" | "setup_proposal";
 }) {
   const t = useTranslation(),
     copy = (en: string, de: string) => t({ en, de });
-  const [library, setLibrary] = useState(initial),
-    [page, setPage] = useState(initial),
-    [links, setLinks] = useState<DocumentLink[]>([
-      pin(initial[0], "S. 1 · Titel, Verkündung und ursprüngliche Gliederung."),
-    ]);
+  const shared = useContext(Library);
+  if (!shared) throw new Error("Evidence must use the shared mock library");
+  const { library, setLibrary } = shared;
+  const [query, setQuery] = useState("");
+  const page = library.filter((record) =>
+    `${record.revision.title} ${record.citationKey}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
+  const [links, setLinks] = useState<DocumentLink[]>([
+    pin(initial[0], "S. 1 · Titel, Verkündung und ursprüngliche Gliederung."),
+  ]);
   const [revisions, setRevisions] = useState<
     Record<string, DocumentRevision[]>
   >({});
@@ -39,13 +68,7 @@ export function Evidence({
     const sequence = ++searchSequence.current;
     await Promise.resolve();
     if (sequence !== searchSequence.current) return false;
-    setPage(
-      library.filter((record) =>
-        `${record.revision.title} ${record.citationKey}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ),
-    );
+    setQuery(query);
     return true;
   }
   async function attach(id: string, revisionId: string) {
@@ -57,8 +80,8 @@ export function Evidence({
     setLinks((current) => [...current, pin({ ...record, revision }, note)]);
     setNotice(
       copy(
-        "Document linked to this proposal. The cited revision is fixed.",
-        "Dokument mit diesem Vorschlag verknüpft. Die zitierte Revision bleibt fest.",
+        "Document linked in this context. The cited revision is fixed.",
+        "Dokument in diesem Kontext verknüpft. Die zitierte Revision bleibt fest.",
       ),
     );
     setNote("");
@@ -97,9 +120,14 @@ export function Evidence({
             )}
           </summary>
           <label>
-            {copy("Note for this proposal", "Notiz zu diesem Vorschlag")}
+            {context === "setup_proposal"
+              ? copy("Note for this proposal", "Notiz zu diesem Vorschlag")
+              : copy(
+                  "Note for this constitution",
+                  "Notiz zu dieser Verfassung",
+                )}
             <textarea
-              form={`setup-note-${mode}`}
+              form={`setup-note-${context}-${mode}`}
               rows={3}
               value={note}
               onChange={(event) => setNote(event.target.value)}
@@ -107,8 +135,8 @@ export function Evidence({
           </label>
           <p className={styles.muted}>
             {copy(
-              "This note belongs to the proposal, not the shared library record.",
-              "Diese Notiz gehört zum Vorschlag, nicht zum gemeinsamen Bibliothekseintrag.",
+              "This note belongs to this attachment, not the shared library record.",
+              "Diese Notiz gehört zu dieser Verknüpfung, nicht zum gemeinsamen Bibliothekseintrag.",
             )}
           </p>
         </details>
@@ -136,7 +164,6 @@ export function Evidence({
           String(data.get("bibliography") || "{}"),
         );
         setLibrary((current) => [...current, record]);
-        setPage((current) => [...current, record]);
         setLinks((current) => [...current, pin(record, note)]);
         setNote("");
         setNotice(

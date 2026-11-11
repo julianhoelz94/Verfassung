@@ -11,10 +11,11 @@ import {
   useTranslation,
 } from "../../../../apps/gateway-web/app/components/TranslationProvider";
 import { SiteHeader } from "../../../../apps/gateway-web/app/components/SiteHeader";
+import { ReaderIcon } from "../../../../apps/gateway-web/app/components/ReaderIcon";
 import {
-  ReaderIcon,
-  type ReaderIconName,
-} from "../../../../apps/gateway-web/app/components/ReaderIcon";
+  ReaderMenu,
+  type ReaderMenuItem,
+} from "../../../../apps/gateway-web/app/components/ReaderMenu";
 import {
   FullWidthPage,
   PageChromeSurface,
@@ -29,9 +30,7 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   PageHeader,
-  TextArea,
 } from "../../../../apps/gateway-web/app/components/ui";
 import {
   Inline,
@@ -41,62 +40,149 @@ import {
   OutlineLayerEditor,
   type LayerSection,
 } from "../../../../apps/gateway-web/app/admin/constitutions/OutlineLayerEditor";
-import { StructurePreview } from "../../../../apps/gateway-web/app/admin/constitutions/StructureWorkspaceTemplate";
 import {
-  explicitLayers,
+  StructurePreview,
+  StructureTemplates,
+} from "../../../../apps/gateway-web/app/admin/constitutions/StructureWorkspaceTemplate";
+import {
   outlineBranches,
   updateOutlineLayers,
+  placeOutlineLayer,
+  removeOutlineLayer,
+  outlineValidationError,
   type OutlineBranch,
+  type OutlineLayer,
+  explicitLayers,
 } from "../../../../apps/gateway-web/app/admin/constitutions/outline-editor-model";
+import {
+  outlineFromTemplate,
+  type ConstitutionTemplate,
+} from "../../../../apps/gateway-web/lib/constitution-templates";
 import { OutlineReaderPreview } from "../../../../apps/gateway-web/app/admin/constitutions/OutlineReaderPreview";
 import { setupOutline } from "../../../../apps/gateway-web/lib/setup-review";
 import { structureUi } from "../../../../apps/gateway-web/lib/structure-workspace";
 import type { DocumentRecord } from "../../../../apps/gateway-web/lib/document-api";
-import { Evidence } from "./Evidence";
-import { kinds, sampleRoots, title } from "./sample";
+import type { SettingsImpact } from "../../../../apps/gateway-web/lib/api";
+import { Evidence, EvidenceLibrary } from "./Evidence";
+import { sampleRoots, title } from "./sample";
+import { Before } from "./Before";
+import { CreationDetails, emptyBasics } from "./CreationDetails";
+import { Identity, Review, History } from "./WorkflowPanels";
+import {
+  pages,
+  views,
+  workflows,
+  initialLayers,
+  structureProjection,
+  useWorkflowState,
+  type Workflow,
+  type View,
+  type ProposalState,
+} from "./workflows";
 import "../../../../apps/gateway-web/app/styles/tokens.css";
 import "../../../../apps/gateway-web/app/globals.css";
 import styles from "./preview.module.css";
 
-type View = "proposal" | "structure" | "documents" | "review" | "history";
-type State =
-  | "proposed"
-  | "requested"
-  | "confirming"
-  | "confirmed"
-  | "withdrawn";
-const views: { id: View; en: string; de: string; icon: ReaderIconName }[] = [
-  { id: "proposal", en: "Proposal", de: "Vorschlag", icon: "details" },
-  { id: "structure", en: "Structure", de: "Struktur", icon: "settings" },
-  { id: "documents", en: "Documents", de: "Dokumente", icon: "link" },
-  { id: "review", en: "Review", de: "Prüfung", icon: "check" },
-  { id: "history", en: "History", de: "Verlauf", icon: "history" },
-];
-
 function Preview() {
+  const query = new URLSearchParams(location.search);
   const [locale, setLocale] = useState<"de" | "en">(
-    new URLSearchParams(location.search).get("lang") === "en" ? "en" : "de",
+    query.get("lang") === "en" ? "en" : "de",
   );
-  const [state, setState] = useState<State>("proposed");
+  const [workflow, setWorkflow] = useState<Workflow>(
+    workflows.includes(query.get("page") as Workflow)
+      ? (query.get("page") as Workflow)
+      : "create",
+  );
+  const [comparison, setComparison] = useState<"before" | "mock">(
+    query.get("view") === "before" ? "before" : "mock",
+  );
+  const [state, setState] = useState<ProposalState>("proposed");
+  const copy = (en: string, de: string) => (locale === "en" ? en : de);
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
-  const copy = (en: string, de: string) => (locale === "en" ? en : de);
+  function open(workflow: Workflow) {
+    setWorkflow(workflow);
+    const url = new URL(location.href);
+    url.searchParams.set("page", workflow);
+    history.replaceState(null, "", url);
+    dispatchEvent(new Event("preview-navigation"));
+    scrollTo(0, 0);
+  }
   return (
     <TranslationProvider locale={locale}>
       <div className={styles.demo}>
         <span>
           {copy(
-            "Interactive design mock · Sample data",
-            "Interaktiver Entwurf · Beispieldaten",
+            "Shared constitution workspace · Interactive mock",
+            "Gemeinsamer Verfassungseditor · Interaktiver Entwurf",
           )}
         </span>
         <div>
-          <label className={styles.statePicker}>
+          <label className={styles.language}>
+            <span className="visually-hidden">
+              {copy("Preview language", "Vorschausprache")}
+            </span>
+            <select
+              value={locale}
+              onChange={(event) => setLocale(event.target.value as "de" | "en")}
+            >
+              <option value="de">Deutsch</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <button type="button" onClick={() => location.reload()}>
+            {copy("Reset", "Zurücksetzen")}
+          </button>
+        </div>
+      </div>
+      <div className={styles.comparisonControls}>
+        <div
+          className={styles.pagePicker}
+          role="group"
+          aria-label={copy("Page", "Seite")}
+        >
+          {workflows.map((mode) => (
+            <button
+              type="button"
+              key={mode}
+              aria-pressed={workflow === mode}
+              onClick={() => open(mode)}
+            >
+              {copy(pages[mode].name.en, pages[mode].name.de)}
+            </button>
+          ))}
+        </div>
+        <div
+          className={styles.comparisonPicker}
+          role="group"
+          aria-label={copy("Before and mock", "Vorher und Entwurf")}
+        >
+          <button
+            type="button"
+            aria-pressed={comparison === "before"}
+            onClick={() => setComparison("before")}
+          >
+            {copy("Before", "Vorher")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={comparison === "mock"}
+            onClick={() => setComparison("mock")}
+          >
+            {copy("Mock", "Entwurf")}
+          </button>
+        </div>
+      </div>
+      {workflow === "proposal" && comparison === "mock" ? (
+        <div className={styles.proposalDemo}>
+          <label>
             {copy("Example state", "Beispielzustand")}
             <select
               value={state}
-              onChange={(event) => setState(event.target.value as State)}
+              onChange={(event) =>
+                setState(event.target.value as ProposalState)
+              }
             >
               <option value="proposed">
                 {copy("Ready for review", "Bereit zur Prüfung")}
@@ -115,77 +201,173 @@ function Preview() {
               </option>
             </select>
           </label>
-          <label className={styles.language}>
-            <span className="visually-hidden">
-              {copy("Preview language", "Vorschausprache")}
-            </span>
-            <select
-              value={locale}
-              onChange={(event) => {
-                const next = event.target.value as "de" | "en";
-                setLocale(next);
-                document.documentElement.lang = next;
-              }}
-            >
-              <option value="de">Deutsch</option>
-              <option value="en">English</option>
-            </select>
-          </label>
-          <button type="button" onClick={() => location.reload()}>
-            {copy("Reset", "Zurücksetzen")}
-          </button>
         </div>
+      ) : null}
+      {comparison === "before" ? <Before workflow={workflow} /> : null}
+      <div hidden={comparison !== "mock"}>
+        <EvidenceLibrary>
+          <SharedWorkspace
+            workflow={workflow}
+            open={open}
+            state={state}
+            setState={setState}
+          />
+        </EvidenceLibrary>
       </div>
-      <Workspace state={state} setState={setState} />
     </TranslationProvider>
   );
 }
 
-function Workspace({
+/** One shell and editor serve creation, saved settings and import proposal review. */
+function SharedWorkspace({
+  workflow,
+  open,
   state,
   setState,
 }: {
-  state: State;
-  setState: (value: State) => void;
+  workflow: Workflow;
+  open: (workflow: Workflow) => void;
+  state: ProposalState;
+  setState: (state: ProposalState) => void;
 }) {
   const t = useTranslation(),
     copy = (en: string, de: string) => t({ en, de });
-  const [view, setView] = useState<View>("proposal"),
-    [expanded, setExpanded] = useState(() => innerWidth > 680);
-  const [layers, setLayers] = useState(() => explicitLayers(kinds, true)),
-    [selected, setSelected] = useState(1),
-    [section, setSection] = useState<LayerSection>("display");
+  const [view, setView] = useWorkflowState<View>(workflow, (key) =>
+    key === "settings" ? "structure" : "identity",
+  );
+  const [layers, setLayers] = useWorkflowState<OutlineLayer[]>(
+    workflow,
+    initialLayers,
+  );
+  const [baseline, setBaseline] = useWorkflowState<OutlineLayer[]>(
+    workflow,
+    initialLayers,
+  );
+  const [selected, setSelected] = useWorkflowState(workflow, () => 1);
+  const [section, setSection] = useWorkflowState<LayerSection>(
+    workflow,
+    () => "display",
+  );
+  const [notice, setNotice] = useWorkflowState(workflow, () => "");
+  const [saved, setSaved] = useWorkflowState(workflow, () => false);
+  const [revision, setRevision] = useWorkflowState<number>(workflow, (key) =>
+    key === "settings" ? 3 : 2,
+  );
+  const [impact, setImpact] = useWorkflowState<SettingsImpact | null>(
+    workflow,
+    () => null,
+  );
+  const [created, setCreated] = useState(false),
+    [basics, setBasics] = useState(emptyBasics);
   const [reason, setReason] = useState(""),
-    [recordedReason, setRecordedReason] = useState(""),
-    [notice, setNotice] = useState(""),
-    [saved, setSaved] = useState(false);
+    [recordedReason, setRecordedReason] = useState("");
+  const [expanded, setExpanded] = useState(() => innerWidth > 680),
+    [templates, setTemplates] = useWorkflowState(workflow, () => false),
+    [template, setTemplate] = useWorkflowState<ConstitutionTemplate>(
+      workflow,
+      () => "articles",
+    );
   const [inspected, setInspected] = useState<DocumentRecord | null>(null),
     [outside, setOutside] = useState("");
+  const [levelMenu, setLevelMenu] = useState<{
+    index: number;
+    parent: number | null;
+    x: number;
+    y: number;
+    origin: HTMLElement;
+  } | null>(null);
   const root = useRef<HTMLDivElement>(null),
     menu = useRef<HTMLDivElement>(null),
     navigation = useRef<HTMLElement>(null),
     withdrawal = useRef<HTMLDialogElement>(null);
   usePageChromeMetrics(root, menu, navigation);
-  const editable = state === "proposed" || state === "requested";
-  const label =
-    state === "confirmed"
-      ? copy("Confirmed", "Bestätigt")
-      : state === "confirming"
-        ? copy("Confirmation interrupted", "Bestätigung unterbrochen")
-        : state === "requested"
-          ? copy("Changes requested", "Änderungen angefordert")
-          : state === "withdrawn"
-            ? copy("Withdrawn", "Zurückgezogen")
-            : copy("Ready for review", "Bereit zur Prüfung");
-  const statusTone =
-    state === "confirmed"
-      ? "added"
-      : state === "requested" || state === "confirming"
-        ? "changed"
-        : "info";
+  useEffect(() => setLevelMenu(null), [workflow]);
+  const layerIndex = Math.min(selected, layers.length - 1),
+    layer = layers[layerIndex];
+  const structural =
+    workflow !== "proposal" && !(workflow === "create" && created);
+  const display =
+    workflow === "proposal"
+      ? state === "proposed" || state === "requested"
+      : !(workflow === "create" && created);
+  const dirty = JSON.stringify(layers) !== JSON.stringify(baseline);
+  const validationMessage = outlineValidationError(layers),
+    validation = validationMessage ? t(validationMessage) : null;
+  const ownerTitle =
+    workflow === "create"
+      ? basics.title || copy("New constitution", "Neue Verfassung")
+      : title;
+  const status =
+    workflow === "create"
+      ? created
+        ? copy("Created in mock", "Im Entwurf angelegt")
+        : copy("Draft", "Entwurf")
+      : workflow === "settings"
+        ? dirty
+          ? copy("Unsaved changes", "Ungespeicherte Änderungen")
+          : copy("Saved settings", "Gespeicherte Einstellungen")
+        : state === "confirmed"
+          ? copy("Confirmed", "Bestätigt")
+          : state === "requested"
+            ? copy("Changes requested", "Änderungen angefordert")
+            : state === "confirming"
+              ? copy("Confirmation interrupted", "Bestätigung unterbrochen")
+              : state === "withdrawn"
+                ? copy("Withdrawn", "Zurückgezogen")
+                : copy("Ready for review", "Bereit zur Prüfung");
   function choose(next: View) {
+    if (workflow === "create" && next === "review" && !created) {
+      const form = document.getElementById(
+        "create-constitution-details",
+      ) as HTMLFormElement | null;
+      if (!form?.checkValidity()) {
+        setView("identity");
+        requestAnimationFrame(() => form?.reportValidity());
+        return;
+      }
+    }
     setView(next);
     setNotice("");
+  }
+  function change(next: OutlineLayer[]) {
+    setLayers(next);
+    setImpact(null);
+    setSaved(false);
+    setNotice("");
+  }
+  function checkImpact() {
+    if (validation) {
+      choose("structure");
+      setNotice(validation);
+      return;
+    }
+    const structuralChange =
+      structureProjection(layers) !== structureProjection(baseline);
+    setImpact({
+      currentRevisionId: `settings-${revision}`,
+      classification: structuralChange ? "migration_required" : "display_only",
+      affectedVersionIds: ["version-1949", "version-2022"],
+      affectedDraftSessionIds: ["draft-example"],
+      violations: [],
+      reasons: structuralChange
+        ? [
+            copy(
+              "The proposed structure differs from the structure pinned by existing text. A reviewed migration is needed.",
+              "Der vorgeschlagene Aufbau weicht von der im vorhandenen Text festgelegten Struktur ab. Eine geprüfte Migration ist erforderlich.",
+            ),
+          ]
+        : [
+            copy(
+              "The example display change can be saved without changing historical structure pins.",
+              "Die beispielhafte Darstellungsänderung lässt sich ohne Änderung historischer Strukturbezüge speichern.",
+            ),
+          ],
+    });
+    setView("review");
+  }
+  function primary() {
+    if (workflow === "settings") checkImpact();
+    else choose("review");
   }
   function requestChanges() {
     choose("review");
@@ -213,38 +395,111 @@ function Workspace({
       <ul className={styles.tree}>
         {branches.map((branch) => (
           <li key={branch.path}>
-            <button
-              type="button"
-              aria-current={selected === branch.index ? "true" : undefined}
-              onClick={() => {
-                setSelected(branch.index);
-                choose("structure");
-              }}
-            >
-              <span>{layers[branch.index].displayLabel}</span>
-              <small>
-                {copy(
-                  branch.children.length
-                    ? "Contains child units"
-                    : "Contains text",
-                  branch.children.length
-                    ? "Enthält Untereinheiten"
-                    : "Enthält Text",
-                )}
-              </small>
-            </button>
+            <div className={styles.hierarchyRow}>
+              <button
+                type="button"
+                aria-current={layerIndex === branch.index ? "true" : undefined}
+                onClick={() => {
+                  setSelected(branch.index);
+                  choose("structure");
+                }}
+              >
+                <span>{layers[branch.index].displayLabel}</span>
+                <small>
+                  {copy(
+                    branch.children.length
+                      ? "Contains child units"
+                      : "Contains text",
+                    branch.children.length
+                      ? "Enthält Untereinheiten"
+                      : "Enthält Text",
+                  )}
+                </small>
+              </button>
+              <button
+                type="button"
+                className={styles.levelMenu}
+                aria-label={`${copy("Actions for", "Aktionen für")} ${layers[branch.index].displayLabel}`}
+                onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect();
+                  setSelected(branch.index);
+                  setLevelMenu({
+                    index: branch.index,
+                    parent: branch.parent,
+                    x: box.left,
+                    y: box.bottom,
+                    origin: event.currentTarget,
+                  });
+                }}
+              >
+                ⋯
+              </button>
+            </div>
             {branch.children.length ? hierarchy(branch.children) : null}
           </li>
         ))}
       </ul>
     );
   }
-  const actions = (
-    <Inline>
-      <Badge tone={statusTone}>{label}</Badge>
-      <span className={styles.revision}>{copy("Revision", "Revision")} 2</span>
-    </Inline>
-  );
+  const menuItems: ReaderMenuItem[] = levelMenu
+    ? [
+        {
+          id: "display",
+          label: copy("Edit display", "Darstellung bearbeiten"),
+          onSelect: () => {
+            setSection("display");
+            choose("structure");
+            setLevelMenu(null);
+          },
+        },
+        ...(structural
+          ? [
+              {
+                id: "child",
+                label: copy("Add child level", "Unterebene hinzufügen"),
+                onSelect: () => {
+                  change(
+                    placeOutlineLayer(
+                      layers,
+                      copy("New level", "Neue Ebene"),
+                      "child",
+                      levelMenu.index,
+                      levelMenu.parent,
+                    ),
+                  );
+                  setSelected(layers.length);
+                  setView("structure");
+                  setLevelMenu(null);
+                },
+              },
+              {
+                id: "remove",
+                label: copy("Remove level", "Ebene entfernen"),
+                onSelect: () => {
+                  change(removeOutlineLayer(layers, levelMenu.index));
+                  setSelected(Math.max(0, levelMenu.index - 1));
+                  setView("structure");
+                  setLevelMenu(null);
+                },
+              },
+            ]
+          : workflow === "proposal" && display
+            ? [
+                {
+                  id: "request",
+                  label: copy(
+                    "Request structural changes",
+                    "Strukturänderung anfordern",
+                  ),
+                  onSelect: () => {
+                    setLevelMenu(null);
+                    requestChanges();
+                  },
+                },
+              ]
+            : []),
+      ]
+    : [];
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -265,43 +520,41 @@ function Workspace({
           setOutside(copy("Search", "Suche"));
         }}
       >
-        <SiteHeader
-          user={{ email: "editor@example.test", roles: ["editor"] }}
-        />
+        <SiteHeader user={{ email: "admin@example.test", roles: ["admin"] }} />
       </div>
       <FullWidthPage template="workspace">
         <PageChromeSurface ref={root} className={styles.surface}>
           <div className={styles.header}>
             <PageHeader
               separator={false}
-              title={copy(
-                "Review constitution setup",
-                "Verfassungseinrichtung prüfen",
-              )}
+              title={t(pages[workflow].title)}
               breadcrumbs={[
-                { href: "#proposal", label: copy("Imports", "Importe") },
-                { label: copy("Constitution setup", "Verfassungseinrichtung") },
+                {
+                  href: "#",
+                  label:
+                    workflow === "proposal"
+                      ? copy("Imports", "Importe")
+                      : copy("Constitutions", "Verfassungen"),
+                },
+                { label: t(pages[workflow].name) },
               ]}
-              meta={copy(
-                "Check the proposed identity and structure before creating the constitution.",
-                "Prüfen Sie Identität und Aufbau, bevor die Verfassung angelegt wird.",
-              )}
+              meta={t(pages[workflow].description)}
             />
           </div>
           <PageMenuFrame ref={menu}>
             <PageMenuBar
               compact
-              label={copy("Constitution setup", "Verfassungseinrichtung")}
+              label={copy("Constitution workspace", "Verfassungseditor")}
               role="toolbar"
             >
               <button
                 type="button"
                 className={styles.tool}
-                title={copy(
+                aria-label={copy(
                   expanded ? "Hide overview" : "Show overview",
                   expanded ? "Übersicht ausblenden" : "Übersicht einblenden",
                 )}
-                aria-label={copy(
+                title={copy(
                   expanded ? "Hide overview" : "Show overview",
                   expanded ? "Übersicht ausblenden" : "Übersicht einblenden",
                 )}
@@ -318,20 +571,17 @@ function Workspace({
               <div
                 className={styles.tabs}
                 role="tablist"
-                aria-label={copy(
-                  "Constitution setup views",
-                  "Ansichten der Verfassungseinrichtung",
-                )}
+                aria-label={copy("Workspace views", "Ansichten des Editors")}
               >
                 {views.map((tab, index) => (
                   <button
-                    key={tab.id}
                     type="button"
+                    key={tab.id}
                     role="tab"
                     id={`setup-tab-${tab.id}`}
                     aria-controls={`setup-panel-${tab.id}`}
-                    aria-label={copy(tab.en, tab.de)}
-                    title={copy(tab.en, tab.de)}
+                    aria-label={t(tab.label)}
+                    title={t(tab.label)}
                     aria-selected={view === tab.id}
                     tabIndex={view === tab.id ? 0 : -1}
                     className={styles.tool}
@@ -339,9 +589,7 @@ function Workspace({
                     onKeyDown={(event) => keyboard(event, index)}
                   >
                     <ReaderIcon name={tab.icon} />
-                    <span className={styles.toolLabel}>
-                      {copy(tab.en, tab.de)}
-                    </span>
+                    <span className={styles.toolLabel}>{t(tab.label)}</span>
                   </button>
                 ))}
               </div>
@@ -353,36 +601,75 @@ function Workspace({
             expanded={expanded}
             navigation={
               <nav
-                aria-label={copy("Proposal overview", "Vorschlagsübersicht")}
+                aria-label={copy(
+                  "Constitution overview",
+                  "Verfassungsübersicht",
+                )}
                 className={styles.contents}
               >
                 <p className={styles.eyebrow}>
-                  {copy("This proposal", "Dieser Vorschlag")}
+                  {copy("This constitution", "Diese Verfassung")}
                 </p>
                 <div className={styles.owner}>
-                  <span>DE</span>
+                  <span>{workflow === "create" ? basics.isoCode : "DE"}</span>
                   <div>
-                    {copy("Germany", "Deutschland")}
+                    {workflow === "create"
+                      ? basics.countryName
+                      : copy("Germany", "Deutschland")}
                     <small>
-                      {copy(
-                        "National constitution · German",
-                        "Nationale Verfassung · Deutsch",
-                      )}
+                      {workflow === "proposal"
+                        ? copy("Submitted proposal", "Eingereichter Vorschlag")
+                        : workflow === "settings"
+                          ? copy(
+                              "Saved constitution",
+                              "Gespeicherte Verfassung",
+                            )
+                          : copy("New constitution", "Neue Verfassung")}
                     </small>
                   </div>
                 </div>
-
                 <div className={styles.division}>
                   <p className={styles.eyebrow}>
-                    {copy("Proposed hierarchy", "Vorgeschlagene Gliederung")}
+                    {copy("Hierarchy", "Gliederung")}
                   </p>
                   {hierarchy(outlineBranches(layers))}
+                  {structural ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        change(
+                          placeOutlineLayer(
+                            layers,
+                            copy("New level", "Neue Ebene"),
+                            "root",
+                            layerIndex,
+                            null,
+                          ),
+                        );
+                        setSelected(layers.length);
+                        setView("structure");
+                      }}
+                    >
+                      {copy("New level", "Neue Ebene")}
+                    </Button>
+                  ) : null}
                 </div>
                 <p className={styles.sidebarNote}>
-                  {copy(
-                    "Proposal revision 2. Nothing has been published.",
-                    "Vorschlag in Revision 2. Noch nichts veröffentlicht.",
-                  )}
+                  {workflow === "proposal"
+                    ? copy(
+                        "Structure corrections need a revised proposal. Display can be adjusted here.",
+                        "Strukturkorrekturen benötigen einen überarbeiteten Vorschlag. Die Darstellung kann hier angepasst werden.",
+                      )
+                    : workflow === "settings"
+                      ? copy(
+                          "Published versions retain their pinned structure.",
+                          "Veröffentlichte Fassungen behalten ihre festgelegte Struktur.",
+                        )
+                      : copy(
+                          "Create setup first. Documents and wording follow afterwards.",
+                          "Zuerst die Einrichtung anlegen. Dokumente und Wortlaut folgen danach.",
+                        )}
                 </p>
               </nav>
             }
@@ -390,29 +677,80 @@ function Workspace({
             <PageContentsBody className={styles.body}>
               <div className={styles.selectedHeader}>
                 <div>
-                  {actions}
-                  <h2>{title}</h2>
+                  <Inline>
+                    <Badge
+                      tone={
+                        (workflow === "proposal" && state === "requested") ||
+                        dirty
+                          ? "changed"
+                          : workflow === "create" && created
+                            ? "added"
+                            : "info"
+                      }
+                    >
+                      {status}
+                    </Badge>
+                    {workflow !== "create" ? (
+                      <span className={styles.revision}>
+                        {copy("Revision", "Revision")} {revision}
+                      </span>
+                    ) : null}
+                  </Inline>
+                  <h2>{ownerTitle}</h2>
                 </div>
                 {view !== "review" &&
-                !["confirmed", "withdrawn"].includes(state) ? (
-                  <Button type="button" onClick={() => choose("review")}>
-                    {copy("Review and confirm", "Zur Bestätigung")}
+                !(workflow === "create" && created) &&
+                !(
+                  workflow === "proposal" &&
+                  ["confirmed", "withdrawn"].includes(state)
+                ) ? (
+                  <Button type="button" onClick={primary}>
+                    {workflow === "settings"
+                      ? copy("Review impact", "Auswirkungen prüfen")
+                      : copy("Review and confirm", "Zur Prüfung")}
                     <ReaderIcon name="right" />
                   </Button>
                 ) : null}
               </div>
+              {workflow === "create" ? (
+                <nav
+                  className="creation-steps"
+                  aria-label={copy("Creation steps", "Schritte zum Anlegen")}
+                >
+                  {[
+                    ["identity", copy("Details", "Angaben")],
+                    ["structure", copy("Structure", "Struktur")],
+                    ["review", copy("Review and create", "Prüfen und anlegen")],
+                  ].map(([id, label], index) => (
+                    <span
+                      key={id}
+                      aria-current={view === id ? "step" : undefined}
+                    >
+                      {index + 1}. {label}
+                    </span>
+                  ))}
+                </nav>
+              ) : null}
               {notice ? (
                 <p role="status" className={styles.notice}>
                   <ReaderIcon name="check" />
                   {notice}
                 </p>
               ) : null}
-              {state === "requested" ? (
+              {workflow === "create" && created ? (
+                <Alert tone="success">
+                  {copy(
+                    "Constitution and initial structure created in this mock. No wording has been published.",
+                    "Verfassung und Anfangsstruktur im Entwurf angelegt. Es wurde kein Wortlaut veröffentlicht.",
+                  )}
+                </Alert>
+              ) : null}
+              {workflow === "proposal" && state === "requested" ? (
                 <Alert tone="info">
                   {recordedReason ||
                     copy(
-                      "Please verify the source reference before confirming the proposal.",
-                      "Bitte prüfen Sie die Quellenangabe, bevor Sie den Vorschlag bestätigen.",
+                      "Please verify the source reference before confirming.",
+                      "Bitte prüfen Sie die Quellenangabe vor der Bestätigung.",
                     )}{" "}
                   <button
                     type="button"
@@ -421,8 +759,8 @@ function Workspace({
                       setState("proposed");
                       setNotice(
                         copy(
-                          "A revised example proposal has been loaded.",
-                          "Ein überarbeiteter Beispielvorschlag wurde geladen.",
+                          "Revised example loaded.",
+                          "Überarbeitetes Beispiel geladen.",
                         ),
                       );
                     }}
@@ -434,7 +772,7 @@ function Workspace({
                   </button>
                 </Alert>
               ) : null}
-              {state === "confirmed" ? (
+              {workflow === "proposal" && state === "confirmed" ? (
                 <Alert tone="success">
                   {copy(
                     "Constitution and structure created. Importing and publishing wording remain separate steps.",
@@ -442,165 +780,76 @@ function Workspace({
                   )}
                 </Alert>
               ) : null}
-              {state === "confirming" ? (
+              {workflow === "proposal" && state === "confirming" ? (
                 <Alert tone="info">
                   {copy(
-                    "Confirmation was interrupted. Resume the existing operation without creating a second constitution.",
-                    "Die Bestätigung wurde unterbrochen. Setzen Sie den bestehenden Vorgang fort, ohne eine zweite Verfassung anzulegen.",
+                    "Resume the interrupted confirmation without creating a second constitution.",
+                    "Setzen Sie die unterbrochene Bestätigung fort, ohne eine zweite Verfassung anzulegen.",
                   )}
                 </Alert>
               ) : null}
-              {state === "withdrawn" ? (
+              {workflow === "proposal" && state === "withdrawn" ? (
                 <Alert tone="info">
                   {copy(
-                    "This proposal was withdrawn. Its details and history remain available.",
-                    "Dieser Vorschlag wurde zurückgezogen. Angaben und Verlauf bleiben einsehbar.",
+                    "This proposal was withdrawn. Details and history remain available.",
+                    "Der Vorschlag wurde zurückgezogen. Angaben und Verlauf bleiben verfügbar.",
                   )}
                 </Alert>
               ) : null}
               <section
-                id="setup-panel-proposal"
+                id="setup-panel-identity"
                 role="tabpanel"
-                aria-labelledby="setup-tab-proposal"
-                hidden={view !== "proposal"}
+                aria-labelledby="setup-tab-identity"
+                hidden={view !== "identity"}
               >
-                <Stack gap="section">
-                  <div className={styles.changeStrip}>
-                    <ReaderIcon name="history" />
-                    <p>
-                      {copy("Revised proposal", "Überarbeiteter Vorschlag")}
-                      <small>
-                        {copy(
-                          "Source reference added · Paragraph display adjusted",
-                          "Quellenangabe ergänzt · Absatzdarstellung angepasst",
-                        )}
-                      </small>
-                    </p>
-                    <button type="button" onClick={() => choose("history")}>
-                      {copy("View changes", "Änderungen ansehen")}
-                      <ReaderIcon name="right" />
-                    </button>
-                  </div>
-                  <div className={styles.summaryGrid}>
+                <div hidden={workflow !== "create"}>
+                  <CreationDetails
+                    onSummary={setBasics}
+                    onContinue={() => choose("structure")}
+                    onSettings={() => open("settings")}
+                    disabled={created}
+                  />
+                </div>
+                {workflow !== "create" ? (
+                  <Stack gap="section">
+                    <Identity
+                      workflow={workflow}
+                      choose={choose}
+                      revision={revision}
+                    />
                     <section>
-                      <h3>
-                        {copy(
-                          "Identity and ownership",
-                          "Identität und Zuordnung",
-                        )}
-                      </h3>
-                      <dl className={styles.facts}>
-                        <div>
-                          <dt>{copy("Country", "Land")}</dt>
-                          <dd>{copy("Germany", "Deutschland")} · DE</dd>
-                        </div>
-                        <div>
-                          <dt>{copy("Constitution", "Verfassung")}</dt>
-                          <dd>{title}</dd>
-                        </div>
-                        <div>
-                          <dt>{copy("Language", "Sprache")}</dt>
-                          <dd>Deutsch · de</dd>
-                        </div>
-                        <div>
-                          <dt>{copy("Scope", "Zuordnung")}</dt>
-                          <dd>
-                            {copy(
-                              "National · No predecessor specified",
-                              "National · Kein Vorgänger angegeben",
-                            )}
-                          </dd>
-                        </div>
-                      </dl>
-                      <details className={styles.secondary}>
-                        <summary>
-                          {copy("Technical identifier", "Technische Kennung")}
-                        </summary>
-                        <code>grundgesetz</code>
-                      </details>
-                    </section>
-                    <section>
-                      <h3>
-                        {copy(
-                          "Source of the proposal",
-                          "Quelle des Vorschlags",
-                        )}
-                      </h3>
-                      <p className={styles.sourceTitle}>
-                        Bundesgesetzblatt 1949, S. 1
-                      </p>
-                      <p className={styles.muted}>
-                        {copy(
-                          "Basic Law, promulgated on 23 May 1949. The sample below is a text excerpt.",
-                          "Grundgesetz, verkündet am 23. Mai 1949. Das folgende Lesebeispiel ist ein Textauszug.",
-                        )}
-                      </p>
-                      <a
-                        className={styles.sourceLink}
-                        href="https://www.gesetze-im-internet.de/gg/"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        gesetze-im-internet.de/gg
-                        <ReaderIcon name="external" />
-                      </a>
-                      <p className={styles.muted}>
-                        {copy(
-                          "Supplementary documents are kept separately from these proposed source details.",
-                          "Ergänzende Dokumente werden getrennt von diesen vorgeschlagenen Quellenangaben geführt.",
-                        )}
-                      </p>
-                      <button
-                        type="button"
-                        className={styles.textButton}
-                        onClick={() => choose("documents")}
-                      >
-                        {copy(
-                          "View supplementary evidence",
-                          "Ergänzende Belege ansehen",
-                        )}
-                        <ReaderIcon name="right" />
-                      </button>
-                    </section>
-                  </div>
-                  <section>
-                    <div className={styles.sectionHeading}>
-                      <div>
+                      <div className={styles.sectionHeading}>
                         <h3>
-                          {copy("Proposed structure", "Vorgeschlagener Aufbau")}
+                          {copy("Structure at a glance", "Aufbau im Überblick")}
                         </h3>
-                        <p className={styles.muted}>
-                          {copy(
-                            "Three levels, with a reading example from the proposal.",
-                            "Drei Ebenen mit einem Lesebeispiel aus dem Vorschlag.",
-                          )}
-                        </p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => choose("structure")}
+                        >
+                          {copy("Inspect structure", "Struktur prüfen")}
+                          <ReaderIcon name="right" />
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => choose("structure")}
-                      >
-                        {copy("Inspect structure", "Struktur prüfen")}
-                        <ReaderIcon name="right" />
-                      </Button>
-                    </div>
-                    <div className={styles.hierarchyStrip}>
-                      {layers.map((layer, index) => (
-                        <span key={layer.kindCode}>
-                          {index ? <ReaderIcon name="right" /> : null}
-                          {layer.displayLabel}
-                        </span>
-                      ))}
-                    </div>
-                    <div className={styles.excerpt}>
-                      <OutlineReaderPreview
-                        roots={sampleRoots}
-                        outline={setupOutline(layers)}
-                      />
-                    </div>
-                  </section>
-                </Stack>
+                      <div className={styles.hierarchyStrip}>
+                        {layers.map((entry, index) => (
+                          <span key={entry.kindCode}>
+                            {index ? <ReaderIcon name="right" /> : null}
+                            {entry.displayLabel}
+                          </span>
+                        ))}
+                      </div>
+                      {workflow === "proposal" ? (
+                        <div className={styles.excerpt}>
+                          <OutlineReaderPreview
+                            roots={sampleRoots}
+                            outline={setupOutline(layers)}
+                          />
+                        </div>
+                      ) : null}
+                    </section>
+                  </Stack>
+                ) : null}
               </section>
               <section
                 id="setup-panel-structure"
@@ -617,110 +866,158 @@ function Workspace({
                       )}
                     </h3>
                     <p className={styles.muted}>
-                      {copy(
-                        "Display changes appear immediately in the reading preview.",
-                        "Änderungen an der Darstellung erscheinen sofort in der Lesefassung.",
-                      )}
+                      {workflow === "proposal"
+                        ? copy(
+                            "Display changes update the preview; structural changes require a request.",
+                            "Darstellungsänderungen aktualisieren die Vorschau; Strukturänderungen benötigen eine Anfrage.",
+                          )
+                        : copy(
+                            "Select a level on the left. Changes appear immediately in the reading preview.",
+                            "Wählen Sie links eine Ebene. Änderungen erscheinen sofort in der Leservorschau.",
+                          )}
                     </p>
                   </div>
-                </div>
-                <div className={styles.structureGrid}>
-                  <section
-                    className={styles.levelEditor}
-                    aria-label={copy("Selected level", "Ausgewählte Ebene")}
-                  >
-                    <header>
-                      <span className={styles.eyebrow}>
-                        {copy("Selected level", "Ausgewählte Ebene")}
-                      </span>
-                      <h3>{layers[selected].displayLabel}</h3>
-                    </header>
-                    <div
-                      className={styles.innerTabs}
-                      role="group"
-                      aria-label={copy(
-                        "Level settings",
-                        "Einstellungen der Ebene",
-                      )}
-                    >
-                      {(
-                        ["display", "structure", "editing"] as LayerSection[]
-                      ).map((tab) => (
-                        <button
-                          type="button"
-                          key={tab}
-                          aria-pressed={section === tab}
-                          onClick={() => setSection(tab)}
-                        >
-                          {t(structureUi[tab])}
-                        </button>
-                      ))}
-                    </div>
-                    <div className={styles.levelFields}>
-                      <OutlineLayerEditor
-                        layer={layers[selected]}
-                        index={selected}
-                        layers={layers}
-                        section={section}
-                        structural={false}
-                        display={editable}
-                        update={(index, patch) => {
-                          setLayers((current) =>
-                            updateOutlineLayers(current, index, patch),
-                          );
-                          setSaved(false);
-                        }}
-                      />
-                      {section !== "display" ? (
-                        <p className={styles.muted}>
-                          {copy(
-                            "The proposed structure is fixed here. Request changes if its hierarchy or editing rules need correction.",
-                            "Der vorgeschlagene Aufbau bleibt hier fest. Fordern Sie Änderungen an, wenn Gliederung oder Eingaberegeln korrigiert werden müssen.",
-                          )}
-                        </p>
-                      ) : null}
-                    </div>
-                  </section>
-                  <StructurePreview layers={layers} sampleRoots={sampleRoots} />
-                </div>
-                <Inline className={styles.saveRow}>
-                  {editable ? (
+                  {workflow === "create" && !created ? (
                     <Button
                       type="button"
-                      onClick={() => {
-                        setSaved(true);
-                        setNotice(
-                          copy(
-                            "Display settings saved in this mock.",
-                            "Darstellung in diesem Entwurf gespeichert.",
-                          ),
-                        );
-                      }}
+                      aria-expanded={templates}
+                      onClick={() => setTemplates(!templates)}
                     >
-                      {copy("Save display", "Darstellung speichern")}
+                      {copy("Choose template", "Vorlage wählen")}
                     </Button>
                   ) : null}
-                  <span className={styles.muted}>
-                    {saved
-                      ? copy("Saved", "Gespeichert")
-                      : copy(
-                          "Authored wording and the hierarchy remain unchanged.",
-                          "Wortlaut und Gliederung bleiben unverändert.",
-                        )}
-                  </span>
-                  {editable ? (
-                    <button
-                      type="button"
-                      className={styles.textButton}
-                      onClick={requestChanges}
+                </div>
+                {workflow === "create" && templates && !created ? (
+                  <div className={styles.templatePanel}>
+                    <StructureTemplates
+                      value={template}
+                      onChoose={(id) => {
+                        setTemplate(id);
+                        change(explicitLayers(outlineFromTemplate(id), false));
+                        setSelected(0);
+                        setTemplates(false);
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {validation ? <Alert tone="error">{validation}</Alert> : null}
+                <div className={styles.structureGrid} data-structure-grid>
+                  {layer ? (
+                    <section
+                      className={styles.levelEditor}
+                      aria-label={copy("Selected level", "Ausgewählte Ebene")}
                     >
+                      <header>
+                        <span className={styles.eyebrow}>
+                          {copy("Selected level", "Ausgewählte Ebene")}
+                        </span>
+                        <h3>{layer.displayLabel}</h3>
+                      </header>
+                      <div
+                        className={styles.innerTabs}
+                        role="group"
+                        aria-label={copy(
+                          "Level settings",
+                          "Einstellungen der Ebene",
+                        )}
+                      >
+                        {(
+                          ["display", "structure", "editing"] as LayerSection[]
+                        ).map((tab) => (
+                          <button
+                            type="button"
+                            key={tab}
+                            aria-pressed={section === tab}
+                            onClick={() => setSection(tab)}
+                          >
+                            {t(structureUi[tab])}
+                          </button>
+                        ))}
+                      </div>
+                      <div className={styles.levelFields}>
+                        <OutlineLayerEditor
+                          layer={layer}
+                          index={layerIndex}
+                          layers={layers}
+                          section={section}
+                          structural={structural}
+                          display={display}
+                          update={(index, patch) =>
+                            change(updateOutlineLayers(layers, index, patch))
+                          }
+                          removeLayer={
+                            structural
+                              ? (index) => {
+                                  change(removeOutlineLayer(layers, index));
+                                  setSelected(Math.max(0, index - 1));
+                                }
+                              : undefined
+                          }
+                        />
+                        {workflow === "proposal" && section !== "display" ? (
+                          <p className={styles.muted}>
+                            {copy(
+                              "Request a correction to change this proposed hierarchy.",
+                              "Fordern Sie eine Korrektur an, um die vorgeschlagene Gliederung zu ändern.",
+                            )}
+                          </p>
+                        ) : null}
+                      </div>
+                    </section>
+                  ) : (
+                    <p>
                       {copy(
-                        "Request structural changes",
-                        "Strukturänderung anfordern",
+                        "Add a level to define the hierarchy.",
+                        "Fügen Sie eine Ebene für die Gliederung hinzu.",
                       )}
+                    </p>
+                  )}
+                  <StructurePreview
+                    layers={layers}
+                    sampleRoots={workflow === "proposal" ? sampleRoots : []}
+                  />
+                </div>
+                <Inline className={styles.saveRow}>
+                  {workflow === "proposal" && display ? (
+                    <>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setSaved(true);
+                          setNotice(
+                            copy(
+                              "Display saved in this mock.",
+                              "Darstellung im Entwurf gespeichert.",
+                            ),
+                          );
+                        }}
+                      >
+                        {copy("Save display", "Darstellung speichern")}
+                      </Button>
+                      <button
+                        type="button"
+                        className={styles.textButton}
+                        onClick={requestChanges}
+                      >
+                        {copy(
+                          "Request structural changes",
+                          "Strukturänderung anfordern",
+                        )}
+                        <ReaderIcon name="right" />
+                      </button>
+                    </>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={primary}
+                      disabled={workflow === "create" && created}
+                    >
+                      {workflow === "settings"
+                        ? copy("Review impact", "Auswirkungen prüfen")
+                        : copy("Continue to review", "Weiter zur Prüfung")}
                       <ReaderIcon name="right" />
-                    </button>
-                  ) : null}
+                    </Button>
+                  )}
                 </Inline>
               </section>
               <section
@@ -729,15 +1026,59 @@ function Workspace({
                 aria-labelledby="setup-tab-documents"
                 hidden={view !== "documents"}
               >
-                <Stack gap="card">
+                <div hidden={workflow !== "create"}>
+                  <Stack gap="card">
+                    <h3>{copy("Documents", "Dokumente")}</h3>
+                    <p className={styles.muted}>
+                      {created
+                        ? copy(
+                            "Setup has been simulated. The settings example shows attachment controls for an existing constitution.",
+                            "Die Einrichtung wurde simuliert. Das Einstellungsbeispiel zeigt die Dokumentfunktionen für eine vorhandene Verfassung.",
+                          )
+                        : copy(
+                            "Create the constitution first. Documents can then be linked from its settings.",
+                            "Legen Sie zuerst die Verfassung an. Danach lassen sich Dokumente in ihren Einstellungen verknüpfen.",
+                          )}
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() =>
+                        created ? open("settings") : choose("identity")
+                      }
+                    >
+                      {created
+                        ? copy(
+                            "View settings example",
+                            "Einstellungsbeispiel ansehen",
+                          )
+                        : copy("Back to details", "Zurück zu den Angaben")}
+                    </Button>
+                  </Stack>
+                </div>
+                <div
+                  data-evidence-owner="constitution"
+                  hidden={workflow !== "settings"}
+                >
                   <p className={styles.muted}>
                     {copy(
-                      "Evidence for this setup proposal. Each attachment keeps its cited revision and its own contextual note.",
-                      "Belege zu diesem Einrichtungsvorschlag. Jede Verknüpfung behält ihre zitierte Revision und eine eigene Kontextnotiz.",
+                      "Documents attached to this constitution. Their library records stay independent from structure edits.",
+                      "Mit dieser Verfassung verknüpfte Dokumente. Die Bibliothekseinträge bleiben von Strukturänderungen unabhängig.",
                     )}
                   </p>
-                  <Evidence onInspect={setInspected} />
-                </Stack>
+                  <Evidence context="constitution" onInspect={setInspected} />
+                </div>
+                <div
+                  data-evidence-owner="setup_proposal"
+                  hidden={workflow !== "proposal"}
+                >
+                  <p className={styles.muted}>
+                    {copy(
+                      "Private evidence for this setup proposal, separate from its submitted source details.",
+                      "Private Belege dieses Einrichtungsvorschlags, getrennt von den eingereichten Quellenangaben.",
+                    )}
+                  </p>
+                  <Evidence context="setup_proposal" onInspect={setInspected} />
+                </div>
               </section>
               <section
                 id="setup-panel-review"
@@ -745,161 +1086,58 @@ function Workspace({
                 aria-labelledby="setup-tab-review"
                 hidden={view !== "review"}
               >
-                <Stack gap="card">
-                  <div>
-                    <h3>{copy("Before confirming", "Vor der Bestätigung")}</h3>
-                    <p className={styles.muted}>
-                      {copy(
-                        "Check the proposal as a whole. Confirming creates the constitution and its proposed structure.",
-                        "Prüfen Sie den Vorschlag als Ganzes. Die Bestätigung legt die Verfassung mit dem vorgeschlagenen Aufbau an.",
-                      )}
-                    </p>
-                  </div>
-                  <ol className={styles.checklist}>
-                    {[
-                      {
-                        en: "Identity and source",
-                        de: "Identität und Quelle",
-                        detail: copy(
-                          "Germany · German · Federal Law Gazette 1949",
-                          "Deutschland · Deutsch · Bundesgesetzblatt 1949",
+                <Review
+                  workflow={workflow}
+                  layers={layers}
+                  basics={basics}
+                  state={state}
+                  reason={reason}
+                  setReason={setReason}
+                  recordedReason={recordedReason}
+                  choose={choose}
+                  created={created}
+                  onCreate={() => {
+                    if (!validation) {
+                      setCreated(true);
+                      setNotice(
+                        copy(
+                          "Initial setup created locally.",
+                          "Anfangseinrichtung lokal angelegt.",
                         ),
-                        target: "proposal",
-                      },
-                      {
-                        en: "Structure and reading example",
-                        de: "Struktur und Lesebeispiel",
-                        detail: layers
-                          .map((layer) => layer.displayLabel)
-                          .join(" → "),
-                        target: "structure",
-                      },
-                      {
-                        en: "Evidence and changes",
-                        de: "Belege und Änderungen",
-                        detail: copy(
-                          "Pinned document revisions and the changes in revision 2.",
-                          "Fest zitierte Dokumentrevisionen und die Änderungen in Revision 2.",
-                        ),
-                        target: "documents",
-                      },
-                    ].map((entry, index) => (
-                      <li key={entry.target}>
-                        <span>{index + 1}</span>
-                        <div>
-                          <h4>{copy(entry.en, entry.de)}</h4>
-                          <p>{entry.detail}</p>
-                        </div>
-                        <button
-                          type="button"
-                          className={styles.textButton}
-                          onClick={() => choose(entry.target as View)}
-                        >
-                          {copy("Inspect", "Ansehen")}
-                          <ReaderIcon name="right" />
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                  {!["confirmed", "withdrawn"].includes(state) ? (
-                    <Card>
-                      <h3>{copy("Confirm setup", "Einrichtung bestätigen")}</h3>
-                      <p className={styles.muted}>
-                        {copy(
-                          "This step does not publish constitutional wording. Import review and publication follow separately.",
-                          "Dieser Schritt veröffentlicht keinen Verfassungstext. Importprüfung und Veröffentlichung folgen gesondert.",
-                        )}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        disabled={state === "requested"}
-                        onClick={() => {
-                          setState("confirmed");
-                          setSaved(true);
-                        }}
-                      >
-                        {copy(
-                          state === "confirming"
-                            ? "Resume confirmation"
-                            : "Confirm setup",
-                          state === "confirming"
-                            ? "Bestätigung fortsetzen"
-                            : "Einrichtung bestätigen",
-                        )}
-                        <ReaderIcon name="check" />
-                      </Button>
-                      {state === "requested" ? (
-                        <p className={styles.muted}>
-                          {copy(
-                            "A revised proposal is required before confirmation.",
-                            "Vor der Bestätigung ist ein überarbeiteter Vorschlag erforderlich.",
-                          )}
-                        </p>
-                      ) : null}
-                    </Card>
-                  ) : null}
-                  {editable ? (
-                    <details className={styles.feedback}>
-                      <summary>
-                        {copy(
-                          "Something needs correcting?",
-                          "Etwas muss korrigiert werden?",
-                        )}
-                      </summary>
-                      <Stack>
-                        <TextArea
-                          id="requested-changes"
-                          label={copy(
-                            "Requested changes",
-                            "Gewünschte Änderungen",
-                          )}
-                          value={reason}
-                          onChange={(event) => setReason(event.target.value)}
-                          rows={4}
-                          maxLength={4000}
-                          help={copy(
-                            "Describe the correction separately from the proposed content. At least 10 characters.",
-                            "Beschreiben Sie die Korrektur getrennt vom vorgeschlagenen Inhalt. Mindestens 10 Zeichen.",
-                          )}
-                        />
-                        <Button
-                          type="button"
-                          disabled={reason.trim().length < 10}
-                          onClick={() => {
-                            setRecordedReason(reason);
-                            setState("requested");
-                            setNotice(
-                              copy(
-                                "Changes requested in this mock. Your note has been retained.",
-                                "Änderungen in diesem Entwurf angefordert. Ihre Notiz bleibt erhalten.",
-                              ),
-                            );
-                          }}
-                        >
-                          {copy("Request changes", "Änderungen anfordern")}
-                        </Button>
-                      </Stack>
-                    </details>
-                  ) : null}
-                  {editable ? (
-                    <div className={styles.withdraw}>
-                      <button
-                        type="button"
-                        className={styles.textButton}
-                        onClick={() => withdrawal.current?.showModal()}
-                      >
-                        {copy("Withdraw proposal", "Vorschlag zurückziehen")}
-                      </button>
-                      <span className={styles.muted}>
-                        {copy(
-                          "Use this if the proposal should not be processed.",
-                          "Wenn dieser Vorschlag nicht weiter bearbeitet werden soll.",
-                        )}
-                      </span>
-                    </div>
-                  ) : null}
-                </Stack>
+                      );
+                    }
+                  }}
+                  onConfirm={() => {
+                    setState("confirmed");
+                    setNotice("");
+                  }}
+                  onRequest={() => {
+                    setRecordedReason(reason);
+                    setState("requested");
+                  }}
+                  withdrawal={withdrawal}
+                  impact={impact}
+                  checkImpact={checkImpact}
+                  onSave={() => {
+                    if (
+                      !impact ||
+                      impact.classification === "migration_required"
+                    )
+                      return;
+                    setRevision(revision + 1);
+                    setBaseline(layers);
+                    setImpact(null);
+                    setSaved(true);
+                    setNotice(
+                      copy(
+                        "New example settings revision saved.",
+                        "Neue Beispieleinstellungsrevision gespeichert.",
+                      ),
+                    );
+                  }}
+                  revision={revision}
+                  validation={validation}
+                />
               </section>
               <section
                 id="setup-panel-history"
@@ -907,111 +1145,30 @@ function Workspace({
                 aria-labelledby="setup-tab-history"
                 hidden={view !== "history"}
               >
-                <Stack gap="card">
-                  <div>
-                    <h3>
-                      {copy("Proposal history", "Verlauf des Vorschlags")}
-                    </h3>
-                    <p className={styles.muted}>
-                      {copy(
-                        "Changes to the proposal remain separate from constitutional text history.",
-                        "Änderungen am Vorschlag bleiben von der Textgeschichte der Verfassung getrennt.",
-                      )}
-                    </p>
-                  </div>
-                  <ol className={styles.timeline}>
-                    {state === "confirmed" ? (
-                      <li>
-                        <span className={styles.eyebrow}>
-                          {copy("Just now", "Gerade eben")}
-                        </span>
-                        <h4>
-                          {copy("Setup confirmed", "Einrichtung bestätigt")}
-                        </h4>
-                        <p>
-                          {copy(
-                            "Constitution and proposed structure created in this mock.",
-                            "Verfassung und vorgeschlagene Struktur in diesem Entwurf angelegt.",
-                          )}
-                        </p>
-                      </li>
-                    ) : null}
-                    {recordedReason ? (
-                      <li>
-                        <span className={styles.eyebrow}>
-                          {copy("Just now", "Gerade eben")}
-                        </span>
-                        <h4>
-                          {copy("Changes requested", "Änderungen angefordert")}
-                        </h4>
-                        <p>{recordedReason}</p>
-                      </li>
-                    ) : null}
-                    <li>
-                      <span className={styles.eyebrow}>
-                        {copy(
-                          "Revision 2 · Current proposal",
-                          "Revision 2 · Aktueller Vorschlag",
-                        )}
-                      </span>
-                      <h4>
-                        {copy(
-                          "Source and display revised",
-                          "Quelle und Darstellung überarbeitet",
-                        )}
-                      </h4>
-                      <div className={styles.changes}>
-                        <div>
-                          <span>
-                            {copy("Source reference", "Quellenangabe")}
-                          </span>
-                          <p>
-                            <del>Gesetze im Internet</del>
-                            <ins>
-                              Bundesgesetzblatt 1949, S. 1 · Gesetze im Internet
-                            </ins>
-                          </p>
-                        </div>
-                        <div>
-                          <span>
-                            {copy("Paragraph display", "Absatzdarstellung")}
-                          </span>
-                          <p>
-                            <del>
-                              {copy("Separate blocks", "Einzelne Blöcke")}
-                            </del>
-                            <ins>
-                              {copy(
-                                "Running text with superscript labels",
-                                "Fließtext mit hochgestellten Bezeichnungen",
-                              )}
-                            </ins>
-                          </p>
-                        </div>
-                      </div>
-                      <p className={styles.muted}>
-                        {copy(
-                          "Hierarchy and source wording unchanged.",
-                          "Gliederung und Quellwortlaut unverändert.",
-                        )}
-                      </p>
-                    </li>
-                    <li>
-                      <span className={styles.eyebrow}>
-                        {copy("Revision 1", "Revision 1")}
-                      </span>
-                      <h4>
-                        {copy("Proposal submitted", "Vorschlag eingereicht")}
-                      </h4>
-                      <p>
-                        {copy(
-                          "Identity, source details, three structural levels and a reading sample.",
-                          "Identität, Quellenangaben, drei Gliederungsebenen und ein Lesebeispiel.",
-                        )}
-                      </p>
-                    </li>
-                  </ol>
-                </Stack>
+                <History
+                  workflow={workflow}
+                  revision={revision}
+                  saved={saved || (workflow === "settings" && revision > 3)}
+                  created={created}
+                  recordedReason={recordedReason}
+                  confirmed={state === "confirmed"}
+                  restore={() => {
+                    change(
+                      initialLayers("settings").map((entry) =>
+                        entry.kindCode === "paragraph"
+                          ? { ...entry, presentation: "section" }
+                          : entry,
+                      ),
+                    );
+                    setView("review");
+                    setNotice(
+                      copy(
+                        "Previous display restored as an unsaved draft. Check the impact before saving.",
+                        "Vorige Darstellung als ungespeicherten Entwurf wiederhergestellt. Prüfen Sie die Auswirkungen vor dem Speichern.",
+                      ),
+                    );
+                  }}
+                />
               </section>
             </PageContentsBody>
           </PageContentsLayout>
@@ -1019,11 +1176,20 @@ function Workspace({
       </FullWidthPage>
       <footer className={styles.footer}>
         {copy(
-          "Design mock only. Changes, notes and files stay in this browser session.",
-          "Reiner Designentwurf. Änderungen, Notizen und Dateien bleiben in dieser Browsersitzung.",
+          "Interactive mock · Sample data · No live application changes",
+          "Interaktiver Entwurf · Beispieldaten · Keine Änderungen an der Live-Anwendung",
         )}
         <span>Constitution Atlas</span>
       </footer>
+      {levelMenu ? (
+        <ReaderMenu
+          title={copy("Level actions", "Aktionen für Ebene")}
+          items={menuItems}
+          position={levelMenu}
+          origin={levelMenu.origin}
+          onClose={() => setLevelMenu(null)}
+        />
+      ) : null}
       <dialog
         ref={withdrawal}
         className={styles.dialog}
@@ -1034,8 +1200,8 @@ function Workspace({
         </h2>
         <p>
           {copy(
-            "The proposal remains in the history. No constitution will be created from it.",
-            "Der Vorschlag bleibt im Verlauf erhalten. Daraus wird keine Verfassung angelegt.",
+            "Its details remain in the history.",
+            "Die Angaben bleiben im Verlauf erhalten.",
           )}
         </p>
         <Inline>
@@ -1069,9 +1235,6 @@ function Workspace({
             {inspected.revision.revision} · {inspected.citationKey}
           </p>
           <p>{inspected.revision.fileName || inspected.revision.sourceUrl}</p>
-          {inspected.revision.description ? (
-            <p>{inspected.revision.description}</p>
-          ) : null}
           <Button type="button" onClick={() => setInspected(null)}>
             {copy("Close", "Schließen")}
           </Button>
@@ -1089,12 +1252,12 @@ function Workspace({
           <h2 id="outside-title">{outside}</h2>
           <p>
             {copy(
-              "This interactive mock focuses on constitution setup. Global navigation keeps the established site design.",
-              "Dieser interaktive Entwurf zeigt die Verfassungseinrichtung. Die globale Navigation übernimmt das bestehende Seitendesign.",
+              "This mock covers creation, settings and import proposal review. Use the page switch above to compare them.",
+              "Dieser Entwurf zeigt Anlegen, Einstellungen und Importprüfung. Vergleichen Sie die Seiten über den Umschalter oben.",
             )}
           </p>
           <Button type="button" onClick={() => setOutside("")}>
-            {copy("Back to proposal", "Zurück zum Vorschlag")}
+            {copy("Back to workspace", "Zurück zum Editor")}
           </Button>
         </dialog>
       ) : null}

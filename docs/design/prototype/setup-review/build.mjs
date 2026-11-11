@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir, cp } from "node:fs/promises";
 import { dirname, join } from "node:path";
 const require = createRequire(
   new URL("../../../../apps/gateway-web/package.json", import.meta.url),
@@ -44,10 +44,16 @@ const result = await build({
         }));
         build.onLoad({ filter: /.*/, namespace: "preview" }, (args) => ({
           loader: "jsx",
+          resolveDir: fileURLToPath(
+            new URL("../../../../apps/gateway-web/", import.meta.url),
+          ),
           contents:
             args.path === "next/link"
               ? "export default function Link({children,...props}) {return <a {...props}>{children}</a>}"
-              : 'export const usePathname=()=>"/admin/import/setup/preview"; export const useSearchParams=()=>new URLSearchParams(location.search); export const useRouter=()=>({push(){},replace(){},refresh(){}});',
+              : `import {useSyncExternalStore} from 'react';
+               const path=()=>({create:'/admin/constitutions',settings:'/admin/constitutions/preview',proposal:'/admin/import/setup/preview'}[new URLSearchParams(location.search).get('page')]||'/admin/constitutions');
+               const subscribe=fn=>{addEventListener('preview-navigation',fn);addEventListener('popstate',fn);return()=>{removeEventListener('preview-navigation',fn);removeEventListener('popstate',fn)}};
+               export const usePathname=()=>useSyncExternalStore(subscribe,path,path);export const useSearchParams=()=>new URLSearchParams(location.search);export const useRouter=()=>({push(){},replace(){},refresh(){}});`,
         }));
       },
     },
@@ -57,8 +63,13 @@ const js = result.outputFiles.find((file) => file.path.endsWith(".js")).text;
 const css = result.outputFiles.find((file) => file.path.endsWith(".css")).text;
 const output = process.argv[2] || "/tmp/constitution-setup-review/index.html";
 await mkdir(dirname(output), { recursive: true });
+await cp(
+  fileURLToPath(new URL("./before", import.meta.url)),
+  join(dirname(output), "before"),
+  { recursive: true },
+);
 await writeFile(
   output,
-  `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Interaktiver Entwurf für die Prüfung einer Verfassungseinrichtung. Beispieldaten, keine Änderungen am Live-System."><title>Verfassung einrichten · Constitution Atlas</title><style>${css}</style></head><body><div id="root"></div><script>${js.replaceAll("</script", "<\\/script")}</script></body></html>`,
+  `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Gemeinsamer Entwurf für Anlegen, Einstellungen und Importprüfung mit Vorher-Screenshots. Beispieldaten."><title>Verfassungseditor · Constitution Atlas</title><style>${css}</style></head><body><div id="root"></div><script>${js.replaceAll("</script", "<\\/script")}</script></body></html>`,
 );
 console.log(output);

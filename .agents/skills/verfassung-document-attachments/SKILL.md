@@ -64,6 +64,8 @@ The event integration uses `lifecycle_material` links, with constitution ID as t
 
 For unsaved owners use `StagedDocumentPicker`, optionally setting `form` to the owning form's ID when the picker is outside it. Its hidden field carries `{documentId,revision,citationNote?}`. Resolve these references on the server before saving the owner; attach only to the saved exact scope. Library-only uploads are atomic and idempotent via `POST /library/documents`, and remain in the central library if the host is cancelled. Do not switch the mounted composer to an immediate-save adapter after a partial failure.
 
+For controlled staged owners, pass `references` with `onChange` and optional `onDetach` validation. Inline Wiki citations can add a pin while the Sources picker has an unfinished upload; hydrate its selected cards in place and keep the upload subtree mounted. Reject removing a pin still used by inline occurrences. See [the Wiki workspace contract](../../../docs/design/wiki-editor-workspace.md) for minimal stored reference metadata, source numbering, save receipts and viewer reuse.
+
 Wiki image reuse uses the staged adapter's `kind="image"` filter and retains page-owned presentation metadata. Wiki bibliography uses immutable citations and verifies pins at publication. Supplementary import evidence uses private job/proposal/run link targets without modifying captures. Structured references use the `document` target with `documentId`, `documentRevision` and optional `locator`; publication synchronizes them from Content, never from a client-supplied list. Preserve note references through the note editor and popup projections as well as the main reader. Keep legacy URLs compatible.
 
 ## Verification

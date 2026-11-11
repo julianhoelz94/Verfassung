@@ -160,6 +160,7 @@ export type WikiPageRevision = {
   predecessorId: string | null;
   summary: string;
   body: string;
+  bodyDocument?: import('./wiki-document').WikiNode | null;
   images: WikiImage[];
   citations?: (import('./document-reference').DocumentReference & { title: string })[];
   sourceUrls: string[];
@@ -500,6 +501,7 @@ export function saveWikiDraft(targetType: WikiTargetType, targetId: string, payl
   operationId?: string;
   summary: string;
   body: string;
+  bodyDocument?: import('./wiki-document').WikiNode | null;
   images: WikiImage[];
   citations?: (import('./document-reference').DocumentReference & { title: string })[];
   sourceUrls: string[];

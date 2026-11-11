@@ -1,5 +1,6 @@
 package com.constitutionatlas.catalog.api
 
+import tools.jackson.databind.JsonNode
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -29,6 +30,7 @@ data class WikiPageRevision(
     val createdBy: UUID? = null,
     val publishedAt: OffsetDateTime? = null,
     val citations: List<WikiCitation> = emptyList(),
+    val bodyDocument: JsonNode? = null,
 )
 
 data class SaveWikiPage(
@@ -39,6 +41,7 @@ data class SaveWikiPage(
     val sourceUrls: List<String> = emptyList(),
     val citations: List<WikiCitation> = emptyList(),
     val operationId: UUID? = null,
+    val bodyDocument: JsonNode? = null,
 )
 
 data class PublishWikiPage(val revisionId: UUID)

@@ -4,11 +4,9 @@ import type { ReactNode } from 'react';
 import { ui, type UiMessage } from '../../lib/messages';
 import { useTranslation } from './TranslationProvider';
 
-export function LocalizedRegion({ as, label, className, children }: { as: 'nav' | 'div'; label: UiMessage; className?: string; children: ReactNode }) {
+export function LocalizedRegion({ as: Element, label, className, children }: { as: 'nav' | 'div' | 'section'; label: UiMessage; className?: string; children: ReactNode }) {
   const t = useTranslation();
-  return as === 'nav'
-    ? <nav className={className} aria-label={t(label)}>{children}</nav>
-    : <div className={className} aria-label={t(label)}>{children}</div>;
+  return <Element className={className} aria-label={t(label)}>{children}</Element>;
 }
 
 export function LocalizedTitle({ label, className, children }: { label: UiMessage; className?: string; children: ReactNode }) {

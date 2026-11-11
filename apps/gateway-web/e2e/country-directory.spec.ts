@@ -116,6 +116,7 @@ test('regional reading, comparison and overview retain the current published sna
   const fullWikiUrl=new URL(fullWikiHref!,page.url());expect(fullWikiUrl.pathname).toBe(`/jurisdictions/${regionId}/constitutions/${regionalConstitution}`);expect(fullWikiUrl.searchParams.get('view')).toBe('wiki');expect(fullWikiUrl.searchParams.get('viewed')).toContain(correctionId);
   await wiki.getByRole('link', { name: 'Edit constitution page', exact: true }).click();
   await expect(page).toHaveURL(`/editor/wiki/constitution/${regionalConstitution}?jurisdictionId=${regionId}`);
+  await page.getByRole('button', { name: 'View published page', exact: true }).click();
   await expect(page.getByRole('link', { name: 'View public page', exact: true })).toHaveAttribute('href', `/jurisdictions/${regionId}/constitutions/${regionalConstitution}?view=wiki`);
   await page.goto(`/jurisdictions/${regionId}/versions/${correctionId}`);
   await page.getByRole('button', { name: 'Compare', exact: true }).click();
@@ -127,12 +128,12 @@ test('regional reading, comparison and overview retain the current published sna
   await regional.getByRole('button', { name: 'Compare', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/jurisdictions/${regionId}/compare\\?from=${oldId}&to=${correctionId}$`));
   await expect(page.getByRole('heading', { name: '2000 → 2020', exact:true })).toBeVisible();
-  await expect(page.locator('main')).toContainText('Corrected spelling.');
+  await expect(page.getByRole('main')).toContainText('Corrected spelling.');
   await expect(page.getByRole('combobox',{name:'Ending version',exact:true})).toHaveValue(correctionId);
   await page.getByRole('checkbox',{name:/Include changes later reversed/}).check();
   await page.getByRole('button',{name:'Filter',exact:true}).click();
   await expect(page).toHaveURL(/reversed=1/);
-  await expect(page.locator('main')).toContainText('Corrected spelling.');
+  await expect(page.getByRole('main')).toContainText('Corrected spelling.');
   await page.goto('/countries/DE');
   await regional.getByRole('link',{name:'Wiki',exact:true}).click();
   await expect(page).toHaveURL(`/jurisdictions/${regionId}/constitutions/${regionalConstitution}?view=wiki`);
@@ -239,17 +240,19 @@ test('country and regional Wiki panels expose an explicit editor and keep drafts
     await page.goto(path);
     await page.getByRole('button', { name: 'Wiki', exact: true }).click();
     await page.getByRole('link', { name: 'Edit wiki', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Edit wiki · ${name}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Edit the background story');
     await page.getByLabel('Short description', { exact: true }).fill(`Updated wiki for ${name}`);
     await page.getByLabel('Page text', { exact: true }).fill(`Private draft for ${name}`);
-    await page.getByRole('button', { name: 'Save Wiki draft', exact: true }).click();
+    await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Draft saved' })).toBeVisible();
     const publicBefore = await (await request.get(`${mockOrigin}/api/catalog/wiki/${type}/${id}`)).json();
     expect(publicBefore?.body).not.toBe(`Private draft for ${name}`);
     expect((await request.get(`${mockOrigin}/api/catalog/wiki/${type}/${id}/draft`)).status()).toBe(401);
+    await page.getByRole('button', { name: 'Review & publish', exact: true }).click();
     await page.getByRole('button', { name: 'Publish page', exact: true }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Page published' })).toBeVisible();
-    await page.getByRole('link', { name: 'View public page', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Wiki page published' })).toBeVisible();
+    await page.getByRole('button', { name: 'View published page', exact: true }).click();
+    await page.goto((await page.getByRole('link', { name: 'View public page', exact: true }).getAttribute('href'))!);
     await expect(page).toHaveURL(`${path}?wiki=1`);
     await expect(page.getByRole('region', { name: 'Wiki', exact: true })).toContainText(`Private draft for ${name}`);
   }

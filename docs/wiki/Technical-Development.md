@@ -273,3 +273,5 @@ for the original measurement scope; the specification test inventory defines the
 follow-up regression and overall-floor policy.
 
 Wiki rich-text storage, citation pins, retained draft behavior and shared viewer rules are documented in [`docs/design/wiki-editor-workspace.md`](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/wiki-editor-workspace.md). The same workspace serves country, jurisdiction and constitution Wikis.
+
+Constitution creation, settings and import setup review share `StructureWorkspaceFrame` and `OutlineWorkspace`, with Details / Structure / Documents / Review / History views. Server routes retain loading and permissions; Catalog and Ingestion actions retain validation and writes. Document controls stay mounted outside host forms. Settings edits invalidate pending impact checks so late responses cannot authorize a different draft. See [`docs/design/constitution-structure-workspace.md`](https://github.com/julianhoelz94/Verfassung/blob/main/docs/design/constitution-structure-workspace.md).

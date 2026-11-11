@@ -1,0 +1,24 @@
+.sectionIntro {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--gap-field);
+}
+.sectionIntro h3 {
+  font: 400 var(--text-xl) / 1.4 var(--font-heading);
+  margin: 0;
+}
+.sectionIntro p {
+  margin: var(--gap-control) 0 0;
+}
+.sectionIntro > button {
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .sectionIntro {
+    display: block;
+  }
+  .sectionIntro > button {
+    margin-top: var(--gap-field);
+  }
+}

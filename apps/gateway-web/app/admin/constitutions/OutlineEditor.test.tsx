@@ -174,6 +174,17 @@ describe('impact checks gate settings writes', () => {
   });
 });
 
+it('ignores an impact result returned after the draft changed', async () => {
+  await existing();
+  let complete!: (result: SettingsImpact) => void;
+  vi.mocked(previewOutlineImpactAction).mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+  await click(button(view.host, 'Preview change impact'));
+  await change(view.host.querySelector('[name="label-0"]')!, 'Changed during check');
+  await act(async () => complete(impact()));
+  expect(button(view.host, 'Save outline').disabled).toBe(true);
+  expect(view.host.querySelector('[name="label-0"]')).toHaveProperty('value', 'Changed during check');
+});
+
 describe('guided creation requires explicit review and creation', () => {
   it('collects basics, chooses a template and reviews before creating', async () => {
     const action = vi.fn().mockRejectedValue(new Error('save unavailable'));

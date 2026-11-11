@@ -16,14 +16,14 @@ test('the structure task bar stays below the actual site header while scrolling'
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 700 });
     await page.goto(`/admin/constitutions/${constitution}`);
-    const tasks = page.getByRole('navigation', { name: 'Structure', exact: true });
+    const tasks = page.getByRole('toolbar', { name: 'Constitution workspace', exact: true });
     await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
     await expect.poll(async () => {
       const menu = await tasks.boundingBox();
       const header = await page.locator('.topbar').boundingBox();
       return menu!.y - (header!.y + header!.height);
     }).toBeGreaterThanOrEqual(-1);
-    await tasks.getByRole('button', { name: 'Preview', exact: true }).click();
+    await tasks.getByRole('tab', { name: 'Structure', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Reader preview', exact: true }).filter({ visible: true })).toBeVisible();
   }
 });
@@ -32,7 +32,7 @@ test('one structure workspace retains native help, explicit placement and save r
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signInAdmin(page);
   await page.goto(`/admin/constitutions/${constitution}`);
-  const tasks = page.getByRole('navigation', { name: 'Structure', exact: true });
+  const tasks = page.getByRole('toolbar', { name: 'Constitution workspace', exact: true });
   const editor = page.getByRole('region', { name: 'Article Structure', exact: true });
   const alignment = await page.locator('[data-outline-path="0"]').evaluate(node => ({ parent: node.querySelector('button > span')!.getBoundingClientRect().left, child: node.querySelector('li')!.getBoundingClientRect().left }));
   expect(Math.abs(alignment.parent - alignment.child)).toBeLessThan(1);
@@ -44,12 +44,12 @@ test('one structure workspace retains native help, explicit placement and save r
   await expect(technical).toHaveAttribute('open', '');
   await expect(page.getByRole('note')).toContainText('Kind code');
   await page.keyboard.press('Escape');
-  const paragraph = page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Paragraph Structural level', exact: true });
+  const paragraph = page.getByRole('navigation', { name: 'Levels', exact: true }).getByRole('button', { name: 'Paragraph Structural level', exact: true });
   await paragraph.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Insert between Article and Paragraph', exact: true }).click();
   await expect(page.getByRole('region', { name: 'New level Structure', exact: true })).toBeVisible();
   await page.getByRole('textbox', { name: 'Reader-facing name' }).fill('Clause');
-  await tasks.getByRole('button', { name: 'Review impact', exact: true }).first().click();
+  await tasks.getByRole('tab', { name: 'Review', exact: true }).first().click();
   await expect(page.getByRole('button', { name: 'Save outline', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Preview change impact', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Safe to save', exact: true })).toBeVisible();
@@ -65,13 +65,13 @@ for (const locale of ['en', 'de']) test(`creation and import share the responsiv
   await page.setExtraHTTPHeaders({ 'Accept-Language': locale });
   const de = locale === 'de';
   await page.goto('/admin/constitutions');
-  await expect(page.getByRole('navigation', { name: de ? 'Struktur' : 'Structure', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: de ? 'Angaben' : 'Details', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.getByLabel(de ? 'Verfassungstitel' : 'Constitution title').fill('Example charter');
   await page.getByRole('button', { name: de ? 'Weiter zur Strukturierung' : 'Continue to structure', exact: true }).click();
   await expect(page.getByRole('button', { name: de ? 'Vorlage verwenden' : 'Use this template', exact: true })).toBeVisible();
   await expect(page.locator('button[aria-pressed] small')).toHaveCount(5);
   await page.getByRole('button', { name: de ? 'Vorlage verwenden' : 'Use this template', exact: true }).click();
-  const tasks = page.getByRole('navigation', { name: de ? 'Struktur' : 'Structure', exact: true });
+  const tasks = page.getByRole('toolbar', { name: de ? 'Verfassungseditor' : 'Constitution workspace', exact: true });
   for (const width of [1440, 820, 390, 320]) {
     await page.setViewportSize({ width, height: 950 });
     await expect(page.getByRole('textbox', { name: de ? 'Name in der Leseansicht' : 'Reader-facing name' })).toBeVisible();
@@ -79,7 +79,7 @@ for (const locale of ['en', 'de']) test(`creation and import share the responsiv
     await page.evaluate(() => scrollTo(0, 0));
     await page.screenshot({ path: testInfo.outputPath(`creation-${locale}-${width}.png`), fullPage: true });
   }
-  await tasks.getByRole('button', { name: de ? 'Vorschau' : 'Preview', exact: true }).click();
+  await tasks.getByRole('tab', { name: de ? 'Struktur' : 'Structure', exact: true }).click();
   const preview = page.getByRole('region', { name: de ? 'Vorschau des Lesers' : 'Reader preview', exact: true }).filter({ visible: true });
   await expect(preview.locator('[data-preview-kind="appendix"]').first()).toBeVisible();
   const term = preview.getByRole('button', { name: /^Kind name of the level Article:|^Art-Bezeichnung der Ebene Article:/ }).first();

@@ -19,7 +19,7 @@ recorded in `before/captures.json`.
 The mock changes no application route and sends no live application commands.
 Display edits, files, evidence and correction notes stay in browser memory. Drafts
 remain independent across the three page contexts and survive comparison toggles.
-The current application files remain unchanged.
+The accepted design is implemented by the shared runtime frame described in [the workspace contract](../../constitution-structure-workspace.md). This standalone reference continues to use simulated commands.
 
 ## Concrete shared design and behavior
 
@@ -43,8 +43,7 @@ The proposed source metadata is separate. New owners defer document attachment
 until creation, matching the existing workflow.
 
 Only Next navigation and unused server-command boundaries are replaced by local
-adapters. These three screens are a proposed shared-workspace change, not a new
-standalone import editor.
+adapters. These three screens document the accepted shared-workspace design. The application uses its existing Catalog and Ingestion commands.
 
 ## Build and verification
 

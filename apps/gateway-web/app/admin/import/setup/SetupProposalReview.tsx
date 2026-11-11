@@ -11,17 +11,19 @@ import {
 import { ui } from "../../../../lib/messages";
 import { useTranslation } from "../../../components/TranslationProvider";
 import { Stack } from "../../../components/layout/Layout";
-import { Alert, Button, Card } from "../../../components/ui";
+import { Alert, Badge, Button, Card } from "../../../components/ui";
 import {
   StructureWorkspaceTemplate,
   OutlineWorkspace,
-  StructurePreview,
+  StructurePanel,
 } from "../../constitutions/StructureWorkspaceTemplate";
 import {
   explicitLayers,
   withoutExisting,
 } from "../../constitutions/outline-editor-model";
-import { structureUi as copy } from "../../../../lib/structure-workspace";
+import { constitutionWorkspaceUi as m } from "../../../../lib/constitution-workspace-messages";
+import { constitutionTasks } from "../../constitutions/StructureWorkspaceFrame";
+import { ReaderIcon } from "../../../components/ReaderIcon";
 import { OutlineReaderPreview } from "../../constitutions/OutlineReaderPreview";
 import { previewRoots } from "../ImportPreview";
 import { reviewSetupAction } from "./actions";
@@ -55,16 +57,22 @@ export function SetupProposalReview({
   proposal,
   error,
   identity,
+  header,
+  context,
+  documents,
 }: {
   proposal: SetupProposal;
   error?: string;
   identity?: ReactNode;
+  header?: ReactNode;
+  context?: ReactNode;
+  documents?: ReactNode;
 }) {
   const t = useTranslation();
   const [kinds, setKinds] = useState(() => setupKinds(proposal.payload));
   const [message, setMessage] = useState("");
   const [view, setView] = useState(
-    proposal.status === "confirming" || proposal.status === "confirmed"
+    error || proposal.status === "confirming" || proposal.status === "confirmed"
       ? "review"
       : "structure",
   );
@@ -98,136 +106,195 @@ export function SetupProposalReview({
   }
   const layers = explicitLayers(kinds, true),
     sample = previewRoots(proposal.payload.sampleRoots);
-  const tabs = [
-    { id: "structure", label: copy.structure },
-    { id: "preview", label: copy.preview },
-    { id: "proposal", label: copy.proposal },
-    { id: "changes", label: copy.changes },
-    { id: "review", label: copy.review },
-  ];
   return (
-    <>
-      {proposalStatusCard(proposal, error, failed, t)}
-      <StructureWorkspaceTemplate
-        tabs={tabs}
-        active={view}
-        onSelect={setView}
-        primary={
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => setView("review")}
-          >
-            {t(ui.setupReview.title)}
-          </Button>
-        }
-      >
-        <form onSubmit={submit}>
-          <input type="hidden" name="proposalId" value={proposal.id} />
-          <input type="hidden" name="revision" value={proposal.revision} />
-          <input
-            type="hidden"
-            name="display"
-            value={JSON.stringify(displayKinds(kinds))}
-          />
-          <div hidden={view !== "structure"}>
-            <Stack>
-              <OutlineWorkspace
-                layers={layers}
-                onChange={(next) => setKinds(withoutExisting(next))}
-                structural={false}
-                display={editable && !busy}
-                sampleRoots={sample}
-                onRequestChanges={editable ? requestChanges : undefined}
-              />
-              {editable ? (
-                <Button name="intent" value="display" disabled={busy}>
-                  {t(ui.setupReview.save)}
-                </Button>
-              ) : null}
-            </Stack>
-          </div>
-          {view === "preview" ? (
-            <StructurePreview layers={layers} sampleRoots={sample} />
+    <OutlineWorkspace
+      layers={layers}
+      onChange={(next) => setKinds(withoutExisting(next))}
+      structural={false}
+      display={editable && !busy}
+      sampleRoots={sample}
+      onRequestChanges={editable ? requestChanges : undefined}
+      onNavigate={() => setView("structure")}
+    >
+      {({ navigation, content }) => (
+        <StructureWorkspaceTemplate
+          header={header}
+          title={String(proposal.payload.constitutionTitle ?? "")}
+          context={context}
+          navigation={navigation}
+          tabs={constitutionTasks}
+          active={view}
+          onSelect={setView}
+          status={
+            <>
+              <Badge tone={proposal.changesRequested ? "changed" : "info"}>
+                {t(proposalStatus(proposal))}
+              </Badge>
+              <span>
+                {t(ui.setupReview.revision)} {proposal.revision}
+              </span>
+            </>
+          }
+          primary={
+            view !== "review" && (editable || recoverable) ? (
+              <Button type="button" onClick={() => setView("review")}>
+                {t(m.review)}
+                <ReaderIcon name="right" />
+              </Button>
+            ) : null
+          }
+        >
+          {error || failed ? (
+            <Alert tone="error">{t(proposalError(error))}</Alert>
           ) : null}
-          <div hidden={view !== "proposal"}>{identity}</div>
-          <div hidden={view !== "changes"}>{proposalChanges(proposal, t)}</div>
-          <div hidden={view !== "review"}>
-            {proposal.requestedChanges ? (
-              <Card>
-                <h2>{t(ui.setupReview.recorded)}</h2>
-                <p className={styles.feedback}>{proposal.requestedChanges}</p>
-              </Card>
-            ) : null}
-            {recoverable ? (
-              <Card>
-                <Button
-                  variant="primary"
-                  name="intent"
-                  value="confirm"
-                  disabled={busy}
-                >
-                  {t(
-                    busy
-                      ? ui.setupReview.saving
-                      : ui.setupReview.resumeConfirmation,
-                  )}
-                </Button>
-              </Card>
-            ) : null}
-            {editable ? (
-              <Card id="setup-final-review">
-                <h2>{t(ui.admin.import.setup.proposalid.page.finalReview)}</h2>
-                <div className={styles.actions}>
-                  <Button
-                    variant="primary"
-                    name="intent"
-                    value="confirm"
-                    disabled={busy || proposal.changesRequested}
-                  >
-                    {t(busy ? ui.setupReview.saving : ui.setupReview.confirm)}
-                  </Button>
-                </div>
-                <details ref={feedback}>
-                  <summary>{t(ui.setupReview.feedback)}</summary>
-                  <p>{t(ui.setupReview.feedbackHelp)}</p>
-                  <label htmlFor="setup-requested-changes">
-                    {t(ui.setupReview.feedbackLabel)}
-                  </label>
-                  <textarea
-                    id="setup-requested-changes"
-                    name="message"
-                    value={message}
-                    maxLength={4000}
-                    rows={4}
-                    onChange={(event) => setMessage(event.target.value)}
-                  />
+          <form
+            onSubmit={submit}
+            hidden={view === "documents" || view === "history"}
+          >
+            <input type="hidden" name="proposalId" value={proposal.id} />
+            <input type="hidden" name="revision" value={proposal.revision} />
+            <input
+              type="hidden"
+              name="display"
+              value={JSON.stringify(displayKinds(kinds))}
+            />
+            <StructurePanel id="identity" active={view}>
+              <Stack gap="card">
+                {identity}
+                <p className="muted">{t(m.proposalHelp)}</p>
+              </Stack>
+            </StructurePanel>
+            <StructurePanel id="structure" active={view}>
+              <Stack gap="card">
+                <p className="muted">{t(m.proposalHelp)}</p>
+                {content}
+                {editable ? (
                   <div className={styles.actions}>
-                    <Button
-                      name="intent"
-                      value="request-changes"
-                      disabled={busy || message.trim().length < 10}
-                    >
+                    <Button name="intent" value="display" disabled={busy}>
+                      {t(ui.setupReview.save)}
+                    </Button>
+                    <Button type="button" onClick={requestChanges}>
                       {t(ui.setupReview.feedbackButton)}
+                      <ReaderIcon name="right" />
                     </Button>
                   </div>
-                </details>
-                <div className={styles.actions}>
-                  <Button
-                    name="intent"
-                    value="withdraw"
-                    formNoValidate
-                    disabled={busy}
-                  >
-                    {t(ui.admin.import.setup.proposalid.page.withdrawProposal)}
-                  </Button>
-                </div>
-              </Card>
-            ) : null}
-          </div>
-        </form>
-      </StructureWorkspaceTemplate>
-    </>
+                ) : null}
+              </Stack>
+            </StructurePanel>
+            <StructurePanel id="review" active={view}>
+              <Stack gap="card">
+                {proposalStatusCard(proposal, t)}
+                <p>{t(m.setupOnly)}</p>
+                {proposalChanges(proposal, t)}
+                {proposal.requestedChanges ? (
+                  <Card>
+                    <h2>{t(ui.setupReview.recorded)}</h2>
+                    <p className={styles.feedback}>
+                      {proposal.requestedChanges}
+                    </p>
+                  </Card>
+                ) : null}
+                {recoverable ? (
+                  <Card>
+                    <Button
+                      variant="primary"
+                      name="intent"
+                      value="confirm"
+                      disabled={busy}
+                    >
+                      {t(
+                        busy
+                          ? ui.setupReview.saving
+                          : ui.setupReview.resumeConfirmation,
+                      )}
+                    </Button>
+                  </Card>
+                ) : null}
+                {editable ? (
+                  <Card id="setup-final-review">
+                    <h2>
+                      {t(ui.admin.import.setup.proposalid.page.finalReview)}
+                    </h2>
+                    <div className={styles.actions}>
+                      <Button
+                        variant="primary"
+                        name="intent"
+                        value="confirm"
+                        disabled={busy || proposal.changesRequested}
+                      >
+                        {t(
+                          busy ? ui.setupReview.saving : ui.setupReview.confirm,
+                        )}
+                      </Button>
+                    </div>
+                    <details ref={feedback}>
+                      <summary>{t(ui.setupReview.feedback)}</summary>
+                      <p>{t(ui.setupReview.feedbackHelp)}</p>
+                      <label htmlFor="setup-requested-changes">
+                        {t(ui.setupReview.feedbackLabel)}
+                      </label>
+                      <textarea
+                        id="setup-requested-changes"
+                        name="message"
+                        value={message}
+                        maxLength={4000}
+                        rows={4}
+                        onChange={(event) => setMessage(event.target.value)}
+                      />
+                      <div className={styles.actions}>
+                        <Button
+                          name="intent"
+                          value="request-changes"
+                          disabled={busy || message.trim().length < 10}
+                        >
+                          {t(ui.setupReview.feedbackButton)}
+                        </Button>
+                      </div>
+                    </details>
+                    <details>
+                      <summary>
+                        {t(
+                          ui.admin.import.setup.proposalid.page
+                            .withdrawProposal,
+                        )}
+                      </summary>
+                      <p>{t(m.withdrawHelp)}</p>
+                      <Button
+                        name="intent"
+                        value="withdraw"
+                        formNoValidate
+                        disabled={busy}
+                      >
+                        {t(
+                          ui.admin.import.setup.proposalid.page
+                            .withdrawProposal,
+                        )}
+                      </Button>
+                    </details>
+                  </Card>
+                ) : null}
+              </Stack>
+            </StructurePanel>
+          </form>
+          <StructurePanel id="documents" active={view}>
+            {documents}
+          </StructurePanel>
+          <StructurePanel id="history" active={view}>
+            <Stack gap="card">
+              <h3>{t(m.proposalHistory)}</h3>
+              <p>
+                {t(ui.setupReview.revision)} {proposal.revision} ·{" "}
+                {t(proposalStatus(proposal))}
+              </p>
+              {proposalChanges(proposal, t) ?? <p>{t(m.noPreviousProposal)}</p>}
+              {proposal.requestedChanges ? (
+                <p className={styles.feedback}>{proposal.requestedChanges}</p>
+              ) : null}
+            </Stack>
+          </StructurePanel>
+        </StructureWorkspaceTemplate>
+      )}
+    </OutlineWorkspace>
   );
 }
 
@@ -293,13 +360,8 @@ function proposalDifferences(proposal: SetupProposal) {
   return { changedMetadata, hierarchyChanged, sampleChanged, displayChanged };
 }
 
-/** Keeps proposal status, safe error details and resume/reload guidance in their original card. */
-function proposalStatusCard(
-  proposal: SetupProposal,
-  error: string | undefined,
-  failed: boolean,
-  t: SetupTranslation,
-) {
+/** Keeps frozen revision status and resume/reload guidance in the final review. */
+function proposalStatusCard(proposal: SetupProposal, t: SetupTranslation) {
   const editable = proposal.status === "proposed";
   const recoverable = proposal.status === "confirming";
   return (
@@ -314,19 +376,6 @@ function proposalStatusCard(
         <p>{t(ui.setupReview.resume)}</p>
       ) : recoverable ? (
         <p>{t(ui.setupReview.recoveryHelp)}</p>
-      ) : null}
-      {error || failed ? (
-        <Alert tone="error">
-          {t(
-            error === "creation_rejected"
-              ? ui.setupReview.creationRejected
-              : error === "running"
-                ? ui.setupReview.confirmationRunning
-                : error === "stale"
-                  ? ui.setupReview.stale
-                  : ui.setupReview.error,
-          )}
-        </Alert>
       ) : null}
       <a href={`/admin/import/setup/${proposal.id}`}>
         {t(ui.setupReview.reload)}
@@ -387,4 +436,12 @@ function proposalChanges(proposal: SetupProposal, t: SetupTranslation) {
       </details>
     </Card>
   ) : null;
+}
+
+/** Safe error copy retains the server's stale/running/rejected categories. */
+function proposalError(error?: string) {
+  if (error === "creation_rejected") return ui.setupReview.creationRejected;
+  if (error === "running") return ui.setupReview.confirmationRunning;
+  if (error === "stale") return ui.setupReview.stale;
+  return ui.setupReview.error;
 }

@@ -1,20 +1,10 @@
-.tasks {
-  margin-block: var(--gap-card);
-}
-.tasks :global(.btn-primary) {
-  margin-inline-start: auto;
-}
-.tasks [aria-pressed="true"],
 .sections [aria-pressed="true"] {
   background: var(--color-accent-soft);
   color: var(--color-accent-strong);
 }
-.body {
-  padding-block: var(--gap-card);
-}
 .workspace {
   display: grid;
-  grid-template-columns: 172px minmax(0, 1fr) minmax(240px, 0.95fr);
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1fr);
   gap: var(--gap-card);
   align-items: start;
 }
@@ -204,49 +194,23 @@
   gap: var(--gap-field);
   margin-block-start: var(--gap-card);
 }
-.mobile {
-  display: none;
-}
-@media (max-width: 1100px) {
+@media (max-width: 1024px) {
   .workspace {
-    grid-template-columns: 156px minmax(0, 1fr);
-  }
-  .preview {
-    grid-column: 2;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 640px) {
-  .workspace,
   .templates {
     display: block;
-  }
-  .mobile {
-    display: block;
-    margin-block-end: var(--gap-field);
-  }
-  .hierarchy {
-    display: none;
-    margin-block-end: var(--gap-field);
-  }
-  .hierarchy[data-expanded="true"] {
-    display: block;
-  }
-  .workspace > .preview {
-    display: none;
   }
   .fields,
   .editor > header,
   .paper {
-    max-height: min(68vh, 650px);
-    overflow: auto;
     padding: var(--gap-field);
   }
   .more {
     min-width: 44px;
     min-height: 44px;
-  }
-  .tasks {
-    margin-block: var(--gap-field);
   }
   .templates > .preview {
     margin-block-start: var(--gap-card);

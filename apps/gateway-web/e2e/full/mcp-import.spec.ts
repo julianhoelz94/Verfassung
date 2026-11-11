@@ -273,7 +273,7 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     expect((await request.post(`${path}/confirm`, { headers: { Authorization: `Bearer ${key.token}`, 'If-Match': '1' } })).status()).toBe(403);
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto(`/admin/import/setup/${proposalId}`);
-    await expect(page.getByRole('heading', { name: 'Your confirmation is required' })).toBeVisible();
+    await expect(page.getByText('Your confirmation is required', { exact: true }).filter({ visible: true })).toBeVisible();
     await page.getByLabel('Reader-facing name', { exact: true }).fill('Art.');
     await page.getByRole('button', { name: 'Save display settings' }).click();
     await expect.poll(async () => (await (await request.get(path, { headers: admin })).json()).revision).toBe(2);
@@ -283,7 +283,7 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     await page.getByRole('button', { name: 'Request changes', exact: true }).click();
     await page.getByLabel('Requested changes', { exact: true }).fill('Add sentence units without changing the original German wording.');
     await page.getByRole('button', { name: 'Record requested changes' }).click();
-    await expect(page.getByRole('heading', { name: 'Waiting for a revised proposal' })).toBeVisible();
+    await expect(page.getByText('Waiting for a revised proposal', { exact: true }).filter({ visible: true })).toBeVisible();
     await openStructureTask(page, 'Review');
     await expect(page.getByRole('button', { name: 'Confirm structure and enable full upload' })).toBeDisabled();
     const feedback = (await tool(request, 'get_setup_proposal', { proposalId }, key.token)).structuredContent!;
@@ -296,10 +296,10 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     expect(revised.structuredContent?.nextAction).toBe('wait_for_confirmation');
     expect((await request.post(`${path}/confirm`, { headers: { ...admin, 'If-Match': String(feedback.revision) } })).status()).toBe(409);
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Revised proposal ready for review' })).toBeVisible();
-    await openStructureTask(page, 'Changes');
-    await expect(page.getByText('Hierarchy or editing rules changed.')).toBeVisible();
-    await openStructureTask(page, 'Preview');
+    await expect(page.getByText('Revised proposal ready for review', { exact: true }).filter({ visible: true })).toBeVisible();
+    await openStructureTask(page, 'History');
+    await expect(page.getByText('Hierarchy or editing rules changed.').filter({ visible: true })).toBeVisible();
+    await openStructureTask(page, 'Structure');
     await expect(page.locator('[data-preview-kind="sentence"]:visible')).toHaveCount(2);
     await expect(page.locator('[data-preview-kind="article"]:visible')).toContainText('Art. 1');
     await openStructureTask(page, 'Structure');

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { T, useTranslation } from "../../components/TranslationProvider";
 import { ui, type UiMessage } from "../../../lib/messages";
 import type { SettingsImpact } from "../../../lib/api";
@@ -8,15 +7,6 @@ import { Inline } from "../../components/layout/Layout";
 import surfaceStyles from "../../components/surfaces.module.css";
 import type { OutlineLayer } from "./outline-editor-model";
 
-type CreationProps = {
-  guidedCreation: boolean;
-  step: number;
-  basicsSummary: string;
-  layers: OutlineLayer[];
-  serializedOutline: string;
-  children?: ReactNode;
-  advance: () => void;
-};
 type LayerProps = { layer: OutlineLayer; index: number };
 type FeedbackProps = {
   showErrors: boolean;
@@ -38,75 +28,6 @@ type SubmitProps = {
   advance: () => void;
   back: () => void;
 };
-
-/** Guided creation retains stage navigation, the same hidden fields and explicit template selection. */
-export function OutlineCreationHeader({
-  guidedCreation,
-  step,
-  basicsSummary,
-  layers,
-  serializedOutline,
-  children,
-  advance,
-}: CreationProps) {
-  const t = useTranslation();
-  return (
-    <>
-      {guidedCreation ? (
-        <nav
-          className="creation-steps"
-          aria-label={t(ui.accessibility.creationSteps)}
-        >
-          {[
-            ui.outlineDynamic.basics,
-            ui.outlineDynamic.structure,
-            ui.outlineDynamic.reviewCreate,
-          ].map((name, index) => (
-            <span
-              key={name.en}
-              aria-current={step === index + 1 ? "step" : undefined}
-            >
-              {index + 1}. {t(name)}
-            </span>
-          ))}
-        </nav>
-      ) : null}
-      <div hidden={guidedCreation && step !== 1}>{children}</div>
-      <input type="hidden" name="outline" value={serializedOutline} />
-      {guidedCreation && step === 1 ? (
-        <Inline align="end" className="form-row">
-          <Button type="button" variant="primary" onClick={advance}>
-            <T
-              value={ui.admin.constitutions.outlineeditor.continueToStructure}
-            />
-          </Button>
-        </Inline>
-      ) : null}
-      {guidedCreation && step === 3 ? (
-        <section
-          className={["card", surfaceStyles.card].join(" ")}
-          aria-label={t(ui.accessibility.reviewConstitution)}
-        >
-          <h2>
-            <T
-              value={ui.admin.constitutions.outlineeditor.reviewBeforeCreating}
-            />
-          </h2>
-          <p>{basicsSummary}</p>
-          <p>{layers.map((layer) => layer.displayLabel).join(" · ")}</p>
-          <p>
-            <T
-              value={
-                ui.admin.constitutions.outlineeditor
-                  .theNewConstitutionCanBeEditedAfter
-              }
-            />
-          </p>
-        </section>
-      ) : null}
-    </>
-  );
-}
 
 /** Read-only final settings use the same effective display rules as the live reader. */
 export function OutlineReviewCard({

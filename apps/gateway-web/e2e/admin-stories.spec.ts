@@ -133,7 +133,7 @@ test('administrator creates a constitution and changes its outline settings', as
   await page.getByLabel('Constitution title').fill('Test Constitution');
   await page.getByRole('button', { name: 'Continue to structure' }).click();
   await page.getByRole('button', { name: 'Use this template', exact: true }).click();
-  await page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Paragraph Structural level', exact: true }).first().click();
+  await page.getByRole('navigation', { name: 'Levels', exact: true }).getByRole('button', { name: 'Paragraph Structural level', exact: true }).first().click();
   await page.getByRole('textbox', { name: 'Reader-facing name', exact: true }).fill('Clause');
   await page.getByRole('button', { name: 'Continue to review' }).click();
   await expect(page.getByRole('heading', { name: 'Review before creating' })).toBeVisible();
@@ -143,18 +143,18 @@ test('administrator creates a constitution and changes its outline settings', as
   await expect(page).toHaveURL(/\/admin\/constitutions\/[^/?]+$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Test Constitution' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Import the first version' })).toBeVisible();
-  await page.getByRole('button', { name: /^Levels ·/ }).click();
-  await page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Clause Structural level', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Show overview', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Levels', exact: true }).getByRole('button', { name: 'Clause Structural level', exact: true }).first().click();
   await expect(page.getByRole('textbox', { name: 'Reader-facing name', exact: true })).toHaveValue('Clause');
   await page.getByLabel('How this layer is shown').selectOption('concatenated');
-  await page.getByRole('navigation', { name: 'Structure', exact: true }).getByRole('button', { name: 'Review impact', exact: true }).first().click();
+  await page.getByRole('tab', { name: 'Review', exact: true }).first().click();
   await page.getByRole('button', { name: 'Preview change impact' }).click();
   await expect(page.getByRole('heading', { name: 'Safe to save' })).toBeVisible();
   await page.getByRole('button', { name: 'Save outline' }).click();
   await expect(page).toHaveURL(/saved=1/, { timeout: 30000 });
   await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
-  await page.getByRole('button', { name: /^Levels ·/ }).click();
-  await page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Clause Structural level', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Show overview', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Levels', exact: true }).getByRole('button', { name: 'Clause Structural level', exact: true }).first().click();
   await expect(page.getByLabel('How this layer is shown')).toHaveValue('concatenated');
 });
 
@@ -169,7 +169,7 @@ test('constitution preview explains units and shows running sentences throughout
   const preview = page.getByRole('region', { name: 'Reader preview', exact: true }).filter({ visible: true });
   await expect(preview.getByRole('heading', { name: 'Structure map' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Use this template', exact: true }).click();
-  await page.getByRole('complementary', { name: 'Levels', exact: true }).getByRole('button', { name: 'Article Structural level', exact: true }).first().click();
+  await page.getByRole('navigation', { name: 'Levels', exact: true }).getByRole('button', { name: 'Article Structural level', exact: true }).first().click();
   await page.getByRole('region', { name: 'Article Structure', exact: true }).getByRole('button', { name: 'Editing', exact: true }).click();
   await page.getByLabel('Allow text alongside child units').check();
   const sentences = preview.locator('.constitution-concat').first().locator('[data-preview-kind="sentence"]');
@@ -203,7 +203,7 @@ test('constitution preview explains units and shows running sentences throughout
     await phone.getByLabel('Constitution title').fill('Mobile Constitution');
     await phone.getByRole('button', { name: 'Continue to structure' }).click();
     await phone.getByRole('button', { name: 'Use this template', exact: true }).click();
-    await phone.getByRole('navigation', { name: 'Structure', exact: true }).getByRole('button', { name: 'Preview', exact: true }).click();
+    await phone.getByRole('tab', { name: 'Structure', exact: true }).click();
     const phonePreview = phone.getByRole('region', { name: 'Reader preview', exact: true }).filter({ visible: true });
     // Tap actual text rather than the bounding box of a wrapped inline sentence.
     await phonePreview.locator('[data-preview-kind="sentence"]').first().scrollIntoViewIfNeeded();
@@ -277,7 +277,7 @@ test('outline mixed-content preview follows permissions on desktop and mobile', 
   await permission.uncheck();
   await expect(preview.locator('[data-preview-kind="article"] > .node-tree > p')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('navigation', { name: 'Structure', exact: true }).getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByRole('tab', { name: 'Structure', exact: true }).click();
   await expect(preview).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   await page.screenshot({ path: testInfo.outputPath('outline-mobile.png'), fullPage: true });
@@ -313,7 +313,7 @@ test('administrator previews a structure proposal uploaded as a JSON file', asyn
   });
   await page.getByRole('button', { name: 'Preview proposed structure' }).click();
   await expect(page).toHaveURL(/\/admin\/import\/setup\/[^/?]+$/);
-  await page.getByRole('navigation', { name: 'Structure', exact: true }).getByRole('button', { name: 'Proposal', exact: true }).click();
+  await page.getByRole('tab', { name: 'Details', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Source and identity' })).toBeVisible();
   await expect(page.getByText('Germany (DE) · Uploaded structure proposal')).toBeVisible();
 });

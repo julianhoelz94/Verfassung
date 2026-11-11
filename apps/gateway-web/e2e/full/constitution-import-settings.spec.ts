@@ -32,7 +32,7 @@ const select = (scope: Locator, name: string) => scope.locator(`select[name^="${
 async function saveSettings(page: Page) {
   const revision = page.locator('input[name="settingsRevisionId"]').first();
   const previousRevision = await revision.inputValue();
-  await openStructureTask(page, 'Review impact');
+  await openStructureTask(page, 'Review');
   const save = page.getByRole('button', { name: 'Save outline', exact: true });
   await expect(save).toBeDisabled();
   await page.getByRole('button', { name: 'Preview change impact', exact: true }).click();

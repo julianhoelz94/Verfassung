@@ -121,13 +121,89 @@ it("restores history into an unsaved draft and still requires another impact che
 });
 
 it("does not flag a connected kind merely because an orphan also references it", () => {
-  const layers = explicitLayers([
-    { ...DEFAULT_NEW_OUTLINE[0], root: true, allowedChildKinds: ["sentence"] },
-    { ...DEFAULT_NEW_OUTLINE[1], root: false, allowedChildKinds: ["sentence"] },
-    { ...DEFAULT_NEW_OUTLINE[2], root: false, allowedChildKinds: [] },
-  ], false);
+  const layers = explicitLayers(
+    [
+      {
+        ...DEFAULT_NEW_OUTLINE[0],
+        root: true,
+        allowedChildKinds: ["sentence"],
+      },
+      {
+        ...DEFAULT_NEW_OUTLINE[1],
+        root: false,
+        allowedChildKinds: ["sentence"],
+      },
+      { ...DEFAULT_NEW_OUTLINE[2], root: false, allowedChildKinds: [] },
+    ],
+    false,
+  );
   const branches = outlineBranches(layers);
   expect(branches[1].unplaced).toBe(true);
   expect(branches[1].children[0].unplaced).toBe(false);
   expect(outlineGraphProblem(layers)?.en).toContain("Connect every kind");
+});
+
+it("keeps basics, structure and an unfinished document upload mounted across tabs and the overview toggle", async () => {
+  const { getByLabelText } = await import("@testing-library/dom");
+  view = await mount(
+    <OutlineEditor
+      initial={DEFAULT_NEW_OUTLINE}
+      guidedCreation
+      documents={
+        <label>
+          Evidence file
+          <input type="file" aria-label="Evidence file" />
+        </label>
+      }
+    >
+      <input
+        name="title"
+        aria-label="Constitution title"
+        required
+        defaultValue="Draft charter"
+      />
+    </OutlineEditor>,
+  );
+  const title = getByLabelText(view.host, "Constitution title");
+  await click(getByRole(view.host, "tab", { name: "Documents" }));
+  const upload = getByLabelText(view.host, "Evidence file") as HTMLInputElement;
+  const file = new File(["unfinished"], "evidence.txt", { type: "text/plain" });
+  fireEvent.change(upload, { target: { files: [file] } });
+  expect(upload.form).toBeNull();
+  await click(getByRole(view.host, "tab", { name: "Structure", exact: true }));
+  await change(view.host.querySelector('[name="label-0"]')!, "Edited article");
+  await click(
+    getByRole(view.host, "button", { name: /Hide overview|Show overview/ }),
+  );
+  await click(getByRole(view.host, "tab", { name: "Details" }));
+  expect(getByLabelText(view.host, "Constitution title")).toBe(title);
+  expect((title as HTMLInputElement).value).toBe("Draft charter");
+  await click(getByRole(view.host, "tab", { name: "Documents" }));
+  expect(getByLabelText(view.host, "Evidence file")).toBe(upload);
+  expect(upload.files?.[0]).toBe(file);
+  expect(data()[0].displayLabel).toBe("Edited article");
+});
+
+it("requires valid basics when entering Review directly and supports keyboard tab navigation", async () => {
+  view = await mount(
+    <OutlineEditor initial={DEFAULT_NEW_OUTLINE} guidedCreation>
+      <input name="title" required aria-label="Title" />
+    </OutlineEditor>,
+  );
+  const details = getByRole(view.host, "tab", { name: "Details" });
+  await click(getByRole(view.host, "tab", { name: "Review", exact: true }));
+  expect(details.getAttribute("aria-selected")).toBe("true");
+  expect(
+    view.host.querySelector('[data-create="true"]')?.closest("[hidden]"),
+  ).not.toBeNull();
+  await act(async () => fireEvent.keyDown(details, { key: "ArrowRight" }));
+  const structure = getByRole(view.host, "tab", {
+    name: "Structure",
+    exact: true,
+  });
+  expect(document.activeElement).toBe(structure);
+  expect(structure.getAttribute("aria-selected")).toBe("true");
+  expect(
+    document.getElementById(structure.getAttribute("aria-controls")!)?.hidden,
+  ).toBe(false);
 });

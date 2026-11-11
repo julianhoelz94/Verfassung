@@ -7,6 +7,8 @@ export async function openStructureTask(page: Page, name: "Details" | "Structure
 
 /** The viewer-style overview toggle owns the same hierarchy on desktop and mobile. */
 export async function selectStructureLevel(page: Page, name: string, section?: "Structure" | "Editing" | "Display") {
+  // Streaming HTML can be visible before its responsive client state is restored.
+  await expect(page.locator("[data-workspace-ready=true]")).toBeVisible();
   const overview = page.locator("#structure-contents");
   await expect(page.getByRole("tab", { name: "Structure", exact: true })).toBeVisible();
   if (!(await overview.isVisible())) await page.getByRole("button", { name: "Show overview", exact: true }).click();

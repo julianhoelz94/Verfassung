@@ -71,13 +71,14 @@ export function StructureWorkspaceFrame({
     menu = useRef<HTMLDivElement>(null),
     contents = useRef<HTMLElement>(null);
   usePageChromeMetrics(root, menu, contents);
+  // The server has no viewport; null distinguishes hydration from a collapsed pane.
   const desktop = useSyncExternalStore(
     subscribeViewport,
     desktopViewport,
-    () => false,
+    () => null,
   );
   const [override, setOverride] = useState<boolean>();
-  const expanded = override ?? desktop;
+  const expanded = override ?? desktop ?? false;
   function keyboard(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const next = nextTab(event.key, index, tabs.length);
     if (next === null) return;
@@ -87,7 +88,7 @@ export function StructureWorkspaceFrame({
   }
   return (
     <FullWidthPage template="workspace">
-      <PageChromeSurface ref={root}>
+      <PageChromeSurface ref={root} data-workspace-ready={desktop !== null}>
         <div className={styles.header}>
           {header ?? <PageHeader separator={false} title={t(m.title)} />}
         </div>

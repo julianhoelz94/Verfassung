@@ -35,3 +35,5 @@ The accepted reference, including actual before screenshots, is [the interactive
 ## Verification
 
 Check graph updates and rejection without writes, all five preset graphs, metadata visibility independent of numbering, exact text/mark/table preservation, read-only import payloads, impact/stale gates, history-to-draft behavior, browser preference restoration and absence of draft operations from display changes. Inspect the running application in English and German at desktop and narrow widths, including contextual tools, native disclosures and keyboard/touch help. Run gateway unit tests, typecheck, lint, build and focused browser journeys.
+
+Streaming server markup can appear before the responsive client state has hydrated. `StructureWorkspaceFrame` exposes `data-workspace-ready` when its client viewport snapshot is available. Browser level-selection helpers wait for that state before deciding whether to open the overview; a transient server-rendered closed pane must not be mistaken for the user’s choice.

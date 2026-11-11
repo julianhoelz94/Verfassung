@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures/consent';
 import { signInAdmin, startEditorSession, VERSION_2022 } from './helpers';
+import { selectStructureLevel } from './structure-workspace';
 
 test.use({ actionTimeout: 10000 });
 
@@ -56,6 +57,8 @@ test('one structure workspace retains native help, explicit placement and save r
   await page.getByRole('button', { name: 'Save outline', exact: true }).click();
   await expect(page).toHaveURL(/saved=1/);
   await expect(page.getByText('Settings saved. Historical versions retain their structural settings.')).toBeVisible();
+  await selectStructureLevel(page, 'Clause', 'Display');
+  await expect(page.getByRole('textbox', { name: 'Reader-facing name', exact: true })).toHaveValue('Clause');
   await page.screenshot({ path: testInfo.outputPath('settings-desktop.png'), fullPage: true });
 });
 

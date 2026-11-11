@@ -60,7 +60,7 @@ it('reuses the upload operation after a failed request and keeps required upload
 
 it('updates controlled source pins without remounting unfinished optional upload fields', async () => {
   const onChange = vi.fn(), onDetach = vi.fn().mockReturnValue(false);
-  const render = (references: { documentId: string; revision: number }[]) => root.render(<StagedDocumentPicker references={references} onChange={onChange} onDetach={onDetach} />);
+  const render = (references: { documentId: string; revision: number; citationNote?: string }[]) => root.render(<StagedDocumentPicker references={references} onChange={onChange} onDetach={onDetach} />);
   await act(async () => render([]));
   await click('Upload new document');
   await act(async () => fireEvent.change(getByLabelText(host, 'Title', { exact: true }), { target: { value: 'Unfinished upload' } }));
@@ -71,6 +71,8 @@ it('updates controlled source pins without remounting unfinished optional upload
   expect((getByLabelText(host, 'Source URL') as HTMLInputElement).value).toBe('https://example.org/retained');
   expect(optional.parentElement!.hasAttribute('open')).toBe(true);
   expect(getByRole(host, 'link', { name: 'Official source' }).getAttribute('href')).toContain('revision=2');
+  await act(async () => render([{ documentId: doc.id, revision: 2, citationNote: 'Revised source note' }]));
+  expect(host.textContent).toContain('Revised source note');
   await click('Detach: Official source'); expect(onChange).not.toHaveBeenCalled();
   onDetach.mockReturnValue(true); await click('Detach: Official source'); expect(onChange).toHaveBeenCalledWith([]);
 });

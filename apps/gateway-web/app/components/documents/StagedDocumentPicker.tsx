@@ -63,7 +63,7 @@ export function StagedDocumentPicker({ name, form, heading, headingLevel = 'h2',
     })).then(value => {
       setLinks(current => selectedReferences.current.flatMap(ref => {
         const link = current.find(item => item.documentId === ref.documentId && item.document.revision.revision === ref.revision) ?? value.find(item => item.documentId === ref.documentId && item.document.revision.revision === ref.revision);
-        return link ? [link] : [];
+        return link ? [{ ...link, citationNote: ref.citationNote }] : [];
       }));
     }).catch(fail);
   }

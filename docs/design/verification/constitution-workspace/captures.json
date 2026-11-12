@@ -1,0 +1,17 @@
+{
+  "environment": "Local production application with synthetic API fixtures; no live user data.",
+  "browser": "System Chromium; behavior evidence, not golden baselines.",
+  "view": "Structure tab; creation has an unsaved synthetic title.",
+  "screenshots": [
+    "create-de-1440.png",
+    "create-de-390.png",
+    "proposal-de-1440.png",
+    "proposal-de-390.png",
+    "settings-de-1440.png",
+    "settings-de-390.png"
+  ],
+  "details_screenshots": [
+    "settings-de-1440-details.png",
+    "proposal-de-1440-details.png"
+  ]
+}

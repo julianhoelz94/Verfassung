@@ -5,13 +5,17 @@ import { ui, type UiMessage } from "../../../lib/messages";
 import type { FormEvent, ReactNode } from "react";
 import { useRef, useState } from "react";
 import { Button } from "../../components/ui";
+import { ReaderIcon } from "../../components/ReaderIcon";
 import { structureUi as copy } from "../../../lib/structure-workspace";
+import { constitutionWorkspaceUi as m } from "../../../lib/constitution-workspace-messages";
 import {
   StructureWorkspaceTemplate,
   OutlineWorkspace,
   StructureTemplates,
-  StructurePreview,
+  StructurePanel,
 } from "./StructureWorkspaceTemplate";
+import { constitutionTasks } from "./StructureWorkspaceFrame";
+import { StructureOverview } from "./StructureOverview";
 import type {
   OutlineKindWrite,
   SettingsImpact,
@@ -23,19 +27,21 @@ import {
 } from "../../../lib/constitution-templates";
 import { saveOutlineAction, previewOutlineImpactAction } from "./actions";
 import { Stack } from "../../components/layout/Layout";
+import { OutlineFeedback, OutlineSubmitActions } from "./OutlineCreationStages";
 import {
-  OutlineCreationHeader,
-  OutlineReviewCard,
-  OutlineFeedback,
-  OutlineSubmitActions,
-} from "./OutlineCreationStages";
-import {
-  exampleOutlineFor,
   explicitLayers,
   outlineValidationError,
   withoutExisting,
   type OutlineLayer as Layer,
 } from "./outline-editor-model";
+import {
+  OutlineDraftStatus,
+  CreationSteps,
+  OutlineIdentityPanel,
+  OutlineStructurePanel,
+  OutlineReviewPanel,
+  OutlineHistoryPanel,
+} from "./OutlineEditorPanels";
 
 type OutlineEditorProps = {
   constitutionId?: string;
@@ -49,9 +55,15 @@ type OutlineEditorProps = {
   documents?: ReactNode;
   history?: ReactNode;
   previous?: { id: string; kinds: OutlineKindWrite[] };
+  header?: ReactNode;
+  title?: string;
+  context?: ReactNode;
+  identity?: ReactNode;
+  notices?: ReactNode;
+  existing?: ReactNode;
 };
 
-/** Controlled outline editing and guided creation retain their existing form, review and impact gates. */
+/** Workflow commands stay here; the same frame and selected-level editor serve every owner. */
 export function OutlineEditor({
   constitutionId,
   settingsRevisionId,
@@ -64,303 +76,339 @@ export function OutlineEditor({
   documents,
   history,
   previous,
+  header,
+  title,
+  context,
+  identity,
+  notices,
+  existing,
 }: OutlineEditorProps) {
-  const formRef = useRef<HTMLFormElement>(null);
-  const [step, setStep] = useState(1);
-  const [view, setView] = useState("structure");
-  const [template, setTemplate] = useState<ConstitutionTemplate>("articles");
-  const t = useTranslation();
-  const [showErrors, setShowErrors] = useState(false);
-  const [basicsSummary, setBasicsSummary] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [layers, setLayers] = useState<Layer[]>(
+  const t = useTranslation(),
+    formRef = useRef<HTMLFormElement>(null),
+    impactRequest = useRef(0);
+  const [view, setView] = useState(guidedCreation ? "identity" : "structure");
+  const [template, setTemplate] = useState<ConstitutionTemplate>("articles"),
+    [templates, setTemplates] = useState(false);
+  const [showErrors, setShowErrors] = useState(false),
+    [basicsSummary, setBasicsSummary] = useState("");
+  const [draftIdentity, setDraftIdentity] = useState({ title: "", owner: "" }),
+    [submitting, setSubmitting] = useState(false);
+  const [layers, setLayers] = useState<Layer[]>(() =>
     explicitLayers(initial, Boolean(constitutionId)),
   );
+  const [impact, setImpact] = useState<SettingsImpact | null>(null),
+    [impactError, setImpactError] = useState(false);
+  const [submitError, setSubmitError] = useState(false),
+    [checking, setChecking] = useState(false);
+  const validationError = outlineValidationError(layers);
+  const outlineError = validationError ? t(validationError) : null;
+  const dirty =
+    JSON.stringify(withoutExisting(layers)) !==
+    JSON.stringify(
+      withoutExisting(explicitLayers(initial, Boolean(constitutionId))),
+    );
 
-  const [impact, setImpact] = useState<SettingsImpact | null>(null);
-  const [impactError, setImpactError] = useState(false);
-  const [submitError, setSubmitError] = useState(false);
-  const [checking, setChecking] = useState(false);
-
-  /** Preview checks do not save and retain redirect, loading and failure precedence. */
+  /** Ignore an older check when editing or restoring a draft has invalidated its inputs. */
   async function checkImpact() {
     if (outlineError) {
       setShowErrors(true);
       return;
     }
+    const request = ++impactRequest.current;
     setChecking(true);
     setImpactError(false);
+    setImpact(null);
     try {
       const data = new FormData();
       data.set("constitutionId", constitutionId ?? "");
       data.set("outline", JSON.stringify(withoutExisting(layers)));
       const result = await previewOutlineImpactAction(data);
+      if (request !== impactRequest.current) return;
       if ("redirectTo" in result) {
         window.location.assign(result.redirectTo);
         return;
       }
       setImpact(result);
     } catch {
-      setImpactError(true);
+      if (request === impactRequest.current) setImpactError(true);
     } finally {
-      setChecking(false);
+      if (request === impactRequest.current) setChecking(false);
     }
   }
-
   function changeLayers(next: Layer[]) {
+    impactRequest.current++;
     setImpact(null);
+    setChecking(false);
+    setImpactError(false);
     setLayers(next);
   }
-
-  const exampleOutline = exampleOutlineFor(layers);
-  const validationError = outlineValidationError(layers);
-  const outlineError = validationError ? t(validationError) : null;
-
-  /** Selecting a template resets only the unsaved structure and its visible validation state. */
   function chooseTemplate(id: ConstitutionTemplate) {
     setTemplate(id);
-    setLayers(explicitLayers(outlineFromTemplate(id), false));
+    changeLayers(explicitLayers(outlineFromTemplate(id), false));
     setShowErrors(false);
-    setView("structure");
+    setTemplates(false);
   }
-
-  /** Back navigation preserves edited levels while clearing visible validation feedback. */
-  function back() {
-    setStep(step === 3 ? 2 : 1);
-    setView("structure");
-    setShowErrors(false);
+  function readBasics() {
+    if (!guidedCreation || !formRef.current) return;
+    const data = new FormData(formRef.current);
+    const country = formRef.current.querySelector<HTMLSelectElement>(
+      '[name="countryChoice"]',
+    );
+    const owner =
+      data.get("countryChoice") === "__new__"
+        ? `${data.get("countryName") || ""} (${data.get("isoCode") || ""})`
+        : (country?.selectedOptions[0]?.textContent ?? "");
+    setDraftIdentity({ title: String(data.get("title") ?? ""), owner });
   }
-
-  /** Basic native constraints precede outline validation and review. */
-  function advance() {
-    if (step === 1) {
-      if (!formRef.current?.reportValidity()) return;
-      const data = new FormData(formRef.current);
-      setBasicsSummary(
-        `${data.get("title") || t(ui.remainingStatus.untitledConstitution)} · ${data.get("isoCode") || ""}`,
-      );
-      setStep(2);
-      setView("templates");
-      return;
+  function validBasics() {
+    const form = formRef.current;
+    if (!form) return false;
+    if (!form.checkValidity()) {
+      setView("identity");
+      requestAnimationFrame(() => form.reportValidity());
+      return false;
     }
+    const data = new FormData(form);
+    setBasicsSummary(
+      `${data.get("title") || t(ui.remainingStatus.untitledConstitution)} · ${data.get("isoCode") || ""}`,
+    );
+    return true;
+  }
+  function review() {
+    if (guidedCreation && !validBasics()) return false;
     if (outlineError) {
       setShowErrors(true);
-      return;
+      setView("structure");
+      return false;
     }
-    setStep(3);
     setView("review");
+    return true;
   }
-
-  /** Creation requires the explicit reviewed submitter; native fields retain their order and values. */
+  function selectTask(next: string) {
+    if (next === "review") return review();
+    setView(next);
+  }
+  function advance() {
+    if (view === "identity") {
+      if (!validBasics()) return;
+      setView("structure");
+      setTemplates(true);
+    } else review();
+  }
+  function primary() {
+    if (review() && constitutionId) void checkImpact();
+  }
+  /** An implicit Enter can advance creation, but only its explicit reviewed button can create. */
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
     if (
       guidedCreation &&
-      (step !== 3 || submitter?.getAttribute("data-create") !== "true")
+      (view !== "review" || submitter?.getAttribute("data-create") !== "true")
     ) {
-      if (step !== 3) advance();
+      if (view !== "review") advance();
       return;
     }
     if (outlineError) {
       setShowErrors(true);
+      setView("structure");
       return;
     }
     if (submitting) return;
     setSubmitting(true);
     setSubmitError(false);
     try {
-      const destination = await action(new FormData(event.currentTarget));
-      window.location.assign(destination);
+      window.location.assign(await action(new FormData(event.currentTarget)));
     } catch {
       setSubmitting(false);
       setSubmitError(true);
     }
   }
-  const tabs = structureTasks(
-    guidedCreation,
-    Boolean(constitutionId),
-    Boolean(documents) || guidedCreation,
-    Boolean(history || previous),
-  );
-  function selectTask(next: string) {
-    if (guidedCreation && next === "review" && step !== 3) {
-      advance();
-      return;
-    }
-    if (guidedCreation && step === 3 && next !== "review") setStep(2);
-    setView(next);
-  }
-  const visible = !guidedCreation || step !== 1;
+  const step = view === "identity" ? 1 : view === "review" ? 3 : 2;
   return (
-    <StructureWorkspaceTemplate
-      tabs={visible ? tabs : []}
-      active={view}
-      onSelect={selectTask}
-      primary={
-        constitutionId && view !== "review" ? (
-          <Button
-            type="button"
-            variant="primary"
-            disabled={checking}
-            onClick={() => {
-              setView("review");
-              void checkImpact();
-            }}
-          >
-            {t(ui.outlineDynamic.previewImpact)}
-          </Button>
-        ) : null
-      }
+    <OutlineWorkspace
+      layers={layers}
+      onChange={changeLayers}
+      sampleRoots={sampleRoots}
+      onNavigate={() => setView("structure")}
     >
-      <Stack
-        as="form"
-        elementRef={formRef}
-        onSubmit={onSubmit}
-        hidden={view === "documents" || view === "history"}
-      >
-        {constitutionId ? (
-          <input type="hidden" name="constitutionId" value={constitutionId} />
-        ) : null}
-        {settingsRevisionId ? (
-          <input
-            type="hidden"
-            name="settingsRevisionId"
-            value={settingsRevisionId}
-          />
-        ) : null}
-        <OutlineCreationHeader
-          guidedCreation={guidedCreation}
-          step={step}
-          basicsSummary={basicsSummary}
-          layers={layers}
-          serializedOutline={JSON.stringify(withoutExisting(layers))}
-          advance={advance}
-        >
-          {children}
-        </OutlineCreationHeader>
-        {visible ? (
-          <>
-            {guidedCreation && view === "templates" ? (
-              <StructureTemplates value={template} onChoose={chooseTemplate} />
-            ) : null}
-            <div hidden={view !== "structure"}>
-              <OutlineWorkspace
-                layers={layers}
-                onChange={changeLayers}
-                sampleRoots={sampleRoots}
-              />
-            </div>
-            {view === "preview" ? (
-              <StructurePreview layers={layers} sampleRoots={sampleRoots} />
-            ) : null}
-            <div hidden={view !== "review"}>
-              {guidedCreation && step === 3 ? (
-                <Stack aria-label={t(ui.accessibility.finalStructureSettings)}>
-                  {layers.map((layer, index) => (
-                    <OutlineReviewCard
-                      key={index}
-                      layer={layer}
-                      index={index}
-                      displayKind={exampleOutline.kinds[index]}
-                    />
-                  ))}
-                </Stack>
-              ) : null}
-              <OutlineFeedback
-                showErrors={showErrors}
-                outlineError={outlineError}
-                impactError={impactError}
-                submitError={submitError}
-                impact={impact}
-              />
-            </div>
-            {showErrors && outlineError && view !== "review" ? (
-              <p role="alert">{outlineError}</p>
-            ) : null}
-          </>
-        ) : null}
-        <div hidden={!visible || (!guidedCreation && view !== "review")}>
-          <OutlineSubmitActions
-            constitutionId={constitutionId}
-            settingsRevisionId={settingsRevisionId}
-            guidedCreation={guidedCreation}
-            step={step}
-            submitting={submitting}
-            checking={checking}
-            impact={impact}
-            submitLabel={submitLabel}
-            checkImpact={checkImpact}
-            advance={advance}
-            back={back}
-          />
-        </div>
-      </Stack>
-      <ExtraTasks
-        view={view}
-        documents={documents}
-        history={history}
-        previous={previous}
-        guidedCreation={guidedCreation}
-        onRestore={(kinds) => {
-          changeLayers(explicitLayers(kinds, true));
-          setView("review");
-        }}
-      />
-    </StructureWorkspaceTemplate>
-  );
-}
-
-function structureTasks(
-  creation: boolean,
-  existing: boolean,
-  documents: boolean,
-  history: boolean,
-) {
-  return [
-    ...(creation ? [{ id: "templates", label: copy.templates }] : []),
-    { id: "structure", label: copy.structure },
-    { id: "preview", label: copy.preview },
-    { id: "review", label: existing ? copy.impact : copy.review },
-    ...(documents ? [{ id: "documents", label: copy.documents }] : []),
-    ...(history ? [{ id: "history", label: copy.history }] : []),
-  ];
-}
-function ExtraTasks({
-  view,
-  documents,
-  history,
-  previous,
-  guidedCreation,
-  onRestore,
-}: Pick<
-  OutlineEditorProps,
-  "documents" | "history" | "previous" | "guidedCreation"
-> & { view: string; onRestore: (kinds: OutlineKindWrite[]) => void }) {
-  const t = useTranslation();
-  return (
-    <>
-      {documents || guidedCreation ? (
-        <div hidden={view !== "documents"}>
-          {documents ?? <p>{t(copy.documentsAfterCreate)}</p>}
-        </div>
-      ) : null}
-      {history || previous ? (
-        <div hidden={view !== "history"}>
-          {previous ? (
-            <Stack>
-              <h2>{t(copy.previous)}</h2>
-              <p>{t(copy.restoreHelp)}</p>
-              <Button type="button" onClick={() => onRestore(previous.kinds)}>
-                {t(copy.restoreDraft)}
+      {({ navigation, content }) => (
+        <StructureWorkspaceTemplate
+          header={header}
+          title={draftIdentity.title || title || t(m.newConstitution)}
+          context={
+            context ?? (
+              <p>
+                {draftIdentity.owner ||
+                  t(guidedCreation ? m.create : m.settings)}
+              </p>
+            )
+          }
+          navigation={navigation}
+          tabs={constitutionTasks}
+          active={view}
+          onSelect={selectTask}
+          status={
+            <OutlineDraftStatus creation={guidedCreation} dirty={dirty} />
+          }
+          primary={
+            view !== "review" ? (
+              <Button
+                type="button"
+                onClick={primary}
+                disabled={submitting || checking}
+              >
+                {t(constitutionId ? copy.impact : m.review)}
+                <ReaderIcon name="right" />
               </Button>
-              <StructurePreview layers={explicitLayers(previous.kinds, true)} />
-            </Stack>
-          ) : (
-            history
-          )}
-        </div>
-      ) : null}
-    </>
+            ) : null
+          }
+        >
+          {notices}
+          {guidedCreation ? <CreationSteps step={step} /> : null}
+          <Stack
+            as="form"
+            elementRef={formRef}
+            onSubmit={onSubmit}
+            onChange={readBasics}
+            hidden={view === "documents" || view === "history"}
+          >
+            {constitutionId ? (
+              <input
+                type="hidden"
+                name="constitutionId"
+                value={constitutionId}
+              />
+            ) : null}
+            {settingsRevisionId ? (
+              <input
+                type="hidden"
+                name="settingsRevisionId"
+                value={settingsRevisionId}
+              />
+            ) : null}
+            <input
+              type="hidden"
+              name="outline"
+              value={JSON.stringify(withoutExisting(layers))}
+            />
+            <StructurePanel id="identity" active={view}>
+              <Stack gap="section">
+                <OutlineIdentityPanel
+                  identity={identity}
+                  title={title}
+                  creation={guidedCreation}
+                  existing={existing}
+                  advance={advance}
+                >
+                  {children}
+                </OutlineIdentityPanel>
+                {!guidedCreation ? (
+                  <StructureOverview
+                    layers={layers}
+                    onInspect={() => setView("structure")}
+                  />
+                ) : null}
+              </Stack>
+            </StructurePanel>
+            <StructurePanel id="structure" active={view}>
+              <OutlineStructurePanel
+                error={showErrors ? outlineError : null}
+                toggleTemplates={
+                  guidedCreation ? (
+                    <Button
+                      type="button"
+                      aria-expanded={templates}
+                      onClick={() => setTemplates(!templates)}
+                    >
+                      {t(copy.chooseTemplate)}
+                    </Button>
+                  ) : null
+                }
+                templates={
+                  guidedCreation ? (
+                    <div hidden={!templates}>
+                      <StructureTemplates
+                        value={template}
+                        onChoose={chooseTemplate}
+                      />
+                    </div>
+                  ) : null
+                }
+                next={
+                  <Button
+                    type="button"
+                    onClick={guidedCreation ? () => review() : primary}
+                  >
+                    {t(
+                      constitutionId
+                        ? copy.impact
+                        : ui.admin.constitutions.outlineeditor.continueToReview,
+                    )}
+                    <ReaderIcon name="right" />
+                  </Button>
+                }
+              >
+                {content}
+              </OutlineStructurePanel>
+            </StructurePanel>
+            <StructurePanel id="review" active={view}>
+              <OutlineReviewPanel
+                creation={guidedCreation}
+                summary={basicsSummary}
+                layers={layers}
+              >
+                <OutlineFeedback
+                  showErrors={false}
+                  outlineError={outlineError}
+                  impactError={impactError}
+                  submitError={submitError}
+                  impact={impact}
+                />
+                {impact?.classification === "migration_required" ? (
+                  <p>{t(m.migration)}</p>
+                ) : null}
+                <OutlineSubmitActions
+                  constitutionId={constitutionId}
+                  settingsRevisionId={settingsRevisionId}
+                  guidedCreation={guidedCreation}
+                  step={step}
+                  submitting={submitting}
+                  checking={checking}
+                  impact={impact}
+                  submitLabel={submitLabel}
+                  checkImpact={checkImpact}
+                  advance={advance}
+                  back={() => setView("structure")}
+                />
+              </OutlineReviewPanel>
+            </StructurePanel>
+            {submitError && view !== "review" ? (
+              <OutlineFeedback
+                showErrors={false}
+                outlineError={null}
+                impactError={false}
+                submitError
+                impact={null}
+              />
+            ) : null}
+          </Stack>
+          <StructurePanel id="documents" active={view}>
+            {documents ?? <p>{t(copy.documentsAfterCreate)}</p>}
+          </StructurePanel>
+          <StructurePanel id="history" active={view}>
+            <OutlineHistoryPanel
+              previous={previous}
+              history={history}
+              creation={guidedCreation}
+              onRestore={(kinds) => {
+                changeLayers(explicitLayers(kinds, true));
+                setView("review");
+              }}
+            />
+          </StructurePanel>
+        </StructureWorkspaceTemplate>
+      )}
+    </OutlineWorkspace>
   );
 }

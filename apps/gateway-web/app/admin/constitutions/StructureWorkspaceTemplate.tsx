@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { TriangleAlert, MoreHorizontal } from "lucide-react";
 import { structureUi as copy } from "../../../lib/structure-workspace";
-import { ui, type UiMessage } from "../../../lib/messages";
+import { ui } from "../../../lib/messages";
 import type { OrderedNode } from "../../../lib/api";
 import { outlineExample } from "../../../lib/outline-preview";
 import {
@@ -15,12 +15,6 @@ import { useTranslation } from "../../components/TranslationProvider";
 import { Button, Select } from "../../components/ui";
 import { HelpTooltip } from "../../components/HelpTooltip";
 import { SettingInfo } from "../../components/SettingInfo";
-import {
-  PageChromeSurface,
-  PageMenuBar,
-  PageMenuFrame,
-} from "../../components/layout/PageChrome";
-import { usePageChromeMetrics } from "../../components/layout/usePageChromeMetrics";
 import { ReaderMenu, type ReaderMenuItem } from "../../components/ReaderMenu";
 import { OutlineLayerEditor, type LayerSection } from "./OutlineLayerEditor";
 import { OutlineReaderPreview } from "./OutlineReaderPreview";
@@ -37,47 +31,10 @@ import {
 } from "./outline-editor-model";
 import styles from "./StructureWorkspace.module.css";
 
-type Task = { id: string; label: UiMessage };
-export function StructureWorkspaceTemplate({
-  tabs,
-  active,
-  onSelect,
-  primary,
-  children,
-}: {
-  tabs: Task[];
-  active: string;
-  onSelect: (view: string) => void;
-  primary?: ReactNode;
-  children: ReactNode;
-}) {
-  const t = useTranslation();
-  const root = useRef<HTMLDivElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
-  const navigation = useRef<HTMLElement>(null);
-  usePageChromeMetrics(root, menu, navigation);
-  return (
-    <PageChromeSurface ref={root}>
-      <PageMenuFrame ref={menu} className={styles.tasks} hidden={!tabs.length && !primary}>
-        <PageMenuBar as="nav" label={t(copy.structure)}>
-          {tabs.map((tab) => (
-            <Button
-              type="button"
-              variant="ghost"
-              key={tab.id}
-              aria-pressed={active === tab.id}
-              onClick={() => onSelect(tab.id)}
-            >
-              {t(tab.label)}
-            </Button>
-          ))}
-          {primary}
-        </PageMenuBar>
-      </PageMenuFrame>
-      <div className={styles.body}>{children}</div>
-    </PageChromeSurface>
-  );
-}
+export {
+  StructureWorkspaceFrame as StructureWorkspaceTemplate,
+  StructurePanel,
+} from "./StructureWorkspaceFrame";
 
 type Props = {
   layers: OutlineLayer[];
@@ -86,6 +43,8 @@ type Props = {
   display?: boolean;
   sampleRoots?: OrderedNode[];
   onRequestChanges?: () => void;
+  onNavigate?: () => void;
+  children: (parts: { navigation: ReactNode; content: ReactNode }) => ReactNode;
 };
 /** Common selected-level workspace; only data, permissions and workflow commands come from the host. */
 export function OutlineWorkspace({
@@ -95,11 +54,12 @@ export function OutlineWorkspace({
   display = true,
   sampleRoots = [],
   onRequestChanges,
+  onNavigate,
+  children,
 }: Props) {
   const t = useTranslation(),
     [selected, setSelected] = useState(0),
-    [section, setSection] = useState<LayerSection>("display"),
-    [expanded, setExpanded] = useState(false);
+    [section, setSection] = useState<LayerSection>("display");
   const [menu, setMenu] = useState<{
       index: number;
       parent: number | null;
@@ -113,10 +73,10 @@ export function OutlineWorkspace({
     layer = layers[index],
     branches = outlineBranches(layers),
     unplaced = branches.some((branch) => branch.unplaced);
-  if (!layer) return null;
+
   function choose(next: number) {
     setSelected(next);
-    setExpanded(false);
+    onNavigate?.();
     setConnecting(false);
   }
   function update(position: number, patch: Partial<OutlineLayer>) {
@@ -155,6 +115,7 @@ export function OutlineWorkspace({
     );
     setSelected(layers.length);
     setSection("display");
+    onNavigate?.();
     setMenu(null);
   }
   function nodes(items: OutlineBranch[]): ReactNode {
@@ -241,6 +202,7 @@ export function OutlineWorkspace({
       label,
       onSelect: () => {
         setMenu(null);
+        onNavigate?.();
         action();
       },
     });
@@ -270,121 +232,122 @@ export function OutlineWorkspace({
     } else if (onRequestChanges)
       item("request", t(copy.request), onRequestChanges);
   }
-  return (
-    <div>
+  const navigation = (
+    <nav className={styles.hierarchy} aria-label={t(copy.levels)}>
+      <div className={styles.heading}>
+        <h2>{t(copy.levels)}</h2>
+        <SettingInfo
+          label={t(copy.levels)}
+          description={t(copy.levelsHelp)}
+          changeability="review"
+        />
+      </div>
+      {nodes(branches)}
+      {structural ? (
+        <Button type="button" onClick={() => place("root")}>
+          {t(copy.newLevel)}
+        </Button>
+      ) : null}
+    </nav>
+  );
+  const content = (
+    <>
       {unplaced ? (
         <p className={styles.warningText} role="status">
           {t(copy.unreachable)}
         </p>
       ) : null}
-      <Button
-        type="button"
-        className={styles.mobile}
-        aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
-      >
-        {t(copy.levels)} · {layer.displayLabel}
-      </Button>
-      <div className={styles.workspace}>
-        <aside
-          className={styles.hierarchy}
-          data-expanded={expanded}
-          aria-label={t(copy.levels)}
-        >
-          <div className={styles.heading}>
-            <h2>{t(copy.levels)}</h2>
-            <SettingInfo
-              label={t(copy.levels)}
-              description={t(copy.levelsHelp)}
-              changeability="review"
-            />
-          </div>
-          {nodes(branches)}
-          {structural ? (
-            <Button type="button" onClick={() => place("root")}>
-              {t(copy.newLevel)}
-            </Button>
-          ) : null}
-        </aside>
-        <section
-          className={styles.editor}
-          aria-label={`${layer.displayLabel} ${t(copy.structure)}`}
-        >
-          <header>
-            <small>
-              {t(layer.allowedChildKinds?.length ? copy.parent : copy.leaf)}
-            </small>
-            <h2>{layer.displayLabel}</h2>
-          </header>
-          <nav className={styles.sections} aria-label={t(copy.display)}>
-            {(["structure", "editing", "display"] as const).map((tab) => (
-              <button
-                type="button"
-                key={tab}
-                aria-pressed={section === tab}
-                onClick={() => setSection(tab)}
-              >
-                {t(copy[tab])}
-              </button>
-            ))}
-          </nav>
-          <div className={styles.fields}>
-            {connecting ? (
-              <div>
-                <h3>{t(copy.connect)}</h3>
-                <p>{t(copy.connectionHelp)}</p>
-                <Select
-                  label={t(copy.parentLevel)}
-                  value={parent}
-                  onChange={(event) => setParent(event.target.value)}
-                >
-                  {outlineParentChoices(layers, index).map((position) => (
-                    <option value={position} key={position}>
-                      {layers[position].displayLabel} → {layer.displayLabel}
-                    </option>
-                  ))}
-                </Select>
-                <Button
+      {layer ? (
+        <div className={styles.workspace}>
+          <section
+            className={styles.editor}
+            aria-label={`${layer.displayLabel} ${t(copy.structure)}`}
+          >
+            <header>
+              <small>
+                {t(layer.allowedChildKinds?.length ? copy.parent : copy.leaf)}
+              </small>
+              <h2>{layer.displayLabel}</h2>
+            </header>
+            <nav className={styles.sections} aria-label={t(copy.display)}>
+              {(["display", "structure", "editing"] as const).map((tab) => (
+                <button
                   type="button"
-                  onClick={() => {
-                    const position = Number(parent);
-                    if (outlineParentChoices(layers, index).includes(position))
-                      update(position, {
-                        allowedChildKinds: [
-                          ...(layers[position].allowedChildKinds ?? []),
-                          layer.kindCode,
-                        ],
-                      });
-                    setConnecting(false);
-                  }}
+                  key={tab}
+                  aria-pressed={section === tab}
+                  onClick={() => setSection(tab)}
                 >
-                  {t(copy.connectSave)}
+                  {t(copy[tab])}
+                </button>
+              ))}
+            </nav>
+            <div className={styles.fields}>
+              {connecting ? (
+                <div>
+                  <h3>{t(copy.connect)}</h3>
+                  <p>{t(copy.connectionHelp)}</p>
+                  <Select
+                    label={t(copy.parentLevel)}
+                    value={parent}
+                    onChange={(event) => setParent(event.target.value)}
+                  >
+                    {outlineParentChoices(layers, index).map((position) => (
+                      <option value={position} key={position}>
+                        {layers[position].displayLabel} → {layer.displayLabel}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const position = Number(parent);
+                      if (
+                        outlineParentChoices(layers, index).includes(position)
+                      )
+                        update(position, {
+                          allowedChildKinds: [
+                            ...(layers[position].allowedChildKinds ?? []),
+                            layer.kindCode,
+                          ],
+                        });
+                      setConnecting(false);
+                    }}
+                  >
+                    {t(copy.connectSave)}
+                  </Button>
+                  <Button type="button" onClick={() => setConnecting(false)}>
+                    {t(copy.cancel)}
+                  </Button>
+                </div>
+              ) : null}
+              <OutlineLayerEditor
+                key={index}
+                layer={layer}
+                index={index}
+                layers={layers}
+                section={section}
+                structural={structural}
+                display={display}
+                update={update}
+                removeLayer={structural ? remove : undefined}
+              />
+              {!structural && onRequestChanges && section !== "display" ? (
+                <Button type="button" onClick={onRequestChanges}>
+                  {t(copy.request)}
                 </Button>
-                <Button type="button" onClick={() => setConnecting(false)}>
-                  {t(copy.cancel)}
-                </Button>
-              </div>
-            ) : null}
-            <OutlineLayerEditor
-              key={index}
-              layer={layer}
-              index={index}
-              layers={layers}
-              section={section}
-              structural={structural}
-              display={display}
-              update={update}
-              removeLayer={structural ? remove : undefined}
-            />
-            {!structural && onRequestChanges ? (
-              <Button type="button" onClick={onRequestChanges}>
-                {t(copy.request)}
-              </Button>
-            ) : null}
-          </div>
-        </section>
-        <StructurePreview layers={layers} sampleRoots={sampleRoots} />
-      </div>
+              ) : null}
+            </div>
+          </section>
+          <StructurePreview layers={layers} sampleRoots={sampleRoots} />
+        </div>
+      ) : (
+        <p>{t(copy.newLevel)}</p>
+      )}
+    </>
+  );
+  return (
+    <>
+      {children({ navigation, content })}
       {menu ? (
         <ReaderMenu
           title={`${t(copy.actions)} ${layers[menu.index].displayLabel}`}
@@ -394,7 +357,7 @@ export function OutlineWorkspace({
           onClose={() => setMenu(null)}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 

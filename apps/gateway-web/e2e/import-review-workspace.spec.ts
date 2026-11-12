@@ -250,6 +250,8 @@ test("package preparation, source inspection, approval and publication share one
     page.getByRole("link", { name: "Review next version" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Review next version" }).click();
+  await expect(page.getByRole("heading", { name: "Archive charter · 1953", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Content", exact: true })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("tab", { name: "Review", exact: true }).click();
   await page
     .getByLabel("Review reason")

@@ -139,7 +139,7 @@ test('administrator creates a constitution and updates its outline presentation'
   await selectStructureLevel(page, 'Clause');
   await expect(page.getByRole('textbox', { name: 'Reader-facing name', exact: true })).toHaveValue('Clause');
   await page.getByLabel('How this layer is shown').selectOption('concatenated');
-  await openStructureTask(page, 'Review impact');
+  await openStructureTask(page, 'Review');
   await page.getByRole('button', { name: 'Preview change impact' }).click();
   await expect(page.getByRole('heading', { name: 'Safe to save' })).toBeVisible();
   await page.getByRole('button', { name: 'Save outline' }).click();

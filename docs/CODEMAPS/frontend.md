@@ -93,13 +93,18 @@ redirects, JSON modes and trusted-origin guards.
 
 ## Outline editing and preview
 
-`admin/constitutions/StructureWorkspaceTemplate.tsx` shares task navigation,
-hierarchy, selected-level fields, presets and reader preview across creation,
-existing settings and import setup approval. `OutlineEditor.tsx` retains creation
-and Catalog impact/save commands; `admin/import/setup/SetupProposalReview.tsx`
-retains display-only adjustments and Ingestion review commands. Workflow hosts
-provide documents, source/identity and history. `outline-editor-model.ts` owns
-graph updates, reachability/cycle checks and authoring validation.
+`admin/constitutions/StructureWorkspaceFrame.tsx` (re-exported by
+`StructureWorkspaceTemplate`) supplies shared viewer chrome, an overview toggle
+and Details / Structure / Documents / Review / History tabs for creation,
+settings and import setup review. `OutlineWorkspace` supplies hierarchy and
+selected-level editor/preview slots. `OutlineEditorPanels` provides
+creation/settings presentation; `ConstitutionIdentity` and `StructureOverview` share read-only facts and actual hierarchy paths. Routes supply headers/notices instead of nested
+page templates; `DocumentLinks` stays mounted outside native owner forms.
+`OutlineEditor.tsx` retains creation and Catalog impact/save commands and
+invalidates pending impact checks when their draft changes.
+`admin/import/setup/SetupProposalReview.tsx` retains display-only adjustments
+and Ingestion review commands. `outline-editor-model.ts` owns graph updates,
+reachability/cycle checks and authoring validation.
 `lib/constitution-templates.ts` supplies five editable preset graphs;
 `lib/outline-preview.ts` builds modular examples without changing source samples.
 Catalog remains the write authority. See `docs/design/constitution-structure-workspace.md`.

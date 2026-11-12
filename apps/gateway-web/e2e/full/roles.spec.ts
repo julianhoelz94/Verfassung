@@ -45,8 +45,9 @@ for (const story of roles) {
     await expect(page.getByRole('button', { name: 'Edit this constitution' })).toHaveCount(story.canEdit ? 1 : 0);
     await page.goto('/admin/constitutions');
     if (story.admin) {
-      await expect(page.getByRole('heading', { name: 'Constitutions', exact: true })).toBeVisible();
-      await expect(page.getByText('Atlas Test Charter')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Create a constitution', exact: true })).toBeVisible();
+      await page.locator('summary').filter({ hasText: /^Existing constitutions$/ }).click();
+      await expect(page.getByRole('link', { name: 'Atlas Test Charter', exact: true })).toBeVisible();
     } else {
       await expect(page.getByText('Administrator role required.')).toBeVisible();
     }

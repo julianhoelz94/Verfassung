@@ -261,9 +261,9 @@ describe('setup review presentation contracts', () => {
       payload: { ...proposal.payload, languageCode: 'en', sourceUrl: 'https://new.test' },
     };
     const doc = documentOf(renderToStaticMarkup(<SetupProposalReview proposal={changed} />));
-    expect(doc.querySelector('h2')?.textContent).toBe('Waiting for a revised proposal');
+    expect(doc.querySelector('#structure-panel-review h2')?.textContent).toBe('Waiting for a revised proposal');
     expect(doc.body.textContent).toContain('Keep this feedback.');
-    expect(doc.querySelectorAll('dl > div')).toHaveLength(2);
+    expect(doc.querySelectorAll('#structure-panel-review dl > div')).toHaveLength(2);
     expect(doc.querySelector('button[value="confirm"]')?.hasAttribute('disabled')).toBe(true);
   });
   it('retains the frozen confirmation view without editable display or feedback controls', () => {

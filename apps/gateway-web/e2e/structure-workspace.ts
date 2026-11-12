@@ -1,38 +1,19 @@
 import type { Page } from "@playwright/test";
 import { expect } from "./fixtures/consent";
 
-export async function openStructureTask(page: Page, name: string) {
-  await page
-    .getByRole("navigation", { name: "Structure", exact: true })
-    .getByRole("button", { name, exact: true })
-    .click();
+export async function openStructureTask(page: Page, name: "Details" | "Structure" | "Documents" | "Review" | "History") {
+  await page.getByRole("tab", { name, exact: true }).click();
 }
 
-/** The same level picker serves desktop navigation and the mobile disclosure. */
-export async function selectStructureLevel(
-  page: Page,
-  name: string,
-  section?: "Structure" | "Editing" | "Display",
-) {
-  const levels = page.getByRole("complementary", {
-    name: "Levels",
-    exact: true,
-  });
-  const toggle = page.getByRole("button", { name: /^Levels ·/ });
-  // A streamed server page can still be loading after navigation returns.
-  // Wait for either responsive picker before deciding which one to use.
-  await expect(levels.or(toggle).filter({ visible: true }).first()).toBeVisible();
-  if (!(await levels.isVisible())) {
-    await toggle.click();
-  }
-  await levels
-    .locator("button[aria-current]")
-    .filter({ has: page.getByText(name, { exact: true }) })
-    .first()
-    .click();
+/** The viewer-style overview toggle owns the same hierarchy on desktop and mobile. */
+export async function selectStructureLevel(page: Page, name: string, section?: "Structure" | "Editing" | "Display") {
+  // Streaming HTML can be visible before its responsive client state is restored.
+  await expect(page.locator("[data-workspace-ready=true]")).toBeVisible();
+  const overview = page.locator("#structure-contents");
+  await expect(page.getByRole("tab", { name: "Structure", exact: true })).toBeVisible();
+  if (!(await overview.isVisible())) await page.getByRole("button", { name: "Show overview", exact: true }).click();
+  await overview.locator("button[aria-current]").filter({ has: page.getByText(name, { exact: true }) }).first().click();
   const fields = page.getByRole("region", { name: / Structure$/ });
-  if (section) {
-    await fields.getByRole("button", { name: section, exact: true }).click();
-  }
+  if (section) await fields.getByRole("button", { name: section, exact: true }).click();
   return fields;
 }

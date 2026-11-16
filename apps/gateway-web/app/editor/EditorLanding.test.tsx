@@ -103,4 +103,19 @@ describe('editor workspace handoffs', () => {
     expect(result.rows[0]).toMatchObject({ regional: false, publicHref: '/countries/XA/versions/source' });
     expect(getJurisdiction).not.toHaveBeenCalled();
   });
+
+  it('names a former country from its own jurisdiction when it has no current country record', async () => {
+    vi.mocked(getVersion).mockResolvedValueOnce({ id: 'source', constitutionId: 'constitution', countryCode: null, jurisdictionId: 'former-country', versionLabel: '1949', effectiveDate: null, publicationStatus: 'published', languageCode: 'de' });
+    vi.mocked(getJurisdiction).mockResolvedValueOnce({ jurisdiction: { id: 'former-country', parentId: null, name: 'Former country', slug: 'former-country', kind: 'country', code: 'XF', historical: true, existedFrom: null, existedUntil: '1950' }, ancestors: [], children: [], constitutions: [{ id: 'constitution', slug: 'charter', title: 'Former charter', versions: [], lifecycleStatus: 'repealed' }] });
+    const result = await loadEditorInbox({ userId: 'author', roles: ['editor'], queue: 'mine', archived: false, locale: 'en' });
+    expect(result.rows[0]).toMatchObject({ countryKey: 'XF', country: 'Former country', constitution: 'Former charter', regional: false, historical: true, publicHref: '/jurisdictions/former-country/versions/source' });
+  });
+
+  it('keeps unprepared imports for different constitutions in separate groups', async () => {
+    vi.mocked(listAllSessions).mockResolvedValueOnce([]);
+    vi.mocked(listMyImportJobs).mockResolvedValueOnce(['First charter', 'Second charter'].map((title, index) => ({ id: String(index), versionId: null, status: 'pending_review', submittedBy: 'author', isoCode: 'XA', countryName: 'Testland', constitutionTitle: title, errors: [] })));
+    const result = await loadEditorInbox({ userId: 'author', roles: ['editor'], queue: 'mine', archived: false, locale: 'en' });
+    expect(result.rows.map(row => row.constitution)).toEqual(['First charter', 'Second charter']);
+    expect(new Set(result.rows.map(row => row.constitutionKey)).size).toBe(2);
+  });
 });

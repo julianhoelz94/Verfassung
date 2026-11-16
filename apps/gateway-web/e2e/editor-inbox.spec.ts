@@ -76,12 +76,48 @@ test('partial service failures preserve available work and never masquerade as a
   await expect(page.getByRole('heading', { name: 'Start with a constitution', exact: true })).toBeVisible();
 });
 
+test('a copied workspace link retains its explicit return filters through a save', async ({ page }) => {
+  await signInEditor(page);
+  await startEditorSession(page, VERSION_2022, 'editorial_correction');
+  const workspace = page.url(), returnTo = '/editor?mine=1&query=2022&kind=correction';
+  await page.evaluate(() => sessionStorage.clear());
+  await page.goto(`${workspace}&inbox=${encodeURIComponent(returnTo)}`);
+  await page.getByLabel('What was corrected in this transcription?').fill('Checked the copied workspace against the source.');
+  await page.getByRole('button', { name: 'Save comment', exact: true }).click();
+  await expect(page).toHaveURL(/detailsSaved=1/);
+  await page.getByRole('link', { name: /^Back to My work$/ }).click();
+  await expect(page.getByRole('searchbox', { name: 'Search your work', exact: true })).toHaveValue('2022');
+  await expect(page.getByRole('button', { name: /^Remove filter: Text correction$/ })).toBeVisible();
+});
+
 test('reviewer-only navigation opens the authorised queue without personal editing actions', async ({ page }) => {
   await signInReviewer(page);
   const navigation = page.getByRole('navigation', { name: 'Work queues', exact: true });
   await expect(navigation.getByRole('link')).toHaveCount(1);
   await expect(navigation.getByRole('link', { name: 'Review', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: 'Continue editing', exact: true })).toHaveCount(0);
+});
+
+for (const width of [390, 1440]) test(`the structured canvas keeps its compact first view and sticky tools at ${width}px`, async ({ page, request }, info) => {
+  const height = width === 390 ? 844 : 1000;
+  await page.setViewportSize({ width, height });
+  await request.post(`${mock}/__continuous_reader`);
+  await signInEditor(page);
+  await startEditorSession(page, VERSION_2022, 'editorial_correction');
+  const editor = page.locator('#draft-form [role="textbox"]').first();
+  await expect(editor).toBeVisible();
+  const firstLine = await page.locator('#draft-form [data-constitution-document]').first().evaluate(element => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, { acceptNode: node => node.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+    const text = walker.nextNode()!, range = document.createRange();
+    range.setStart(text, 0); range.setEnd(text, Math.min(1, text.textContent?.length ?? 0));
+    return range.getBoundingClientRect().top;
+  });
+  await page.screenshot({ path: info.outputPath('structured-initial.png') });
+  expect(firstLine, 'the first legal unit starts within the first 60% of the viewport').toBeLessThanOrEqual(height * .6);
+  await editor.scrollIntoViewIfNeeded();
+  const toolbar = page.locator('[data-editor-tools]'), queue = page.locator('[data-editor-queue-frame]');
+  expect((await toolbar.boundingBox())!.y).toBeGreaterThanOrEqual((await queue.boundingBox())!.y + (await queue.boundingBox())!.height - 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 for (const locale of ['en', 'de']) for (const width of [390, 850, 1440]) {
@@ -103,7 +139,7 @@ for (const locale of ['en', 'de']) for (const width of [390, 850, 1440]) {
       await expect(navigation.getByRole('link')).toHaveCount(3);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.addScriptTag({ path: path.join(process.cwd(), 'node_modules/axe-core/axe.min.js') });
-      const violations = await page.evaluate(async () => (await (window as unknown as { axe: { run: (node: Document, options: unknown) => Promise<{ violations: { id: string }[] }> } }).axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa'] } })).violations.map(v => v.id));
+      const violations = await page.evaluate(async () => (await (window as unknown as { axe: { run: (node: Document) => Promise<{ violations: { id: string }[] }> } }).axe.run(document)).violations.map(v => v.id));
       expect(violations).toEqual([]);
       await page.screenshot({ path: info.outputPath(target === href ? 'workspace.png' : 'inbox.png'), fullPage: true });
     }

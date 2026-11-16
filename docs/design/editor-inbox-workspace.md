@@ -19,11 +19,13 @@ Search and immediately applied status/country/work-type filters operate on the c
 
 ## Context and retention
 
+Text sessions use a compact focused heading with the work type, status and pinned source label alongside the return control. The inbox keeps its larger editorial heading. This preserves room for the structured canvas on phones; its queue and context controls stay on one row. Display preferences retain their shared controls with compact working-view spacing.
+
 The focused context pane stays mounted while hidden. The text editor, source picker, optional document metadata, change-record fields and publication forms keep their existing React identity and native validation/permission boundaries. Text-session context shares the existing `EditorDraftState` provider with the canvas, so hiding it cannot bypass unsaved-change submission requirements. The canvas toolbar measures the outer queue bar as well as the global header.
 
 Native work links retain existing before-unload draft protection. This redesign does not introduce automatic saves or replace the application's save, review, MFA or publication commands.
 
-Account-scoped session storage remembers the return inbox for a specific work item, each queue's filters, expanded pagination, invoking row and scroll position. This is a navigation aid, never an authority for loading or changing work. `safeInboxHref` accepts only a canonical `/editor` inbox query with a closed parameter set. Work-management redirects retain that validated state; external URLs, workspace IDs and command destinations are rejected as inbox return targets.
+Account-scoped session storage remembers the return inbox for a specific work item, each queue's filters, expanded pagination, invoking row and scroll position. An explicit return URL in a copied workspace link is remembered before saving can replace that query. This is a navigation aid, never an authority for loading or changing work. `safeInboxHref` accepts only a canonical `/editor` inbox query with a closed parameter set. Work-management redirects retain that validated state; external URLs, workspace IDs and command destinations are rejected as inbox return targets.
 
 ## Work management and verification
 

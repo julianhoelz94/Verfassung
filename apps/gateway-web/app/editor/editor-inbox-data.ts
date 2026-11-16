@@ -43,7 +43,7 @@ function rowContext(versionId: string | null, fallback: Partial<InboxRow>, metad
   const version = versionId ? metadata.versions.get(versionId) : undefined;
   const region = version?.jurisdictionId ? metadata.jurisdictions.get(version.jurisdictionId) : undefined;
   const country = version?.countryCode ? metadata.countries.get(version.countryCode) : undefined;
-  const countryAncestor = region?.ancestors.find(item => item.kind === 'country');
+  const countryAncestor = region?.jurisdiction.kind === 'country' ? region.jurisdiction : region?.ancestors.find(item => item.kind === 'country');
   const constitution = (region?.constitutions ?? country?.constitutions)?.find(item => item.id === version?.constitutionId);
   const countryKey = country?.isoCode ?? version?.countryCode ?? countryAncestor?.code ?? fallback.countryKey ?? 'unavailable';
   return {
@@ -74,7 +74,7 @@ export async function loadEditorInbox({ userId, roles, queue, archived, locale }
     ...data.imports.map(job => ({
       id: job.id, kind: 'import' as const, status: job.status, owned: job.submittedBy === userId, updatedAt: null,
       workspaceHref: `/editor?importJobId=${encodeURIComponent(job.id)}`,
-      ...rowContext(job.versionId, { countryKey: job.isoCode ?? undefined, country: job.countryName ?? job.isoCode ?? undefined, constitution: job.constitutionTitle ?? undefined, version: job.versionLabel ?? undefined }, metadata, locale),
+      ...rowContext(job.versionId, { countryKey: job.isoCode ?? undefined, country: job.countryName ?? job.isoCode ?? undefined, constitutionKey: job.versionId ? undefined : `import:${job.constitutionTitle ?? job.id}`, constitution: job.constitutionTitle ?? undefined, version: job.versionLabel ?? undefined }, metadata, locale),
     })),
   ];
   rows.sort((a, b) => a.country.localeCompare(b.country, locale) || a.constitution.localeCompare(b.constitution, locale) || (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '') || a.id.localeCompare(b.id));

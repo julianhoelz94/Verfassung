@@ -565,7 +565,7 @@ export function EditorSessionView({ state }: { state: EditorSessionState }) {
   } = state;
   return (
     <EditorDraftState><EditorDeskFrame
-      userId={state.user.id} roles={state.user.roles} workKey={`session:${session.id}`}
+      userId={state.user.id} roles={state.user.roles} workKey={`session:${session.id}`} compact
       returnTo={searchParams.inbox} title={title || <T value={ui.nav.editor} />}
       eyebrow={message(locale, session.hopKind === 'legal' ? ui.remainingStatus.nextLegalChange : ui.remainingStatus.transcriptionCorrection)}
       meta={<><Badge tone={session.status === 'open' ? 'accent' : session.status === 'approved' ? 'info' : session.status === 'published' ? 'neutral' : 'changed'}><T value={statusMessage(session.status)} /></Badge>{state.selectedVersion?.versionLabel}</>}

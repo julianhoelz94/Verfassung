@@ -33,13 +33,21 @@ type Props = {
   userId: string; roles: string[]; title: ReactNode; children: ReactNode;
   queue?: InboxQueue; counts?: Partial<Record<InboxQueue, number | null>>;
   intro?: ReactNode; meta?: ReactNode; eyebrow?: ReactNode; context?: ReactNode;
+  compact?: boolean;
   workKey?: string; returnTo?: string; currentHref?: string;
 };
 
 type NavigationProps = Pick<Props, 'userId' | 'roles' | 'queue' | 'workKey' | 'returnTo' | 'currentHref'>;
 function useInboxNavigation({ userId, roles, queue, workKey, returnTo, currentHref }: NavigationProps) {
   const [memory, setMemory] = useState<RememberedInbox>({});
-  useEffect(() => { queueMicrotask(() => setMemory(readInboxMemory(userId))); }, [userId, workKey]);
+  useEffect(() => {
+    const remembered = readInboxMemory(userId), target = safeInboxHref(returnTo);
+    if (workKey && target) {
+      remembered.work = { ...remembered.work, [workKey]: target };
+      try { sessionStorage.setItem(storageKey(userId), JSON.stringify(remembered)); } catch { /* Explicit return links still work without storage. */ }
+    }
+    queueMicrotask(() => setMemory(remembered));
+  }, [userId, workKey, returnTo]);
   const backHref = safeInboxHref(returnTo) ?? (workKey ? safeInboxHref(memory.work?.[workKey]) : null) ?? inboxHref(queue ?? selectedInboxQueue(roles));
   const activeQueue = queue ?? selectedInboxQueue(roles, new URLSearchParams(backHref.split('?')[1]).get('status') ?? undefined);
   const available = inboxQueues(roles);
@@ -80,21 +88,31 @@ export function EditorWorkQueueBar(props: NavigationProps) {
   return <EditorQueueBar {...navigation} />;
 }
 
+function EditorDeskHeading({ compact, backHref, backLabel, title, eyebrow, meta, intro, workKey }: Pick<Props, 'compact' | 'title' | 'eyebrow' | 'meta' | 'intro' | 'workKey'> & { backHref: string; backLabel: string }) {
+  const t = useTranslation();
+  if (compact) return <header className={styles.compactHeading}>
+    <a className={styles.compactBack} href={backHref} aria-label={backLabel} title={backLabel}><ArrowLeft size={18} aria-hidden="true" /></a>
+    <div><div className={styles.compactMeta}>{eyebrow ? <span>{eyebrow}</span> : null}{meta}</div><h1>{title}</h1></div>
+  </header>;
+  return <header className={styles.heading}>
+    <div>{eyebrow ? <div className={styles.eyebrow}>{eyebrow}</div> : null}<h1>{title}</h1>{intro ? <p>{intro}</p> : null}{meta ? <div className={styles.headingMeta}>{meta}</div> : null}</div>
+    {!workKey ? <Link className="btn btn-primary" href="/"><BookOpen size={17} aria-hidden="true" />{t(inboxUi.choose)}</Link> : null}
+  </header>;
+}
+
 /** One measured PageChrome composition for the inbox and its real focused workspaces. */
-export function EditorDeskFrame({ userId, roles, title, children, queue, counts, intro, meta, eyebrow, context, workKey, returnTo, currentHref }: Props) {
+export function EditorDeskFrame({ userId, roles, title, children, queue, counts, intro, meta, eyebrow, context, compact = false, workKey, returnTo, currentHref }: Props) {
   const t = useTranslation(), contextId = useId();
   const root = useRef<HTMLDivElement>(null), menu = useRef<HTMLDivElement>(null), navigation = useRef<HTMLElement>(null);
   usePageChromeMetrics(root, menu, navigation);
   const [contextShown, setContextShown] = useState(true);
   const inboxNavigation = useInboxNavigation({ userId, roles, queue, workKey, returnTo, currentHref });
   const { backHref, activeQueue } = inboxNavigation;
-  return <FullWidthPage template={workKey ? 'workspace' : 'collection'} className={styles.page}>
+  const backLabel = `${t(inboxUi.back)} ${t(queueMessage(activeQueue))}`;
+  return <FullWidthPage template={workKey ? 'workspace' : 'collection'} className={styles.page} data-compact-workspace={compact}>
     <PageChromeSurface ref={root} className={styles.surface} data-editor-desk>
-      {workKey ? <div className={styles.breadcrumb}><a href={backHref}><ArrowLeft size={16} aria-hidden="true" />{t(inboxUi.back)} {t(queueMessage(activeQueue))}</a></div> : null}
-      <header className={styles.heading}>
-        <div>{eyebrow ? <div className={styles.eyebrow}>{eyebrow}</div> : null}<h1>{title}</h1>{intro ? <p>{intro}</p> : null}{meta ? <div className={styles.headingMeta}>{meta}</div> : null}</div>
-        {!workKey ? <Link className="btn btn-primary" href="/"><BookOpen size={17} aria-hidden="true" />{t(inboxUi.choose)}</Link> : null}
-      </header>
+      {workKey && !compact ? <div className={styles.breadcrumb}><a href={backHref}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</a></div> : null}
+      <EditorDeskHeading {...{ compact, backHref, backLabel, title, eyebrow, meta, intro, workKey }} />
       <PageMenuFrame ref={menu} data-editor-queue-frame>
         <EditorQueueBar {...inboxNavigation} counts={counts} actions={context ? <button type="button" className={[chrome.tool, styles.contextToggle].join(' ')} aria-expanded={contextShown} aria-controls={contextId} aria-label={t(contextShown ? inboxUi.hideContext : inboxUi.showContext)} title={t(contextShown ? inboxUi.hideContext : inboxUi.showContext)} onClick={() => setContextShown(!contextShown)}><PanelRight size={17} aria-hidden="true" /><span>{t(contextShown ? inboxUi.hideContext : inboxUi.showContext)}</span></button> : null} />
       </PageMenuFrame>

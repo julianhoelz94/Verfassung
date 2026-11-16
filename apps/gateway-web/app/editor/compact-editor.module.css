@@ -25,6 +25,7 @@
 .status { font-size:.8rem; color:var(--color-muted,#586578); margin:0; padding:8px 18px 0; }
 .validation { margin:8px 18px; font-size:.85rem; }
 .document { padding:20px; min-width:0; }
+.document > details:first-child { margin-block:0 8px; }
 .unit { margin:0 0 22px; }
 .unitHeading { text-align:left; font:inherit; font-weight:500; padding:0; margin:0 0 9px; background:transparent; border:0; min-height:0; }
 .articleHeading { font:400 var(--text-xl)/1.4 var(--font-text); margin-bottom:var(--space-4); }

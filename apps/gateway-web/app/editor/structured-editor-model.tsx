@@ -404,9 +404,17 @@ export function useStructuredEditorModel({
       const visibleBottom = viewport
         ? viewport.offsetTop + viewport.height
         : window.innerHeight;
+      menu.style.setProperty("--editor-panel-offset", "0px");
+      const naturalTop = menu.getBoundingClientRect().top;
+      const headerBottom = document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0;
+      const queueBottom = rootRef.current?.closest('[data-editor-desk]')?.querySelector('[data-editor-queue-frame]')?.getBoundingClientRect().bottom ?? 0;
+      const upper = Math.max((viewport?.offsetTop ?? 0) + 8, Math.min(Math.max(headerBottom, queueBottom) + 8, visibleBottom - 96));
+      const minimumHeight = Math.min(180, Math.max(0, visibleBottom - upper - 12));
+      const top = Math.max(upper, Math.min(naturalTop, visibleBottom - minimumHeight - 12));
+      menu.style.setProperty("--editor-panel-offset", top - naturalTop + "px");
       menu.style.setProperty(
         "--editor-panel-space",
-        Math.max(0, visibleBottom - menu.getBoundingClientRect().top - 12) +
+        Math.max(0, visibleBottom - top - 12) +
           "px",
       );
     };

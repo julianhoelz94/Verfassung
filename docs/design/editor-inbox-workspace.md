@@ -19,7 +19,7 @@ Search and immediately applied status/country/work-type filters operate on the c
 
 ## Context and retention
 
-Text sessions use a compact focused heading with the work type, status and pinned source label alongside the return control. The inbox keeps its larger editorial heading. This preserves room for the structured canvas on phones; its queue and context controls stay on one row. Display preferences retain their shared controls with compact working-view spacing.
+Text sessions use a compact focused heading with the work type, status and pinned source label alongside the return control. The inbox keeps its larger editorial heading. This preserves room for the structured canvas on phones; its queue and context controls stay on one row. Display preferences retain their shared controls with compact working-view spacing. Open canvas tools measure both the visible viewport and shared chrome, moving upward when space below the toolbar is insufficient; this also runs after viewport resizing and remounting Edit.
 
 The focused context pane stays mounted while hidden. The text editor, source picker, optional document metadata, change-record fields and publication forms keep their existing React identity and native validation/permission boundaries. Text-session context shares the existing `EditorDraftState` provider with the canvas, so hiding it cannot bypass unsaved-change submission requirements. The canvas toolbar measures the outer queue bar as well as the global header.
 

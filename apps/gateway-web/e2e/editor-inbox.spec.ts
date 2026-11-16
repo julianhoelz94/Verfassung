@@ -120,6 +120,37 @@ for (const width of [390, 1440]) test(`the structured canvas keeps its compact f
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+test('open canvas tools fit after a short viewport resize and keep article navigation accessible', async ({ page, request }) => {
+  await page.setViewportSize({ width: 720, height: 430 });
+  await request.post(`${mock}/__continuous_reader`);
+  await signInEditor(page);
+  await startEditorSession(page, VERSION_2022, 'editorial_correction');
+  const workspace = page.locator('[data-editor-workspace]'), tools = workspace.locator('[data-editor-tools]');
+  await tools.getByRole('button', { name: 'Insert', exact: true }).click();
+  const panel = workspace.locator('[data-tool-panel]'), action = panel.getByRole('button').last();
+  await action.scrollIntoViewIfNeeded();
+  await page.setViewportSize({ width: 720, height: 360 });
+  await expect.poll(async () => { const box = (await panel.boundingBox())!; return box.y + box.height; }).toBeLessThanOrEqual(361);
+  await action.scrollIntoViewIfNeeded();
+  await action.click({ trial: true });
+  await panel.evaluate(element => element.scrollTo(0, 0));
+  await page.setViewportSize({ width: 720, height: 430 });
+  await workspace.getByRole('button', { name: /^Changes \(/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(tools).toHaveCount(0);
+  await workspace.getByRole('button', { name: 'Edit', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(panel).toBeVisible();
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect.poll(async () => { const box = (await panel.boundingBox())!; return box.y + box.height; }).toBeLessThanOrEqual(431);
+  await panel.getByRole('button', { name: 'Close tools', exact: true }).click();
+  await page.getByRole('button', { name: 'Show article navigation', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: 'Top-level units', exact: true })).toBeVisible();
+  await page.addScriptTag({ path: path.join(process.cwd(), 'node_modules/axe-core/axe.min.js') });
+  const violations = await page.evaluate(async () => (await (window as unknown as { axe: { run: (node: Document) => Promise<{ violations: { id: string }[] }> } }).axe.run(document)).violations.map(v => v.id));
+  expect(violations).toEqual([]);
+});
+
 for (const locale of ['en', 'de']) for (const width of [390, 850, 1440]) {
   test(`inbox and focused queue bar remain usable in ${locale} at ${width}px`, async ({ page, request }, info) => {
     await page.setViewportSize({ width, height: 950 });

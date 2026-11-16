@@ -119,7 +119,7 @@ function EditorNavigation({ state }: { state: EditorSessionState }) {
     draftIds,
   } = state;
   return (
-    <section
+    <aside
       className={['panel', surfaceStyles.panel].join(' ')}
       aria-label={message(locale, ui.accessibility.topLevelUnits)}
     >
@@ -144,7 +144,7 @@ function EditorNavigation({ state }: { state: EditorSessionState }) {
         draftIds={session.status === 'published' ? [] : draftIds}
         outline={displayOutline}
       />
-    </section>
+    </aside>
   );
 }
 /** Keeps modern and legacy publishing gates aligned with role and lifecycle state. */

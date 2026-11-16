@@ -207,9 +207,12 @@ for (const viewport of [
       await workspace.getByRole('button', { name: 'Edit', exact: true }).click();
       await workspace.locator('[data-editor-unit="' + fixture.lastRootId + '"]').scrollIntoViewIfNeeded();
       await expect(toolbar).toBeInViewport();
-      const top = (await toolbar.boundingBox())!.y, headerBottom = await page.locator('.topbar').evaluate(element => element.getBoundingClientRect().bottom);
-      expect(top, 'the toolbar must remain below the application header near Article 20').toBeGreaterThanOrEqual(headerBottom - 1);
-      expect(top, 'the toolbar must remain at the visible top near Article 20').toBeLessThanOrEqual(headerBottom + 3);
+      const top = (await toolbar.boundingBox())!.y;
+      const queue = page.locator('[data-editor-queue-frame]');
+      await expect(queue).toBeInViewport();
+      const chromeBottom = Math.max(await page.locator('.topbar').evaluate(element => element.getBoundingClientRect().bottom), await queue.evaluate(element => element.getBoundingClientRect().bottom));
+      expect(top, 'the toolbar must remain below the header and queue bar near Article 20').toBeGreaterThanOrEqual(chromeBottom - 1);
+      expect(top, 'the toolbar must remain at the visible working area near Article 20').toBeLessThanOrEqual(chromeBottom + 3);
       await noToolbarOverlap(toolbar);
       await toolbar.getByRole('button', { name: 'Footnotes', exact: true }).click();
       await withinViewport(workspace.locator('[data-tool-panel]'), page);

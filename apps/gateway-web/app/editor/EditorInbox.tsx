@@ -93,7 +93,7 @@ function InboxWorkRow({ row, model: m }: { row: InboxRow; model: Model }) {
   const id = `work-${rowKey(row)}`, title = t(kindMessage(row.kind));
   const href = `${row.workspaceHref}&inbox=${encodeURIComponent(m.currentHref)}`;
   const action = t(m.queue === 'reviewing' ? inboxUi.review : m.queue === 'approved' ? inboxUi.publicationReview : row.kind !== 'import' && row.owned && row.status === 'open' ? ui.editorDynamic.continueEditing : workflowUi.viewWork);
-  const date = row.updatedAt && Number.isFinite(new Date(row.updatedAt).valueOf()) ? `${t(inboxUi.updated)} ${new Intl.DateTimeFormat(m.locale, { dateStyle: 'medium' }).format(new Date(row.updatedAt))}` : t(inboxUi.noDate);
+  const date = row.updatedAt && Number.isFinite(new Date(row.updatedAt).valueOf()) ? `${t(inboxUi.updated)} ${new Intl.DateTimeFormat(m.locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(row.updatedAt))}` : t(inboxUi.noDate);
   const record = (focusId: string) => rememberInbox(m.userId, m.currentHref, m.queue, focusId, rowKey(row), m.limit);
   return <li className={styles.row} data-work-id={row.id}>
     <span className={styles.workIcon} data-kind={row.kind}><Icon size={18} aria-hidden="true" /></span>

@@ -81,7 +81,7 @@ test('an admin reviews and publishes their MCP import in the editor journey', as
     await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
     expect((await listed()).some(version => version.versionLabel === versionLabel)).toBe(false);
     await page.goto('/editor?status=approved');
-    await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Publish', exact: true }).click();
+    await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Open publication review', exact: true }).click();
     await page.getByRole('button', { name: 'Publish approved version' }).click();
     await expect(page.getByRole('link', { name: 'Open the published version' })).toBeVisible();
     await page.reload();

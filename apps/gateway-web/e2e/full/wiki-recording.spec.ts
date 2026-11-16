@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rename, rm, stat, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ui, message, type UiMessage } from '../../lib/messages';
+import { inboxUi } from '../../lib/editor-inbox-messages';
 import { authenticatorCode, signIn } from './auth';
 import { illustrate, installPresentation, Walkthrough } from './wiki-presentation';
 
@@ -161,7 +162,7 @@ for (const locale of ['en', 'de'] as const) {
       }));
       paths.push(await record(browser, 'reviewer', locale, `reviewing-a-draft-${locale}.webm`, staging, async (page, watch) => {
         await page.goto('/editor?status=reviewing');
-        await expect(page.getByRole('heading', { name:t(ui.nav.reviewQueue), exact:true })).toBeVisible();
+        await expect(page.getByRole('navigation', { name:t(inboxUi.queues), exact:true }).getByRole('link', { name:t(inboxUi.review), exact:true })).toHaveAttribute('aria-current', 'page');
         await watch.explain(text('Reviewer: open the submitted session from the queue.', 'Prüfung: Öffnen Sie die eingereichte Sitzung aus der Prüfliste.'));
         await watch.click(page.locator(`a[href*="sessionId=${sessionId}"]`).first());
         await selectArticle(page, watch, source.article.id);
@@ -175,7 +176,7 @@ for (const locale of ['en', 'de'] as const) {
       }));
       paths.push(await record(browser, 'publisher', locale, `publishing-a-revision-${locale}.webm`, staging, async (page, watch) => {
         await page.goto('/editor?status=approved');
-        await expect(page.getByRole('heading', { name:t(ui.nav.readyToPublish), exact:true })).toBeVisible();
+        await expect(page.getByRole('navigation', { name:t(inboxUi.queues), exact:true }).getByRole('link', { name:t(ui.nav.readyToPublish), exact:true })).toHaveAttribute('aria-current', 'page');
         await watch.explain(text('Publisher: open the approved session.', 'Veröffentlichung: Öffnen Sie die freigegebene Sitzung.'));
         await watch.click(page.locator(`a[href*="sessionId=${sessionId}"]`).first());
         await selectArticle(page, watch, source.article.id);

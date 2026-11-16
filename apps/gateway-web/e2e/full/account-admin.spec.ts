@@ -182,7 +182,7 @@ test('publisher enrolls with the rendered QR and uses a recovery code once', asy
   const recovery = await page.locator('.recovery-codes code').first().textContent();
   expect(recovery).toBeTruthy();
   await page.getByRole('link', { name: 'Continue', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Editor', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your editorial desk', exact: true })).toBeVisible();
   await signOut(page);
   await passwordLogin();
   await expect(page.getByLabel('Recovery code')).toHaveCount(0);

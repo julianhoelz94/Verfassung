@@ -5,12 +5,10 @@ import { message, ui } from '../../lib/messages';
 import { T } from '../components/TranslationProvider';
 import { ArticleFilterList } from '../components/ArticleFilterList';
 import { ConstitutionText } from '../components/ConstitutionText';
-import { WorkspacePage } from '../components/layout/templates';
 import {
   Alert,
   Badge,
   Button,
-  PageHeader,
   WorkflowSteps,
 } from '../components/ui';
 import { ArticleEditor } from './ArticleEditor';
@@ -19,7 +17,6 @@ import { findUnitRoot } from '../../lib/structured-editor';
 import { StructuredEditor } from './StructuredEditor';
 import { PublishForm } from './PublishForm';
 import { LegacyPublishForm } from './LegacyPublishForm';
-import { reviewUi } from '../../lib/ui-review-messages';
 import { Stack } from '../components/layout/Layout';
 import { workflowUi } from '../../lib/workflow-messages';
 import surfaceStyles from '../components/surfaces.module.css';
@@ -34,6 +31,7 @@ import { ConstitutionDetailsWorkspace } from './ConstitutionDetailsWorkspace';
 import { ConstitutionWikiPanel } from './wiki/WikiWorkspace';
 import shellStyles from './editor-shell.module.css';
 import type { EditorSessionState } from './editor-page-state';
+import { EditorDeskFrame } from './EditorDeskFrame';
 type Structured = NonNullable<EditorSessionState['structured']>;
 /** Renders command-result messages in their original order and with fixed localized copy. */
 function EditorPageAlerts({ state }: { state: EditorSessionState }) {
@@ -121,7 +119,7 @@ function EditorNavigation({ state }: { state: EditorSessionState }) {
     draftIds,
   } = state;
   return (
-    <aside
+    <section
       className={['panel', surfaceStyles.panel].join(' ')}
       aria-label={message(locale, ui.accessibility.topLevelUnits)}
     >
@@ -146,7 +144,7 @@ function EditorNavigation({ state }: { state: EditorSessionState }) {
         draftIds={session.status === 'published' ? [] : draftIds}
         outline={displayOutline}
       />
-    </aside>
+    </section>
   );
 }
 /** Keeps modern and legacy publishing gates aligned with role and lifecycle state. */
@@ -449,11 +447,6 @@ function EditorSessionActions({ state }: { state: EditorSessionState }) {
   return (
     <div className="action-bar">
       {canEdit && session.status === 'open' ? (
-        <a className="btn" href="/editor">
-          <T value={reviewUi.returnToSessions} />{' '}
-        </a>
-      ) : null}
-      {canEdit && session.status === 'open' ? (
         <Stack as="form" action="/editor/command" method="post">
           <input type="hidden" name="command" value="review" />
           <EditorHiddenFields state={state} />
@@ -571,17 +564,12 @@ export function EditorSessionView({ state }: { state: EditorSessionState }) {
     title,
   } = state;
   return (
-    <WorkspacePage
-      width="content"
-      gap="control"
-      className={shellStyles.page}
-      header={
-        <PageHeader
-          compact
-          eyebrow={`${message(locale, session.hopKind === 'legal' ? ui.remainingStatus.nextLegalChange : ui.remainingStatus.transcriptionCorrection)} · ${message(locale, session.status === 'open' ? ui.workflow.draft : session.status === 'reviewing' ? ui.workflow.inReview : session.status === 'approved' ? ui.workflow.approved : ui.workflow.published)}`}
-          title={title || <T value={ui.nav.editor} />}
-        />
-      }
+    <EditorDraftState><EditorDeskFrame
+      userId={state.user.id} roles={state.user.roles} workKey={`session:${session.id}`}
+      returnTo={searchParams.inbox} title={title || <T value={ui.nav.editor} />}
+      eyebrow={message(locale, session.hopKind === 'legal' ? ui.remainingStatus.nextLegalChange : ui.remainingStatus.transcriptionCorrection)}
+      meta={<><Badge tone={session.status === 'open' ? 'accent' : session.status === 'approved' ? 'info' : session.status === 'published' ? 'neutral' : 'changed'}><T value={statusMessage(session.status)} /></Badge>{state.selectedVersion?.versionLabel}</>}
+      context={<EditorSessionSidebar state={state} />}
     >
       <EditorPageAlerts state={state} />
       {preview.sourceEvidenceRevisions?.length ? (
@@ -594,20 +582,17 @@ export function EditorSessionView({ state }: { state: EditorSessionState }) {
         </Alert>
       ) : null}
       {searchParams.sessionId && articles.length > 0 ? (
-        <EditorDraftState>
           <EditorWorkspace
             inlineControls={Boolean(structured && selectedRoot)}
             navigation={<EditorNavigation state={state} />}
-            session={<EditorSessionSidebar state={state} />}
           >
             <EditorDocumentSection state={state} />
           </EditorWorkspace>
-        </EditorDraftState>
       ) : (
         <Alert tone="error">
           <T value={ui.editor.page.thisSessionCouldNotBeLoadedOr} />
         </Alert>
       )}
-    </WorkspacePage>
+    </EditorDeskFrame></EditorDraftState>
   );
 }

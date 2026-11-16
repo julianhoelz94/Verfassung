@@ -82,7 +82,7 @@ test('reviewer cannot open editing controls or administer constitutions', async 
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/editor$/);
   await page.goto('/editor');
-  await expect(page.getByRole('heading', { name: 'Editor' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your editorial desk' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Correct this text' })).toHaveCount(0);
   await page.goto('/admin/constitutions');
   await expect(page.getByText('Administrator role required.')).toBeVisible();

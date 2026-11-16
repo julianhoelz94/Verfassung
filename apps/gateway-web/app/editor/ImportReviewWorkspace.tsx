@@ -35,6 +35,7 @@ type Props = {
   initialDisplay?: ImportDisplay;
   nextHref?: string;
   canCompare?: boolean;
+  editorialNavigation?: ReactNode;
 };
 
 /** One mounted workspace for individual imports, package versions and supporting records. */
@@ -54,6 +55,7 @@ export function ImportReviewWorkspace({
   initialDisplay = "reading",
   nextHref,
   canCompare = true,
+  editorialNavigation,
 }: Props) {
   const t = useTranslation();
   const [tab, setTab] = useState<ImportReviewTab>(
@@ -94,6 +96,7 @@ export function ImportReviewWorkspace({
           />
         </div>
         <PageMenuFrame ref={menu}>
+          {editorialNavigation}
           <PageMenuBar compact role="toolbar" label={t(ui.importReview.title)}>
             {navigation ? (
               <>

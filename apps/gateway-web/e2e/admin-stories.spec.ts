@@ -4,8 +4,10 @@ import { signInAdmin, startEditorSession, VERSION_2022 } from './helpers';
 const mockOrigin = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
 async function sessionDetails(page: Page) {
+  const show = page.getByRole('button', { name: 'Show context', exact: true });
+  if (await show.count()) await show.click();
   const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+  if (await summary.count() && !(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
 }
 
 test.beforeEach(async ({ request }) => {

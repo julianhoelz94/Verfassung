@@ -60,8 +60,8 @@ async function selectArticle(page: Page, watch: Walkthrough, articleId: string) 
 }
 
 async function sessionDetails(page: Page, watch: Walkthrough, locale: Locale) {
-  const summary = page.getByText(locale === 'de' ? 'Sitzung und Veröffentlichung' : 'Session and publication', { exact: true });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await watch.click(summary);
+  const show = page.getByRole('button', { name: locale === 'de' ? 'Kontext anzeigen' : 'Show context', exact: true });
+  if (await show.count()) await watch.click(show);
 }
 
 async function record(browser: Browser, role: Exclude<Role, 'admin'>, locale: Locale, file: string, staging: string,

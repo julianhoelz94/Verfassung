@@ -5,10 +5,11 @@ import { currentUser, requireSessionBearer } from '../../lib/session';
 import { manageSession } from '../../lib/editor-api';
 import { archiveImportJob } from '../../lib/ingestion-api';
 import { myWorkHref } from '../../lib/work-filters';
+import { safeInboxHref } from '../../lib/editor-inbox';
 
 export async function manageWorkAction(form: FormData): Promise<string> {
   if (!await currentUser()) return '/login';
-  const href = myWorkHref(String(form.get('workStatus') ?? ''), form.get('archived') === 'true');
+  const href = safeInboxHref(form.get('returnTo')) ?? myWorkHref(String(form.get('workStatus') ?? ''), form.get('archived') === 'true');
   const id = String(form.get('id') ?? '');
   const kind = form.get('kind');
   const action = form.get('action');

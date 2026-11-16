@@ -2,8 +2,10 @@ import { expect, test, type APIRequestContext, type Page } from '../fixtures/con
 import { signIn, signOut, startFromViewer } from './auth';
 
 async function sessionDetails(page: Page) {
+  const show = page.getByRole('button', { name: 'Show context', exact: true });
+  if (await show.count()) await show.click();
   const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+  if (await summary.count() && !(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
 }
 
 async function publishedVersion(request: APIRequestContext, requirePlainArticle = false): Promise<{ countryIso: string; versionId: string }> {

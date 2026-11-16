@@ -4,8 +4,10 @@ import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
 import { authenticatorCode, signIn, signOut, startFromViewer } from './auth';
 
 async function sessionDetails(page: Page) {
+  const show = page.getByRole('button', { name: 'Show context', exact: true });
+  if (await show.count()) await show.click();
   const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+  if (await summary.count() && !(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
 }
 
 test.use({ locale: 'en-US', extraHTTPHeaders: { 'Accept-Language': 'en' }, screenshot: 'only-on-failure', actionTimeout: 20_000 });

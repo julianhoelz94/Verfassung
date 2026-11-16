@@ -382,7 +382,8 @@ export function useStructuredEditorModel({
   useEffect(() => {
     const header = document.querySelector(".topbar");
     if (!header) return;
-    const measure = () => setToolbarTop(header.getBoundingClientRect().height);
+    const parentMenu = rootRef.current?.closest('[data-editor-desk]')?.querySelector('[data-editor-queue-frame]');
+    const measure = () => setToolbarTop(header.getBoundingClientRect().height + (parentMenu?.getBoundingClientRect().height ?? 0));
     measure();
     if (typeof ResizeObserver === "undefined") {
       window.addEventListener("resize", measure);
@@ -390,6 +391,7 @@ export function useStructuredEditorModel({
     }
     const observer = new ResizeObserver(measure);
     observer.observe(header);
+    if (parentMenu) observer.observe(parentMenu);
     return () => observer.disconnect();
   }, []);
 

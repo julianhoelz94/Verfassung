@@ -20,9 +20,11 @@ Mit dem Filter **Status** zeigen Sie Entwürfe, Bearbeitungen in Prüfung, freig
 
 [▶ Bearbeitung und Einreichung ansehen](https://julianhoelz94.github.io/Verfassung/#editing-a-draft-de)
 
+Die Editor-Startseite gruppiert Ihre Bearbeitungen nach Land und Verfassung. Suche und **Filter** werden sofort angewendet; entfernbare Filterfelder zeigen die aktive Auswahl. Das Archiv ist eine getrennte Ablage. **Weitere Aktionen** bietet die zulässigen Archivierungs-, Wiederherstellungs- oder Löschaktionen mit einer Bestätigung. Listen zeigen zunächst 20 Einträge; die Suche erfasst die vollständige Liste. Bei der Rückkehr aus einer Bearbeitung bleibt Ihre Position erhalten.
+
 ### Schreiben und Fußnoten
 
-Die Navigationsschaltfläche neben **Bearbeiten** blendet die Artikelnavigation aus, damit der Text mehr Platz erhält. **Sitzung und Veröffentlichung** unterhalb des Dokuments öffnet die Angaben zum Arbeitsablauf bei Bedarf. Die haftende Symbolleiste folgt der Textauswahl und hält **Rückgängig**, **Wiederholen** und **Editoransicht** beim Scrollen erreichbar. Ihre Menüs enthalten benannte Aktionen für Einheiten, Tabellen, Eigenschaften, das Teilen und Zusammenführen von Text sowie Verweise. Auf dem Smartphone bleibt die aktive Registerkarte beschriftet; die anderen verwenden Symbole. **Änderungen** zeigt die Text-, Formatierungs-, Fußnoten- und Strukturänderungen der Sitzung. Speichern Sie den Entwurf vor dem Einreichen.
+Die Navigationsschaltfläche neben **Bearbeiten** blendet die Artikelnavigation aus, damit der Text mehr Platz erhält. Die gemeinsame Arbeitslistenleiste bleibt innerhalb einer Sitzung sichtbar. **Kontext ausblenden** und **Kontext anzeigen** schalten den Arbeitsablaufbereich um; eingegebene Felder bleiben beim erneuten Öffnen erhalten. Die haftende Symbolleiste folgt der Textauswahl und hält **Rückgängig**, **Wiederholen** und **Editoransicht** beim Scrollen erreichbar. Ihre Menüs enthalten benannte Aktionen für Einheiten, Tabellen, Eigenschaften, das Teilen und Zusammenführen von Text sowie Verweise. Auf dem Smartphone bleibt die aktive Registerkarte beschriftet; die anderen verwenden Symbole. **Änderungen** zeigt die Text-, Formatierungs-, Fußnoten- und Strukturänderungen der Sitzung. Speichern Sie den Entwurf vor dem Einreichen.
 
 **Fett**, **Kursiv**, **Unterstrichen** und **Durchgestrichen** formatieren die Auswahl oder den anschließend eingegebenen Text. **Rückgängig** und **Wiederholen** sind ohne verfügbare Schritte deaktiviert. Durchstreichen ist eine Textformatierung und erfasst keine rechtliche Aufhebung.
 

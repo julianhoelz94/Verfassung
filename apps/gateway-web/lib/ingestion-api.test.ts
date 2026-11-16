@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { archiveImportJob, isImportRequest, listMyImportJobs, parseImportJson, ImportTransitionError, transitionImportJob, transitionSetupProposal } from './ingestion-api';
+import { archiveImportJob, isImportRequest, listAllImportJobs, listMyImportJobs, parseImportJson, ImportTransitionError, transitionImportJob, transitionSetupProposal } from './ingestion-api';
 
 const valid = {
   isoCode: 'US',
@@ -38,6 +38,17 @@ describe('isImportRequest', () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('personal import archive', () => {
+  it('loads every review queue page and retains its status selector', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(Array.from({ length: 100 }, (_, i) => ({ id: String(i) })))).mockResolvedValueOnce(Response.json([{ id: 'last' }]));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(listAllImportJobs('Bearer reviewer', 'pending_review')).resolves.toHaveLength(101);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(Object.fromEntries(new URL(String(fetchMock.mock.calls[1][0])).searchParams)).toEqual({ status: 'pending_review', limit: '100', offset: '100' });
+  });
+  it('does not turn unavailable review imports into an empty queue', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 404 })));
+    await expect(listAllImportJobs('Bearer reviewer', 'approved')).rejects.toThrow('Imports unavailable');
+  });
   it('loads every page of owned archived work without mixing in the active list', async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => ({ id: String(index) }));
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(firstPage)).mockResolvedValueOnce(Response.json([{ id: 'last' }]));

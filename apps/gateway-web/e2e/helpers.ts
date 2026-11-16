@@ -19,7 +19,7 @@ async function signIn(page: Page, email: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Authenticator code' })).toBeVisible();
   await page.getByLabel('Authenticator code').fill(MFA_CODE);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Editor' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your editorial desk' })).toBeVisible();
 }
 
 export async function signInEditor(page: Page): Promise<void> {
@@ -47,7 +47,7 @@ export async function signInReviewer(page: Page): Promise<void> {
   await page.getByLabel('Email').fill(REVIEWER_EMAIL);
   await page.getByLabel('Password').fill(EDITOR_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'Editor' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your editorial desk' })).toBeVisible();
 }
 
 export async function signOut(page: Page): Promise<void> {

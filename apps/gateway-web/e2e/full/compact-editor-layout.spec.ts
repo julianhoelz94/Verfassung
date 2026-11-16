@@ -128,12 +128,13 @@ for (const viewport of [
       const shownWidth = (await workspace.boundingBox())!.width;
       if (viewport.width >= 900) expect(hiddenWidth - shownWidth).toBeGreaterThan(100);
       else expect(shownWidth).toBeCloseTo(hiddenWidth, 0);
-      const session = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Session and publication$/ }) });
-      await session.locator('summary').first().click();
-      const sessionWidth = (await session.boundingBox())!.width, layoutWidth = (await page.locator('[data-navigation]').boundingBox())!.width;
-      expect(sessionWidth, 'the workflow must span the full workspace with navigation open').toBeGreaterThanOrEqual(layoutWidth - 2);
-      await noHorizontalOverflow(page); await noToolbarOverlap(session);
-      await session.locator('summary').first().click();
+      const context = page.getByRole('complementary', { name: 'Work context', exact: true });
+      await expect(context).toBeVisible();
+      await noHorizontalOverflow(page); await noToolbarOverlap(context);
+      await page.getByRole('button', { name: 'Hide context', exact: true }).click();
+      await expect(context).toBeHidden();
+      await page.getByRole('button', { name: 'Show context', exact: true }).click();
+      await expect(context).toBeVisible();
       await page.getByRole('button', { name: 'Hide article navigation', exact: true }).click();
       await noHorizontalOverflow(page);
 

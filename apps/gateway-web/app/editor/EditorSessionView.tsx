@@ -212,7 +212,7 @@ function EditorSessionSidebar({ state }: { state: EditorSessionState }) {
     publicHref,
   } = state;
   return (
-    <aside
+    <section
       className={['panel panel-side', surfaceStyles.panel].join(' ')}
       aria-label={message(locale, ui.accessibility.session)}
     >
@@ -290,7 +290,7 @@ function EditorSessionSidebar({ state }: { state: EditorSessionState }) {
         ) : null}
       </dl>
       <EditorPublishControls state={state} />
-    </aside>
+    </section>
   );
 }
 /** Chooses structured editing, legacy editing or the shared read-only renderer from the loaded selection. */

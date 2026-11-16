@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { test, expect, type Page } from './fixtures/consent';
 import { signInAdmin, signInEditor, signOut } from './helpers';
+import type { TestInfo } from '@playwright/test';
 
 const PHONE = { width: 390, height: 844 };
 const TABLET = { width: 820, height: 1180 };
@@ -13,13 +14,19 @@ async function snapshot(page: Page, name: string, maxDiffPixelRatio = 0.02): Pro
   await expect.soft(page).toHaveScreenshot(name, { fullPage: true, maxDiffPixelRatio });
 }
 
+// Keep reviewable implementation images even when a changed layout is within the diff tolerance.
+async function editorSnapshot(page: Page, info: TestInfo, name: string) {
+  await snapshot(page, name, 0.05);
+  await page.screenshot({ path: info.outputPath(name), fullPage: true, animations: 'disabled' });
+}
+
 test.beforeEach(async ({ request }) => {
   const response = await request.post(`${MOCK_ORIGIN}/__reset`);
   expect(response.ok()).toBeTruthy();
   expect((await request.post(`${MOCK_ORIGIN}/__visual_roles`)).ok()).toBeTruthy();
 });
 
-test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
+test('public and editor layouts at 390, 820 and 1440', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   test.skip(
     process.env.E2E_SKIP_VISUAL === 'true' || process.platform !== 'linux',
@@ -64,17 +71,17 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }) => {
 
   await signInEditor(page);
   await page.setViewportSize(PHONE);
-  await snapshot(page, 'editor-narrow.png', 0.05);
+  await editorSnapshot(page, testInfo, 'editor-narrow.png');
   await page.goto('/account');
   await snapshot(page, 'account-narrow.png', 0.05);
   await page.setViewportSize(TABLET);
   await page.goto('/editor');
-  await snapshot(page, 'editor-tablet.png', 0.05);
+  await editorSnapshot(page, testInfo, 'editor-tablet.png');
   await page.goto('/account');
   await snapshot(page, 'account-tablet.png', 0.05);
   await page.setViewportSize(DESKTOP);
   await page.goto('/editor');
-  await snapshot(page, 'editor-wide.png', 0.05);
+  await editorSnapshot(page, testInfo, 'editor-wide.png');
   await page.goto('/account');
   await snapshot(page, 'account-wide.png', 0.05);
   await signOut(page);

@@ -85,7 +85,7 @@ test('administrator stages constitution JSON for review without publishing it', 
   await expect(page.getByRole('link', { name: 'Open the published version' })).toHaveCount(0);
   await page.goto('/editor?status=reviewing');
   const item = page.locator('.editor-session-list li').filter({ hasText: '1789' });
-  await item.getByRole('link', { name: 'Open review' }).click();
+  await item.getByRole('link', { name: 'Review', exact: true }).click();
   await expect(page).toHaveURL(/\/editor\?importJobId=/);
   await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
   await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
@@ -111,7 +111,7 @@ test('administrator stages constitution JSON for review without publishing it', 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
   await page.goto('/editor?status=approved');
-  await page.locator('.editor-session-list li').filter({ hasText: '1789' }).getByRole('link', { name: 'Open publish view' }).click();
+  await page.locator('.editor-session-list li').filter({ hasText: '1789' }).getByRole('link', { name: 'Publish', exact: true }).click();
   await page.request.post(`${mockOrigin}/__import_publication_error`, { data: { code: 'publication_credentials_invalid' } });
   await page.getByRole('button', { name: 'Publish approved version' }).click();
   await expect(page.locator('.import-workflow').getByRole('alert')).toContainText('internal publication credential is invalid');

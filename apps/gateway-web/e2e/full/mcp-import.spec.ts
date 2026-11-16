@@ -68,7 +68,7 @@ test('an admin reviews and publishes their MCP import in the editor journey', as
     expect((await listed()).some(version => version.versionLabel === versionLabel)).toBe(false);
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice('Bearer '.length), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto('/editor?status=reviewing');
-    await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Open review' }).click();
+    await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Review', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/editor\\?importJobId=${jobId}`));
     await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
     await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
@@ -81,7 +81,7 @@ test('an admin reviews and publishes their MCP import in the editor journey', as
     await expect(page.getByRole('button', { name: 'Publish approved version' })).toBeVisible();
     expect((await listed()).some(version => version.versionLabel === versionLabel)).toBe(false);
     await page.goto('/editor?status=approved');
-    await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Open publish view' }).click();
+    await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Publish', exact: true }).click();
     await page.getByRole('button', { name: 'Publish approved version' }).click();
     await expect(page.getByRole('link', { name: 'Open the published version' })).toBeVisible();
     await page.reload();

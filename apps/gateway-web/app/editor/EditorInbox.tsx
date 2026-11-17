@@ -102,7 +102,7 @@ function InboxWorkList({ model: m }: { model: Model }) {
   const { t } = m;
   return <>
     <WorkCollectionMeta summary={<>{m.visible.length} {t(m.visible.length === 1 ? inboxUi.item : inboxUi.items)}{m.filters.archived ? ` · ${t(workflowUi.archived)}` : ''}</>} grouping={t(inboxUi.grouped)} />
-    <div className={collection.countries}>{m.countries.filter(([key]) => m.shown.some(row => row.countryKey === key)).map(([key, name]) => <WorkCollectionGroup key={key} className="editor-session-country" title={name} icon={<Globe2 size={15} aria-hidden="true" />}>
+    <div className={collection.groups}>{m.countries.filter(([key]) => m.shown.some(row => row.countryKey === key)).map(([key, name]) => <WorkCollectionGroup key={key} className="editor-session-country" title={name} icon={<Globe2 size={15} aria-hidden="true" />}>
       {[...new Set(m.shown.filter(row => row.countryKey === key).map(row => row.constitutionKey))].map(constitution => {
         const group = m.shown.filter(row => row.countryKey === key && row.constitutionKey === constitution), first = group[0];
         return <WorkCollectionSection key={constitution} className="editor-session-constitution" listClassName="editor-session-list" title={first.constitution}

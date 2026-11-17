@@ -17,9 +17,9 @@
 .textButton { display:inline-flex; align-items:center; gap:var(--space-2); min-height:36px; background:transparent; border:0; padding:4px 0; color:var(--color-accent); font-size:var(--text-xs); cursor:pointer; }.textButton:hover { text-decoration:underline; }
 .chips { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin-top:var(--space-3); }.chip { display:inline-flex; align-items:center; gap:var(--space-2); min-height:36px; font-size:var(--text-xs); border:1px solid var(--color-line); border-radius:var(--radius-sm); background:var(--color-accent-soft); color:var(--color-accent); padding:6px 9px; cursor:pointer; }
 .listMeta { display:flex; justify-content:space-between; gap:var(--space-3); margin-block:20px 16px; font-size:var(--text-xs); color:var(--color-ink-2); }.listMeta>span:last-child { font-size:11px; }
-.countries { display:grid; gap:var(--space-5); }.countryHeading { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); }.countryHeading h2 { font:500 var(--text-xs)/1.5 var(--font-ui); color:var(--color-ink-2); margin:0; }.countryHeading svg { color:var(--color-ink-2); }
-.constitution { border:1px solid var(--color-line); border-radius:var(--radius-md); background:var(--color-surface); }.constitution+.constitution { margin-top:var(--space-3); }
-.constitutionHeading { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--space-3); padding:13px 18px; background:var(--color-surface-2); border-bottom:1px solid var(--color-line); border-radius:var(--radius-md) var(--radius-md) 0 0; }.constitutionHeading h3 { font:400 var(--text-lg)/1.4 var(--font-heading); margin:0; }.constitutionHeading span { font-size:11px; color:var(--color-ink-2); }
+.groups { display:grid; gap:var(--space-5); }.groupHeading { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); }.groupHeading h2 { font:500 var(--text-xs)/1.5 var(--font-ui); color:var(--color-ink-2); margin:0; }.groupHeading svg { color:var(--color-ink-2); }
+.section { border:1px solid var(--color-line); border-radius:var(--radius-md); background:var(--color-surface); }.section+.section { margin-top:var(--space-3); }
+.sectionHeading { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--space-3); padding:13px 18px; background:var(--color-surface-2); border-bottom:1px solid var(--color-line); border-radius:var(--radius-md) var(--radius-md) 0 0; }.sectionHeading h3 { font:400 var(--text-lg)/1.4 var(--font-heading); margin:0; }.sectionHeading span { font-size:11px; color:var(--color-ink-2); }
 .rows { margin:0; padding:0; list-style:none; }.row { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:var(--space-3); align-items:center; padding:var(--space-4); }.row+.row { border-top:1px solid var(--color-line); }
 .workIcon { display:grid; place-items:center; width:32px; height:34px; border:1px solid var(--color-line); border-radius:var(--radius-sm); background:var(--color-accent-soft); color:var(--color-accent); }.workIcon[data-tone='changed'] { background:var(--color-changed-bg); color:var(--color-changed-fg); }.workIcon[data-tone='info'] { background:var(--color-info-bg); color:var(--color-info-fg); }
 .rowInfo { min-width:0; }.rowTitle { display:inline-flex; align-items:center; min-height:26px; font-size:var(--text-sm); font-weight:var(--weight-ui-emphasis); color:var(--color-ink); text-decoration:none; }.rowTitle:hover { color:var(--color-accent); text-decoration:underline; }
@@ -51,7 +51,7 @@
   .rowActions { min-width:0; max-width:100%; flex-wrap:wrap; }
   .rowAction { min-height:44px; min-width:0; max-width:100%; white-space:normal; }.rowDetails { font-size:11px; }
   .searchToolbar { gap:var(--space-2); }.search { padding-inline:10px; }.filterButton { padding-inline:10px; }.filterButton>svg:last-child { display:none; }
-  .listMeta>span:last-child { display:none; }.constitutionHeading { display:block; padding:12px 14px; }.constitutionHeading span { display:block; margin-top:4px; }
+  .listMeta>span:last-child { display:none; }.sectionHeading { display:block; padding:12px 14px; }.sectionHeading span { display:block; margin-top:4px; }
   .focused[data-creation='true'][data-context='true'] { grid-template-columns:minmax(0,1fr); gap:28px; }
   .menu { gap:2px; padding:7px 10px; }
 }

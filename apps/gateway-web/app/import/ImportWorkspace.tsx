@@ -93,7 +93,7 @@ function ImportsQueue({ rows, incomplete }: { rows: ImportCollectionRow[]; incom
       </div>
     </WorkCollectionFilters>
     <WorkCollectionMeta summary={incomplete ? <>{visible.length} {t(m.available)}</> : <>{visible.length} {t(m.of)} {rows.length} {t(m.items)}</>} grouping={t(m.grouped)} />
-    <div className={collection.countries}>{countries.filter(([key]) => shown.some(row => row.countryKey === key)).map(([key, country]) => <WorkCollectionGroup key={key} title={country}>
+    <div className={collection.groups}>{countries.filter(([key]) => shown.some(row => row.countryKey === key)).map(([key, country]) => <WorkCollectionGroup key={key} title={country}>
       <WorkCollectionSection>{shown.filter(row => row.countryKey === key).map(row => <ImportQueueRow key={row.kind + row.id} row={row} />)}</WorkCollectionSection>
     </WorkCollectionGroup>)}</div>
     {!visible.length ? <div className={styles.empty}><BookOpen size={25} aria-hidden="true" /><h2>{t(incomplete ? inboxUi.incompleteTitle : rows.length ? m.noMatches : ui.admin.import.page.noImportsYet)}</h2>{rows.length ? <><p>{t(m.noMatchesHint)}</p><button type="button" className="btn" onClick={() => setFilters(emptyImportFilters)}>{t(inboxUi.clearAll)}</button></> : null}</div> : null}

@@ -67,10 +67,10 @@ export function WorkCollectionMeta({ summary, grouping }: { summary: ReactNode; 
   return <div className={styles.listMeta} aria-live="polite"><span>{summary}</span><span>{grouping}</span></div>;
 }
 export function WorkCollectionGroup({ title, icon, className, children }: { title: ReactNode; icon?: ReactNode; className?: string; children: ReactNode }) {
-  return <section className={className}><div className={styles.countryHeading}>{icon}<h2>{title}</h2></div>{children}</section>;
+  return <section className={className}><div className={styles.groupHeading}>{icon}<h2>{title}</h2></div>{children}</section>;
 }
 export function WorkCollectionSection({ title, meta, className, listClassName, children }: { title?: ReactNode; meta?: ReactNode; className?: string; listClassName?: string; children: ReactNode }) {
-  return <section className={[styles.constitution, className].filter(Boolean).join(' ')}>{title ? <div className={styles.constitutionHeading}><h3>{title}</h3>{meta ? <span>{meta}</span> : null}</div> : null}<ul className={[styles.rows, listClassName].filter(Boolean).join(' ')}>{children}</ul></section>;
+  return <section className={[styles.section, className].filter(Boolean).join(' ')}>{title ? <div className={styles.sectionHeading}><h3>{title}</h3>{meta ? <span>{meta}</span> : null}</div> : null}<ul className={[styles.rows, listClassName].filter(Boolean).join(' ')}>{children}</ul></section>;
 }
 export function WorkCollectionRow({ icon, iconTone, title, details, status, actions, className, ...props }: Omit<ComponentPropsWithoutRef<'li'>, 'title'> & { icon: ReactNode; iconTone?: 'accent' | 'changed' | 'info'; title: ReactNode; details: ReactNode; status: ReactNode; actions: ReactNode }) {
   return <li {...props} className={[styles.row, className].filter(Boolean).join(' ')}><span className={styles.workIcon} data-tone={iconTone}>{icon}</span><div className={styles.rowInfo}>{title}<div className={styles.rowDetails}>{details}</div></div><div className={styles.rowTail}><div className={styles.rowStatus}>{status}</div><div className={styles.rowActions}>{actions}</div></div></li>;

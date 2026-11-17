@@ -46,7 +46,10 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
   });
 }
 test('legacy POST dispatch still stages without publishing; legacy reads retain fragments', async ({ page }) => {
-  await signInAdmin(page); await page.goto('/admin/import?mode=existing#upload');
+  await signInAdmin(page);
+  await page.goto('/admin/import#upload'); await expect(page.locator('#file')).toBeVisible();
+  await page.goto('/admin/import#structure'); await expect(page.locator('#proposalFile')).toBeVisible();
+  await page.goto('/admin/import?mode=existing#upload');
   await expect(page).toHaveURL(/\/import\?mode=existing#upload$/);
   await page.route(url => url.pathname === '/import', async route => {
     if (route.request().method() === 'POST' && route.request().headers()['next-action']) await route.continue({ url: new URL('/admin/import?mode=existing', page.url()).href });

@@ -5,7 +5,7 @@
 .modeChoice input { width: 16px; height: 16px; margin-top: 4px; flex-shrink: 0; accent-color: var(--color-accent); }
 .modeChoice strong { display: block; font-size: var(--text-sm); font-weight: 500; line-height: 1.6; }
 .modeChoice small { display: block; margin-top: 2px; color: var(--color-ink-2); font-size: var(--text-xs); line-height: 1.6; }
-.uploadForm { min-width:0; }
+.uploadForm { min-width:0; scroll-margin-top:var(--page-anchor-offset); }
 .formFields { display:grid; gap:20px; border:0; padding:0; margin:0; min-width:0; }
 .fileDrop { border: 1px dashed var(--color-line-strong); border-radius: var(--radius-sm); padding: 26px; text-align: center; min-width: 0; }
 .fileDrop[data-dragging="true"] { background: var(--color-accent-soft); border-color: var(--color-accent); }

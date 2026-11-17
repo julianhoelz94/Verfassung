@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { BookOpen, Info, PanelLeft, Plus } from 'lucide-react';
 import { useLocale, useTranslation } from '../components/TranslationProvider';
 import { Alert, Badge } from '../components/ui';
@@ -22,6 +22,22 @@ export function ImportWorkspace({ rows, unavailable, membershipUnavailable, canI
   const [creating, setCreating] = useState(canImport && Boolean(initialMode || initialError));
   const [mode, setMode] = useState(initialMode === 'new' ? 'new' : 'existing');
   const [contextShown, setContextShown] = useState(true);
+  const activeCreation = canImport && creating;
+  useEffect(() => {
+    let live = true, frame = 0;
+    function followLegacyAnchor() {
+      const anchor = window.location.hash.slice(1);
+      if (!canImport || !['upload', 'structure'].includes(anchor)) return;
+      queueMicrotask(() => {
+        if (!live) return;
+        setCreating(true); setMode(anchor === 'structure' ? 'new' : 'existing');
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ block: 'start' }));
+      });
+    }
+    followLegacyAnchor(); window.addEventListener('hashchange', followLegacyAnchor);
+    return () => { live = false; cancelAnimationFrame(frame); window.removeEventListener('hashchange', followLegacyAnchor); };
+  }, [canImport]);
   function choose(next: boolean, nextMode = mode) {
     setCreating(next); setMode(nextMode);
     const url = new URL(window.location.href); url.searchParams.delete('error');
@@ -38,18 +54,18 @@ export function ImportWorkspace({ rows, unavailable, membershipUnavailable, canI
   return <WorkCollectionFrame header={<WorkCollectionHeader title={t(m.title)} intro={t(m.intro)} />}
     renderMenu={() => <WorkCollectionMenu role="toolbar" label={t(m.tools)}>
       <div className={styles.tabs} role="tablist" aria-label={t(m.tools)}>
-        {[false, ...(canImport ? [true] : [])].map(next => <button key={String(next)} type="button" id={next ? 'imports-tab-new' : 'imports-tab-queue'} className={chrome.tool} role="tab" aria-selected={creating === next} aria-controls={next ? 'imports-panel-new' : 'imports-panel-queue'} tabIndex={creating === next ? 0 : -1} onKeyDown={canImport ? keyTab : undefined} onClick={() => choose(next)}>
+        {[false, ...(canImport ? [true] : [])].map(next => <button key={String(next)} type="button" id={next ? 'imports-tab-new' : 'imports-tab-queue'} className={chrome.tool} role="tab" aria-selected={activeCreation === next} aria-controls={next ? 'imports-panel-new' : 'imports-panel-queue'} tabIndex={activeCreation === next ? 0 : -1} onKeyDown={canImport ? keyTab : undefined} onClick={() => choose(next)}>
           {next ? <Plus size={16} aria-hidden="true" /> : <PanelLeft size={16} aria-hidden="true" />}<span>{t(next ? m.create : m.overview)}</span>{!next && !unavailable && !membershipUnavailable ? <span className={collection.count} aria-hidden="true">{rows.length}</span> : null}
         </button>)}
       </div>
-      {creating ? <WorkContextToggle shown={contextShown} onToggle={() => setContextShown(!contextShown)} contextId={contextId} labels={{ show: t(inboxUi.showContext), hide: t(inboxUi.hideContext), title: t(m.nextLabel) }} /> : null}
+      {activeCreation ? <WorkContextToggle shown={contextShown} onToggle={() => setContextShown(!contextShown)} contextId={contextId} labels={{ show: t(inboxUi.showContext), hide: t(inboxUi.hideContext), title: t(m.nextLabel) }} /> : null}
     </WorkCollectionMenu>}>
-    <section id="imports-panel-queue" role="tabpanel" aria-labelledby="imports-tab-queue" hidden={creating}>
+    <section id="imports-panel-queue" role="tabpanel" aria-labelledby="imports-tab-queue" hidden={activeCreation}>
       {unavailable ? <Alert tone="error">{t(m.unavailable)} <a href="/import">{t(inboxUi.retry)}</a></Alert> : null}
       {membershipUnavailable ? <Alert tone="error">{t(m.membershipUnavailable)}</Alert> : null}
       <ImportsQueue rows={rows} incomplete={unavailable || membershipUnavailable} />
     </section>
-    {canImport ? <section id="imports-panel-new" role="tabpanel" aria-labelledby="imports-tab-new" hidden={!creating}>
+    {canImport ? <section id="imports-panel-new" role="tabpanel" aria-labelledby="imports-tab-new" hidden={!activeCreation}>
       <ImportUpload mode={mode} onMode={value => choose(true, value)} context={<ImportUploadContext mode={mode} />} contextId={contextId} contextShown={contextShown} initialError={initialError} />
     </section> : null}
   </WorkCollectionFrame>;

@@ -18,6 +18,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.mocked(createImportAction).mockReset().mockResolvedValue('/import?mode=existing&error=json');
   vi.mocked(createSetupProposalAction).mockReset().mockResolvedValue('/import?mode=new&error=proposal');
+  window.history.replaceState(null, '', '/import');
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
@@ -92,4 +93,22 @@ it('closes filters with Escape without clearing a query entered in the search fi
   await act(async () => { fireEvent.change(search, { target: { value: 'Basic' } }); search.focus(); fireEvent.keyDown(search, { key: 'Escape' }); });
   expect(search.value).toBe('Basic'); expect(host.querySelectorAll('#imports-panel-queue li')).toHaveLength(1);
   expect(document.activeElement).toBe(getByRole(host, 'button', { name: 'Filters', exact: true }));
+});
+
+it('opens legacy anchor-only links in the correct retained upload form', async () => {
+  window.history.replaceState(null, '', '/import#structure');
+  await render();
+  expect((getByRole(host, 'radio', { name: /New constitution/ }) as HTMLInputElement).checked).toBe(true);
+  expect(getByRole(host, 'tab', { name: 'New import', exact: true }).getAttribute('aria-selected')).toBe('true');
+  await act(async () => { window.location.hash = '#upload'; window.dispatchEvent(new HashChangeEvent('hashchange')); });
+  expect((getByRole(host, 'radio', { name: /Existing constitution/ }) as HTMLInputElement).checked).toBe(true);
+});
+
+it('returns to the readable overview when upload permissions are removed in place', async () => {
+  await render({ initialMode: 'existing' });
+  expect(getByRole(host, 'tab', { name: 'New import', exact: true }).getAttribute('aria-selected')).toBe('true');
+  await render({ canImport: false });
+  expect(getByRole(host, 'tab', { name: 'Overview', exact: true }).getAttribute('aria-selected')).toBe('true');
+  expect(host.querySelector('input[type=file]')).toBeNull();
+  expect(getByRole(host, 'link', { name: 'Basic Law', exact: true })).toBeTruthy();
 });

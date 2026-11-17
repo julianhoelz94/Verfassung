@@ -48,6 +48,10 @@ success/error, login and MFA return URLs. API endpoints are unchanged. Global
 navigation, breadcrumbs, document usage, MCP outputs and route inventory use the
 canonical family. Retired pre-launch entrypoints remain unavailable.
 
+Anchor-only intake links (`#upload` and `#structure`) also select and reveal the
+matching mounted form after hydration. Switching between these anchors, modes
+or tabs preserves each form's file and JSON draft.
+
 ## Validation
 
 Unit contracts cover access, complete lists, unavailable membership, pins,
@@ -59,3 +63,7 @@ at 390/820/1440px, plus 320px and enlarged-text action reflow. Golden comparison
 must use the repository's pinned Playwright image; system-browser captures are
 behaviour/layout evidence only. Wiki sources are updated; publication follows
 its normal post-merge workflow.
+
+The twelve updated intake baselines were reviewed from CI run `44056997172`,
+artifact `14317220723`, using the pinned Playwright image. Existing Editor and
+review/setup comparison baselines remain authoritative.

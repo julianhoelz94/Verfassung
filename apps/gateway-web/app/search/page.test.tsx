@@ -122,4 +122,11 @@ describe('search selection and results', () => {
     expect(document.querySelector('.pager')).toBeNull();
     expect(output).toContain('No matching passages');
   });
+  it('offers a previous and first page when an offset has moved beyond the available results', async () => {
+    vi.mocked(api.searchArticles).mockResolvedValue({ hits: [], total: 2, limit: 20, offset: 40 });
+    const document = new DOMParser().parseFromString(await html({ q: 'rights', country: 'XA', offset: '40' }), 'text/html');
+    expect(document.body.textContent).toContain('No passages on this page');
+    expect(document.querySelector('.pager a')?.getAttribute('href')).toBe('/search?q=rights&country=XA&offset=20');
+    expect(Array.from(document.querySelectorAll('a')).find(link => link.textContent === 'First results page')?.getAttribute('href')).toBe('/search?q=rights&country=XA');
+  });
 });

@@ -26,6 +26,7 @@ const formId = 'search-workspace-form';
 export function SearchWorkspace({ data }: { data: SearchWorkspaceData }) {
   const model = useSearchWorkspace(data), t = useTranslation();
   return <WorkCollectionFrame id="main-content" className={styles.page} data-search-enhanced={model.enhanced}
+    onKeyDown={event => { if (event.key === 'Escape' && model.filtersOpen && !event.defaultPrevented) { event.preventDefault(); model.closeFilters(); } }}
     header={<WorkCollectionHeader title={t(copy.title)} intro={t(copy.intro)} />}
     renderMenu={() => <SearchMenu model={model} />}>
     <AppliedFilters model={model} />
@@ -46,7 +47,7 @@ function SearchMenu({ model }: { model: SearchModel }) {
   const { search: searchRef, filterButton: filterButtonRef } = model;
   return <>
     <WorkCollectionMenu label={t(copy.tools)} className={styles.menu}>
-      <a className={[chrome.tool, styles.resultsTool].join(' ')} href="#search-results" onClick={event => { event.preventDefault(); document.getElementById('search-results')?.focus(); }}><List size={17} aria-hidden="true" /><span>{t(copy.results)}</span></a>
+      <a className={[chrome.tool, styles.resultsTool].join(' ')} aria-label={t(copy.results)} href="#search-results" onClick={event => { event.preventDefault(); document.getElementById('search-results')?.focus(); }}><List size={17} aria-hidden="true" /><span>{t(copy.results)}</span></a>
       <form id={formId} className={['search-page-form', styles.form].join(' ')} action="/search" method="get"
         onSubmit={event => { event.preventDefault(); model.submit(); }}>
         <label className="visually-hidden" htmlFor="search-q">{t(copy.words)}</label>
@@ -103,10 +104,12 @@ function AppliedFilters({ model }: { model: SearchModel }) {
 
 function SearchResults({ model }: { model: SearchModel }) {
   const t = useTranslation(), data = model.data;
-  if (!data.query || data.unavailable || !data.hits.length) return <SearchEmpty model={model} />;
+  if (!data.query || data.unavailable) return <SearchEmpty model={model} />;
   return <>
+    {data.hits.length ? <>
     <div className={styles.resultMeta} aria-live="polite"><p>{data.total} {t(data.total === 1 ? copy.passage : copy.passages)} {t(copy.for)} <strong>“{data.query}”</strong></p><span>{model.pending ? t(copy.searching) : t(copy.ranking)}</span></div>
     <ul className={['search-hits', styles.hits].join(' ')}>{data.hits.map(hit => <SearchResult key={searchHitKey(hit)} hit={hit} model={model} />)}</ul>
+    </> : <SearchEmpty model={model} />}
     <Pager previous={data.offset > 0 ? { href: searchUrl({ q: data.query, ...data.criteria, offset: Math.max(0, data.offset - data.limit) }), label: t(ui.remainingStatus.previous) } : undefined}
       next={data.offset + data.limit < data.total ? { href: searchUrl({ q: data.query, ...data.criteria, offset: data.offset + data.limit }), label: t(ui.remainingStatus.next) } : undefined} />
   </>;
@@ -132,9 +135,11 @@ function SearchEmpty({ model }: { model: SearchModel }) {
   const t = useTranslation(), { query, unavailable } = model.data;
   const title = unavailable ? ui.errors.searchUnavailable : query ? copy.noResults : copy.start;
   const hint = unavailable ? copy.outageHint : query ? copy.noResultsHint : copy.startHint;
+  const beyondPage = !unavailable && query && model.data.offset > 0 && model.data.total > 0;
   return <div className={styles.empty} role={unavailable ? 'alert' : undefined}>
-    <Search size={27} aria-hidden="true" /><h2>{t(title)}</h2><p>{t(hint)}</p>
+    <Search size={27} aria-hidden="true" /><h2>{t(beyondPage ? copy.noPage : title)}</h2><p>{t(beyondPage ? copy.noPageHint : hint)}</p>
     <div className={styles.emptyActions}>
+      {beyondPage ? <a className="btn" href={searchUrl({ q: query, ...model.data.criteria })}>{t(copy.firstPage)}</a> : null}
       {unavailable ? <><a className="btn" href={model.href}>{t(copy.retry)}</a><Link href="/">{t(ui.search.page.countries)}</Link></> : query ? <>
         <button type="button" className="btn" onClick={() => { model.search.current?.focus(); model.search.current?.select(); }}>{t(copy.changeWords)}</button>
         {Object.values(model.criteria).some(Boolean) ? <a href={searchUrl({ q: query })} onClick={event => { event.preventDefault(); model.navigate(emptySearchCriteria, query, false); }}>{t(copy.clearAll)}</a> : null}

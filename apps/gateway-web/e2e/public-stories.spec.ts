@@ -47,16 +47,19 @@ test('visitor reads the site scope, sources and accessibility statement', async 
 
 test('visitor filters search and result retains its version', async ({ page }) => {
   await page.goto('/search');
-  await page.getByLabel('Keyword').fill('dignity');
+  await page.getByLabel('Search words or a passage').fill('dignity');
+  await page.locator('button[aria-controls="search-filters"]').click();
   await page.getByLabel('Country', { exact: true }).selectOption('DE');
   await page.getByLabel('Version', { exact: true }).selectOption(VERSION_2022);
   await page.getByLabel('Effective date', { exact: true }).selectOption('2022-12-19');
-  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await page.locator('.search-page-form button[type="submit"]').click();
   await expect(page).toHaveURL(new RegExp(`country=DE.*versionId=${VERSION_2022}.*effectiveDate=2022-12-19`));
   const result = page.getByRole('link', { name: /Article 1 — Human dignity/ });
-  await expect(result).toHaveAttribute('href', `/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`);
+  const target = new URL(await result.getAttribute('href') ?? '', page.url());
+  expect(target.pathname).toBe(`/countries/DE/versions/${VERSION_2022}/articles/${ARTICLE_1}`);
+  expect(target.searchParams.get('fromSearch')).toBe(`/search?q=dignity&country=DE&versionId=${VERSION_2022}&effectiveDate=2022-12-19`);
   await result.click();
-  await expect(page).toHaveURL(new RegExp(`/versions/${VERSION_2022}/articles/${ARTICLE_1}$`));
+  await expect(page).toHaveURL(url => url.pathname === target.pathname && url.searchParams.get('fromSearch') === target.searchParams.get('fromSearch'));
 });
 
 test('visitor compares consolidated passages and can include reversed changes',async({page})=>{

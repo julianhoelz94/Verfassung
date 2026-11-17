@@ -8,6 +8,7 @@ import { usability } from '../../lib/usability-messages';
 import { TranslationProvider } from '../components/TranslationProvider';
 import Search, { generateMetadata } from './page';
 vi.mock('../../lib/server-locale', () => ({ currentLocale: vi.fn(async () => 'en') }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock('../../lib/api', async original => ({ ...await original<typeof import('../../lib/api')>(), searchArticles: vi.fn(), searchFacets: vi.fn() }));
 const props = (values: Record<string, string> = {}) => ({ searchParams: Promise.resolve(values) });
 const hit: api.SearchHit = { articleId: 'unit-1', versionId: 'snapshot-1949', countryCode: 'XA', constitutionTitle: 'Republic Charter', versionLabel: '1949', effectiveDate: '1949-05-23', articleNumber: '1', title: 'Equal rights', snippet: 'Every citizen has equal rights.', rank: 1 };
@@ -47,7 +48,7 @@ describe('search selection and results', () => {
     vi.mocked(api.searchArticles).mockRejectedValue(new Error('offline')); const output = await html({ q: 'rights' }); expect(output).toContain('role="alert"'); expect(output).not.toContain('Equal rights');
   });
   it('renders an honest empty result without invented passages', async () => {
-    vi.mocked(api.searchArticles).mockResolvedValue({ hits: [], total: 0, limit: 20, offset: 0 }); const output = await html({ q: 'absent' }); expect(output).not.toContain('Equal rights'); expect(new DOMParser().parseFromString(output, 'text/html').querySelector('.search-hit')).toBeNull(); expect(output).toContain('No articles match');
+    vi.mocked(api.searchArticles).mockResolvedValue({ hits: [], total: 0, limit: 20, offset: 0 }); const output = await html({ q: 'absent' }); expect(output).not.toContain('Equal rights'); expect(new DOMParser().parseFromString(output, 'text/html').querySelector('.search-hit')).toBeNull(); expect(output).toContain('No matching passages');
   });
   it('uses query-specific metadata while retaining the canonical search page', async () => {
     const metadata = await generateMetadata(props({ q: ' rights ' })); expect(metadata.title).toContain('rights'); expect(metadata.alternates?.canonical).toContain('/search');
@@ -119,6 +120,6 @@ describe('search selection and results', () => {
     const document = new DOMParser().parseFromString(output, 'text/html');
     expect(document.querySelector('[role="alert"]')).toBeNull();
     expect(document.querySelector('.pager')).toBeNull();
-    expect(output).toContain('No articles match');
+    expect(output).toContain('No matching passages');
   });
 });

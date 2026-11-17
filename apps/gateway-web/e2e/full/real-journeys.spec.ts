@@ -38,8 +38,8 @@ test('visitor compares legal versions and reads the source document timeline', a
 
 test('visitor finds imported text through the real search index', async ({ page }) => {
   await page.goto('/search');
-  await page.getByLabel('Keyword').fill('dignity');
-  await page.locator('main').getByRole('button', { name: 'Search' }).click();
+  await page.getByLabel('Search words or a passage').fill('dignity');
+  await page.locator('main').getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('link', { name: /Article 1 — Human dignity/ }).first()).toBeVisible();
 });
 
@@ -65,11 +65,12 @@ test('visitor reads historical article context, provenance, and site guidance', 
 
 test('visitor filters real search results and opens their original version', async ({ page }) => {
   await page.goto('/search');
-  await page.getByLabel('Keyword').fill('dignity');
-  await page.locator('main').getByRole('button', { name: 'Search' }).click();
+  await page.getByLabel('Search words or a passage').fill('dignity');
+  await page.locator('main').getByRole('button', { name: 'Search', exact: true }).click();
+  await page.locator('button[aria-controls="search-filters"]').click();
   await page.getByLabel('Country', { exact: true }).selectOption('XA');
   await page.getByLabel('Version', { exact: true }).selectOption(ids.versions['xa-2020']);
-  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await page.locator('.search-page-form button[type="submit"]').click();
   const result = page.getByRole('link', { name: /Article 1 — Human dignity/ });
   await expect(result).toHaveAttribute('href', new RegExp(`/versions/${ids.versions['xa-2020']}/articles/`));
   await result.click();

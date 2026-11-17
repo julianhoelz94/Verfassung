@@ -507,18 +507,6 @@ summary {
   font-weight: var(--weight-ui-emphasis);
 }
 
-.search-hits {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: var(--space-4);
-}
-
-.search-hit {
-  margin-bottom: 0;
-}
-
 .timeline-item {
   margin-bottom: var(--space-5);
 }
@@ -1494,34 +1482,9 @@ button.article-toggle:disabled::after {
   font-variant-numeric: tabular-nums;
 }
 
-.search-page-form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-}
-
 .search-filter-fields {
   display: grid;
   gap: var(--space-4);
-}
-
-.search-snippet {
-  font-family: var(--font-text);
-}
-
-.search-snippet mark {
-  background: var(--color-changed-bg);
-  color: var(--color-changed-fg);
-}
-
-.filters-disclosure > summary {
-  cursor: pointer;
-  margin-bottom: 0;
-}
-
-.filters-disclosure[open] > summary {
-  margin-bottom: var(--space-3);
 }
 
 .pager {
@@ -1988,7 +1951,6 @@ form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
 .searchable-filter input { width: 100%; }
 .search-filter-fields > .field { margin-bottom: 0; }
 .search-filter-fields select { width: 100%; }
-.search-sidebar { border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-4); background: var(--color-surface); }
 .applied-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); }
 .applied-filters .chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .applied-filters .chip span { margin-inline-start: var(--space-2); }
@@ -2030,10 +1992,6 @@ form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
   .history-details > [hidden] { display: grid !important; }
 }
 
-.search-sidebar > summary { display: none; }
-.filters-content { display: grid; gap: var(--space-4); }
-.search-page-form > .flex-grow { display: grid; gap: var(--space-2); }
-.search-page-form > .flex-grow input { width: 100%; }
 .search-filter-fields .field { display: grid; gap: var(--space-2); }
 .search-filter-fields .field > label { margin: 0; }
 

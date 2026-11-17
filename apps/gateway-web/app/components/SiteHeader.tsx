@@ -83,7 +83,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           ))}
         </nav>
         <div className="topbar-actions">
-          {!continuousReader && !setupInProgress && (user || anonymousBrowsingAllowed) ? <SiteSearchForm
+          {!continuousReader && pathname !== '/search' && !setupInProgress && (user || anonymousBrowsingAllowed) ? <SiteSearchForm
             id="header-search-inline"
             className="search-inline"
             versionId={versionId}
@@ -117,7 +117,7 @@ export function SiteHeader({ user, identityUnavailable = false, needsReviewCount
           )}
         </div>
       </div>
-      {!continuousReader && !setupInProgress && (user || anonymousBrowsingAllowed) ? <div className="search-row">
+      {!continuousReader && pathname !== '/search' && !setupInProgress && (user || anonymousBrowsingAllowed) ? <div className="search-row">
         <SiteSearchForm
           id="header-search-phone"
           versionId={versionId}

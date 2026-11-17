@@ -39,7 +39,7 @@ test('a country jurisdiction without a legacy country record has a working index
   expect(result.hits[0].jurisdictionId).toBe(jurisdiction.id);
   await page.goto(`/search?q=${keyword}`);
   await page.locator('.search-hits h2 a').click();
-  await expect(page).toHaveURL(new RegExp(`/jurisdictions/${jurisdiction.id}/versions/${published.versionId}#`));
+  await expect(page).toHaveURL(url => url.pathname === '/jurisdictions/' + jurisdiction.id + '/versions/' + published.versionId && url.hash === '#' + result.hits[0].articleId && url.searchParams.get('fromSearch') === '/search?q=' + keyword);
   await expect(page.getByText(`Exact authored wording ${keyword}.`, { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText(`Exact authored wording ${keyword}.`, { exact: true })).toBeVisible();

@@ -1,26 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
+import { Info } from 'lucide-react';
 import type { SearchFacets } from '../../lib/api';
 import { ui } from '../../lib/messages';
 import { usability } from '../../lib/usability-messages';
 import { migrationUi } from '../../lib/migration-messages';
 import { normalizeSearchSelection, versionMatchesSelection, type SearchSelection } from '../../lib/search-filters';
+import type { SearchCriteria } from '../../lib/search-workspace';
+import { searchWorkspaceUi } from '../../lib/search-workspace-messages';
 import { T, useTranslation } from './TranslationProvider';
+import { HelpTooltip } from './HelpTooltip';
 import fieldStyles from './fields.module.css';
 
 type Option = { value: string; label: string };
-
-function SearchableSelect({ name, label, anyLabel, options, value, onChange, missingLabel }: {
-  name: string; label: string; anyLabel: string; options: Option[]; value: string; onChange: (value: string) => void; missingLabel?: string;
+function SearchableSelect({ name, label, anyLabel, options, value, onChange, missingLabel, form, help }: {
+  name: string; label: string; anyLabel: string; options: Option[]; value: string; onChange: (value: string) => void;
+  missingLabel?: string; form?: string; help?: string;
 }) {
-  const t = useTranslation();
-  const [query, setQuery] = useState('');
+  const t = useTranslation(), [query, setQuery] = useState('');
   const matching = options.filter(option => option.value === value || option.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  return <div className={["field searchable-filter", fieldStyles.field].join(' ')}>
-    <label htmlFor={`filter-${name}`}>{label}</label>
-    {options.length > 8 ? <input type="search" aria-label={`${t(usability.findOption)}: ${label}`} placeholder={t(usability.findOption)} value={query} onChange={event => setQuery(event.target.value)} /> : null}
-    <select id={`filter-${name}`} name={name} value={value} onChange={event => onChange(event.target.value)}>
+  return <div className={['field searchable-filter', fieldStyles.field].join(' ')}>
+    <div className={fieldStyles.labelRow}><label htmlFor={'filter-' + name}>{label}</label>{help ? <HelpTooltip label={help}><Info size={15} aria-hidden="true" /></HelpTooltip> : null}</div>
+    {options.length > 8 ? <input type="search" aria-label={t(usability.findOption) + ': ' + label} placeholder={t(usability.findOption)} value={query} onChange={event => setQuery(event.target.value)} /> : null}
+    <select id={'filter-' + name} name={name} form={form} value={value} onChange={event => onChange(event.target.value)}>
       <option value="">{anyLabel}</option>
       {value && !options.some(option => option.value === value) ? <option value={value}>{missingLabel ?? value}</option> : null}
       {matching.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -29,36 +32,39 @@ function SearchableSelect({ name, label, anyLabel, options, value, onChange, mis
   </div>;
 }
 
-export function SearchFilters({ facets, country, jurisdictionId = '', versionId, effectiveDate }: {
+export function SearchFilters({ facets, country, jurisdictionId = '', versionId, effectiveDate, onChange, form }: {
   facets: SearchFacets; country: string; jurisdictionId?: string; versionId: string; effectiveDate: string;
+  onChange?: (criteria: SearchCriteria) => void; form?: string;
 }) {
   const t = useTranslation();
-  const [selection, setSelection] = useState(() => normalizeSearchSelection(facets, { country, jurisdictionId, versionId }));
+  const [localSelection, setSelection] = useState(() => normalizeSearchSelection(facets, { country, jurisdictionId, versionId }));
+  const selection = onChange ? normalizeSearchSelection(facets, { country, jurisdictionId, versionId }) : localSelection;
   const [adjusted, setAdjusted] = useState(false);
   const versions = facets.versions.filter(version => versionMatchesSelection(version, selection));
   function changeOwner(field: 'country' | 'jurisdictionId', value: string) {
-    const requested: SearchSelection = { ...selection, [field]: value };
-    const next = normalizeSearchSelection(facets, requested, field);
-    setSelection(next);
+    const requested: SearchSelection = { ...selection, [field]: value }, next = normalizeSearchSelection(facets, requested, field);
+    setSelection(next); onChange?.({ ...next, effectiveDate });
     setAdjusted(next.country !== requested.country || next.jurisdictionId !== requested.jurisdictionId || next.versionId !== requested.versionId);
   }
+  function changeVersion(value: string) { setSelection({ ...selection, versionId: value }); onChange?.({ ...selection, versionId: value, effectiveDate }); }
+  const dateProps = onChange ? { value: effectiveDate, onChange: (event: ChangeEvent<HTMLSelectElement>) => onChange({ ...selection, effectiveDate: event.target.value }) } : { defaultValue: effectiveDate };
   return <div className="search-filter-fields">
-    <SearchableSelect name="jurisdictionId" missingLabel={t(usability.selectedJurisdiction)} label={t(migrationUi.jurisdiction)} anyLabel={t(usability.anyJurisdiction)}
-      options={(facets.jurisdictions ?? []).map(facet => ({ value: facet.id, label: `${facet.name}${facet.historical ? ` · ${t(migrationUi.historical)}` : ''} (${facet.count})` }))}
-      value={selection.jurisdictionId} onChange={value => changeOwner('jurisdictionId', value)} />
-    <p className="muted">{t(usability.jurisdictionScope)}</p>
-    <SearchableSelect name="country" label={t(ui.search.page.country)} anyLabel={t(ui.search.page.anyCountry)}
-      options={facets.countries.map(facet => ({ value: facet.code, label: `${facet.countryName || facet.code} (${facet.count})` }))}
+    <SearchableSelect form={form} name="country" label={t(ui.search.page.country)} anyLabel={t(ui.search.page.anyCountry)}
+      options={facets.countries.map(facet => ({ value: facet.code, label: (facet.countryName || facet.code) + ' (' + facet.count + ')' }))}
       value={selection.country} onChange={value => changeOwner('country', value)} />
-    <SearchableSelect key={`${selection.country}:${selection.jurisdictionId}`} name="versionId" missingLabel={t(usability.unlistedVersion)} label={t(ui.search.page.version)} anyLabel={t(ui.search.page.anyVersion)}
-      options={versions.map(facet => ({ value: facet.id, label: `${facet.constitutionTitle} · ${facet.label} (${facet.count})` }))}
-      value={selection.versionId} onChange={value => setSelection(current => ({ ...current, versionId: value }))} />
-    {adjusted ? <p role="status" className="muted"><T value={usability.filtersAdjusted} /></p> : null}
-    <div className={["field", fieldStyles.field].join(' ')}><label htmlFor="filter-effectiveDate"><T value={ui.search.page.effectiveDate} /></label>
-      <select id="filter-effectiveDate" name="effectiveDate" defaultValue={effectiveDate}>
-        <option value=""><T value={ui.search.page.anyDate} /></option>
+    <SearchableSelect form={form} name="jurisdictionId" missingLabel={t(usability.selectedJurisdiction)} label={t(migrationUi.jurisdiction)} anyLabel={t(usability.anyJurisdiction)} help={t(usability.jurisdictionScope)}
+      options={(facets.jurisdictions ?? []).map(facet => ({ value: facet.id, label: facet.name + (facet.historical ? ' · ' + t(migrationUi.historical) : '') + ' (' + facet.count + ')' }))}
+      value={selection.jurisdictionId} onChange={value => changeOwner('jurisdictionId', value)} />
+    <SearchableSelect form={form} key={selection.country + ':' + selection.jurisdictionId} name="versionId" missingLabel={t(usability.unlistedVersion)} label={t(ui.search.page.version)} anyLabel={t(ui.search.page.anyVersion)}
+      options={versions.map(facet => ({ value: facet.id, label: facet.constitutionTitle + ' · ' + facet.label + ' (' + facet.count + ')' }))}
+      value={selection.versionId} onChange={changeVersion} />
+    <div className={['field', fieldStyles.field].join(' ')}><div className={fieldStyles.labelRow}><label htmlFor="filter-effectiveDate"><T value={ui.search.page.effectiveDate} /></label><HelpTooltip label={t(searchWorkspaceUi.dateHelp)}><Info size={15} aria-hidden="true" /></HelpTooltip></div>
+      <select id="filter-effectiveDate" name="effectiveDate" form={form} {...dateProps}>
+        <option value="">{t(ui.search.page.anyDate)}</option>
+        {effectiveDate && !facets.dates.some(facet => facet.effectiveDate === effectiveDate) ? <option value={effectiveDate}>{effectiveDate}</option> : null}
         {facets.dates.map(facet => <option key={facet.effectiveDate} value={facet.effectiveDate}>{facet.effectiveDate} ({facet.count})</option>)}
       </select>
     </div>
+    {adjusted ? <p role="status" className="muted"><T value={usability.filtersAdjusted} /></p> : null}
   </div>;
 }

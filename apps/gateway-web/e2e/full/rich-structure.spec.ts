@@ -49,7 +49,7 @@ test('rich table, note and reference changes appear in compare and search', asyn
   const search = await (await request.get(`/api/search/search?q=Biennial&country=XC&versionId=${to}`)).json();
   expect(search.total).toBe(1);
   await page.goto('/search');
-  await page.getByLabel('Keyword').fill('Biennial');
-  await page.locator('main').getByRole('button', { name: 'Search' }).click();
+  await page.getByLabel('Search words or a passage').fill('Biennial');
+  await page.locator('main').getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByText('Biennial').first()).toBeVisible();
 });

@@ -105,9 +105,9 @@ Use `components/documents/DocumentAttachmentTemplate` for compact browsing and u
 
 `ConstitutionDocument` owns hierarchy spacing and vertical guides through `--constitution-hierarchy-inset`. A child guide aligns with the parent's text start. `HierarchyViewOptions` supplies the two conditional controls to the viewer and editor; `DocumentView` connects editor surfaces to the shared preference store. Reader and Preview use the `reader` scope; working text uses `editor`. These are display preferences and never draft operations. Keep metadata explanations in setup previews; public constitutional wording remains plain authored content.
 
-## Shared editorial and import collections
+## Shared editorial, import and search collections
 
-`layout/WorkCollection` is the common presentation source for Editor and Imports.
+`layout/WorkCollection` is the common presentation source for Editor, Imports and Search.
 It owns the measured full-width frame/menu, normal/compact heading, retained
 context layout/toggle, search/filter disclosure, grouped lists and row/action
 layout. `EditorDeskFrame` adapts editor navigation and return memory; `/import`
@@ -120,3 +120,7 @@ Commands, permissions, status interpretation, pagination/filter state, draft
 retention and owner identity stay with their domains. The specialised existing
 import review/source-comparison and structure viewers remain authoritative.
 See [the contract and URL migration](import-collection-workspace.md).
+
+Public Search uses the same frame, header, measured menu and context toggle.
+Its query submission, progressive filters, server pagination and published
+passage preview remain Search-owned. See [the Search workspace contract](search-workspace.md).

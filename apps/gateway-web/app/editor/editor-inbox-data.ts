@@ -73,7 +73,7 @@ export async function loadEditorInbox({ userId, roles, queue, archived, locale }
     })),
     ...data.imports.map(job => ({
       id: job.id, kind: 'import' as const, status: job.status, owned: job.submittedBy === userId, updatedAt: null,
-      workspaceHref: `/editor?importJobId=${encodeURIComponent(job.id)}`,
+      workspaceHref: `/import/jobs/${encodeURIComponent(job.id)}`,
       ...rowContext(job.versionId, { countryKey: job.isoCode ?? undefined, country: job.countryName ?? job.isoCode ?? undefined, constitutionKey: job.versionId ? undefined : `import:${job.constitutionTitle ?? job.id}`, constitution: job.constitutionTitle ?? undefined, version: job.versionLabel ?? undefined }, metadata, locale),
     })),
   ];

@@ -119,6 +119,20 @@ Ein Herausgeber veröffentlicht die freigegebene Quellenkorrektur nach frischer 
 
 ### Importierte Verfassungen
 
+Unter **Importe** (`/import`) finden Sie die nach Land gruppierte Übersicht.
+Die Suche ist sofort sichtbar; **Filter** öffnet Status, Art und Land.
+Paketfassungen erscheinen einmal innerhalb ihres Pakets. **Neuer Import** bietet
+eine bestehende Verfassung oder einen neuen Strukturvorschlag. Ausgewählte
+Dateien und eingefügtes JSON bleiben beim Wechsel der Ansichten, beider
+Importmodi und der Kontextanzeige erhalten. Nach einem abgewiesenen Upload
+können Sie dieselben Eingaben korrigieren. Vormerken veröffentlicht keinen
+Text. Prüfer und Herausgeber können die Übersicht ohne Uploadrechte öffnen.
+
+Vorgänge, Strukturvorschläge und Pakete liegen unter `/import/jobs/:id`,
+`/import/setup/:id` und `/import/packages/:id`. Ältere Import- und Migrationslinks
+sowie Editorlinks mit `importJobId` führen mit ihrem Kontext zum selben Vorgang.
+Prüf- und Veröffentlichungslisten zeigen Importe weiterhin neben Bearbeitungen.
+
 MCP- und Dateiimporte erscheinen im Editor unter **Prüfliste**, gemeinsam mit eingereichten Bearbeitungssitzungen. Öffnen Sie den Import und prüfen Sie Quelle, eingereichte Gliederung und vorbereitete Lesevorschau. Falls erforderlich, bestätigt ein Bearbeiter/Administrator zuerst die Gliederung und bereitet den unveröffentlichten Entwurf vor. Ein Prüfer/Administrator gibt anschließend mit Begründung frei oder lehnt ab. Freigegebene Importe erscheinen unter **Bereit zur Veröffentlichung**; ein Herausgeber/Administrator veröffentlicht den exakt freigegebenen Entwurf nach frischer MFA-Prüfung.
 
 Dasselbe Konto darf importieren, prüfen und veröffentlichen, sofern es die erforderlichen Rollen besitzt. Ein zweites Konto ist nicht erforderlich. Freigabe und Veröffentlichung bleiben getrennte Aktionen. Bestehende Importlinks öffnen diesen Ablauf im Editor.

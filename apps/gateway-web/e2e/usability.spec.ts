@@ -58,7 +58,7 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
       await expect(editorial.locator('a[href="/editor?status=reviewing"]')).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page.getByRole('button', { name: english ? 'Account menu' : 'Kontomenü' })).toBeFocused();
-      await page.goto(`/editor?importJobId=${jobId}`);
+      await page.goto(`/import/jobs/${jobId}`);
       await page.getByRole('tab', { name: english ? 'Review' : 'Prüfung', exact: true }).click();
       await expect(page.getByRole('textbox', { name: english ? 'Review reason' : 'Begründung der Entscheidung', exact: true })).toBeVisible();
       await expect(page.locator('.technical-identifiers code').first()).toBeHidden();

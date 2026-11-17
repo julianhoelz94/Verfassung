@@ -49,7 +49,7 @@ beforeEach(() => {
 });
 it('encodes forbidden destinations and stops before any downstream access', async () => {
   clients.currentUser.mockResolvedValue(null);
-  expect(await reviewSetupAction(form())).toBe('/admin/import/setup/proposal%2Fa?error=forbidden');
+  expect(await reviewSetupAction(form())).toBe('/import/setup/proposal%2Fa?error=forbidden');
   expect(clients.requireSessionBearer).not.toHaveBeenCalled();
 });
 it('keeps stale revision ahead of malformed intent and display errors', async () => {
@@ -62,7 +62,7 @@ it('keeps stale revision ahead of malformed intent and display errors', async ()
 it('skips display decoding when withdrawing and forbids withdrawal during confirmation', async () => {
   const data = form('withdraw');
   data.set('display', '{');
-  expect(await reviewSetupAction(data)).toBe('/admin/import/setup/proposal%2Fa');
+  expect(await reviewSetupAction(data)).toBe('/import/setup/proposal%2Fa');
   expect(clients.transitionSetupProposal).toHaveBeenCalledWith(proposal.id, 'withdraw', 'Bearer editor', 4);
   expect(clients.saveSetupDisplay).not.toHaveBeenCalled();
   clients.getSetupProposal.mockResolvedValue({ ...proposal, status: 'confirming' });
@@ -71,7 +71,7 @@ it('skips display decoding when withdrawing and forbids withdrawal during confir
 it('saves changed display once before confirming with the exact returned revision', async () => {
   const data = form();
   data.set('display', '[]');
-  expect(await reviewSetupAction(data)).toBe('/admin/import/setup/proposal%2Fa');
+  expect(await reviewSetupAction(data)).toBe('/import/setup/proposal%2Fa');
   expect(clients.saveSetupDisplay).toHaveBeenCalledWith(proposal.id, [], 'Bearer editor', 4);
   expect(clients.transitionSetupProposal).toHaveBeenCalledWith(proposal.id, 'confirm', 'Bearer editor', 5);
   expect(clients.saveSetupDisplay.mock.invocationCallOrder[0]).toBeLessThan(
@@ -88,7 +88,7 @@ it('does not advance the command if display saving returns an unexpected revisio
 it('trims feedback before sending it and checks its length before saving display', async () => {
   const data = form('request-changes');
   data.set('message', '  Please revise the source.  ');
-  expect(await reviewSetupAction(data)).toBe('/admin/import/setup/proposal%2Fa');
+  expect(await reviewSetupAction(data)).toBe('/import/setup/proposal%2Fa');
   expect(clients.requestSetupChanges).toHaveBeenCalledWith(
     proposal.id,
     'Please revise the source.',

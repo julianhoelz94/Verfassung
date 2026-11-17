@@ -104,3 +104,19 @@ Use `components/documents/DocumentAttachmentTemplate` for compact browsing and u
 `admin/constitutions/StructureWorkspaceTemplate` re-exports `StructureWorkspaceFrame`: full-width viewer chrome, the left overview toggle and Details / Structure / Documents / Review / History tabs shared by all three constitution setup routes. `OutlineWorkspace` supplies hierarchy navigation, selected-level fields and the live reader preview as slots. Presets live within Structure; Documents stays mounted outside each owner form. `OutlineEditor` retains creation and Catalog impact/save commands; `SetupProposalReview` supplies read-only structural permissions and Ingestion review commands. Source/identity, documents and history are workflow slots. Add common controls here rather than a third route-specific form. See [the workspace contract](constitution-structure-workspace.md).
 
 `ConstitutionDocument` owns hierarchy spacing and vertical guides through `--constitution-hierarchy-inset`. A child guide aligns with the parent's text start. `HierarchyViewOptions` supplies the two conditional controls to the viewer and editor; `DocumentView` connects editor surfaces to the shared preference store. Reader and Preview use the `reader` scope; working text uses `editor`. These are display preferences and never draft operations. Keep metadata explanations in setup previews; public constitutional wording remains plain authored content.
+
+## Shared editorial and import collections
+
+`layout/WorkCollection` is the common presentation source for Editor and Imports.
+It owns the measured full-width frame/menu, normal/compact heading, retained
+context layout/toggle, search/filter disclosure, grouped lists and row/action
+layout. `EditorDeskFrame` adapts editor navigation and return memory; `/import`
+uses the same frame for Overview/New import and the same context layout for
+creation guidance. Neither adapter copies the other's CSS. Country grouping can
+contain a constitution section (Editor) or direct import/package rows (Imports).
+Complete next-action labels and arrows move together when a row reflows.
+
+Commands, permissions, status interpretation, pagination/filter state, draft
+retention and owner identity stay with their domains. The specialised existing
+import review/source-comparison and structure viewers remain authoritative.
+See [the contract and URL migration](import-collection-workspace.md).

@@ -21,7 +21,7 @@ export const packageReviewHref = (
 ) => {
   const params = new URLSearchParams(query);
   if (item) params.set("item", item);
-  return `/admin/import/packages/${encodeURIComponent(run)}${params.size ? `?${params}` : ""}`;
+  return `/import/packages/${encodeURIComponent(run)}${params.size ? `?${params}` : ""}`;
 };
 export function sourcesForItem(
   run: MigrationRun,

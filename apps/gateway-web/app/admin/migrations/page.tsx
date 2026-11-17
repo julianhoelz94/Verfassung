@@ -1,2 +1,2 @@
 import { redirect } from 'next/navigation';
-export default function MigrationRunsPage() { redirect('/admin/import'); }
+export default function MigrationRunsPage() { redirect('/import'); }

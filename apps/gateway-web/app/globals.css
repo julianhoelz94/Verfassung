@@ -1951,25 +1951,11 @@ form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
 .recovery-codes { padding: var(--space-4); border-radius: var(--radius-md); color: var(--color-added-fg); background: var(--color-added-bg); margin-bottom: var(--space-4); }
 .recovery-codes ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); list-style: none; gap: var(--space-2); padding: 0; }
 .recovery-codes code { font-size: var(--text-base); }
-.task-choices { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin-bottom: var(--space-5); }
-.task-choices a { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-line-strong); border-radius: var(--radius-md); text-decoration: none; font-weight: var(--weight-ui-emphasis); }
-.task-choices a[aria-current='page'] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent-strong); }
-.task-number { flex: 0 0 1.5rem; color: var(--color-ink-3); font-size: var(--text-sm); white-space: nowrap; text-align: center; }
-.import-layout { display: grid; gap: var(--space-5); align-items: start; }
-.task-guidance { padding: var(--space-4) 0 var(--space-5); color: var(--color-ink-2); }
-.task-guidance h2 { font-size: var(--text-lg); color: var(--color-ink); }
-.task-list { list-style: none; padding: 0; display: grid; gap: var(--space-3); }
-.task-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-block: var(--space-2); border-bottom: 1px solid var(--color-line); }
 @media (min-width: 640px) {
-  .task-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .data-row { gap: var(--space-4); }
 }
-@media (min-width: 1024px) {
-
-  .import-layout { grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr); }
-}
 @media print {
-  .section-nav, .page-actions, .card-actions, .snapshot-notice, .task-choices { display: none; }
+  .section-nav, .page-actions, .card-actions, .snapshot-notice { display: none; }
 }
 .section-nav a[aria-current='page'] { background: var(--color-accent-soft); color: var(--color-accent-strong); font-weight: var(--weight-ui-emphasis); }
 

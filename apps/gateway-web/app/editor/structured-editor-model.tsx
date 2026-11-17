@@ -382,7 +382,7 @@ export function useStructuredEditorModel({
   useEffect(() => {
     const header = document.querySelector(".topbar");
     if (!header) return;
-    const parentMenu = rootRef.current?.closest('[data-editor-desk]')?.querySelector('[data-editor-queue-frame]');
+    const parentMenu = rootRef.current?.closest('[data-editor-desk]')?.querySelector('[data-work-collection-menu]');
     const measure = () => setToolbarTop(header.getBoundingClientRect().height + (parentMenu?.getBoundingClientRect().height ?? 0));
     measure();
     if (typeof ResizeObserver === "undefined") {
@@ -407,7 +407,7 @@ export function useStructuredEditorModel({
       menu.style.setProperty("--editor-panel-offset", "0px");
       const naturalTop = menu.getBoundingClientRect().top;
       const headerBottom = document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0;
-      const queueBottom = rootRef.current?.closest('[data-editor-desk]')?.querySelector('[data-editor-queue-frame]')?.getBoundingClientRect().bottom ?? 0;
+      const queueBottom = rootRef.current?.closest('[data-editor-desk]')?.querySelector('[data-work-collection-menu]')?.getBoundingClientRect().bottom ?? 0;
       const upper = Math.max((viewport?.offsetTop ?? 0) + 8, Math.min(Math.max(headerBottom, queueBottom) + 8, visibleBottom - 96));
       const minimumHeight = Math.min(180, Math.max(0, visibleBottom - upper - 12));
       const top = Math.max(upper, Math.min(naturalTop, visibleBottom - minimumHeight - 12));

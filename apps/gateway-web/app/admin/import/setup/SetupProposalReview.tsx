@@ -405,7 +405,7 @@ function proposalStatusCard(proposal: SetupProposal, t: SetupTranslation) {
       ) : recoverable ? (
         <p>{t(ui.setupReview.recoveryHelp)}</p>
       ) : null}
-      <a href={`/admin/import/setup/${proposal.id}`}>
+      <a href={`/import/setup/${proposal.id}`}>
         {t(ui.setupReview.reload)}
       </a>
     </Card>

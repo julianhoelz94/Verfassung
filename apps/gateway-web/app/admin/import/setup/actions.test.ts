@@ -14,7 +14,7 @@ beforeEach(() => {
 it('resumes the pinned confirmation without trying to change display settings', async () => {
   const data = new FormData();
   data.set('proposalId', 'proposal'); data.set('revision', '4'); data.set('intent', 'confirm'); data.set('display', 'malformed unrelated display');
-  expect(await reviewSetupAction(data)).toBe('/admin/import/setup/proposal');
+  expect(await reviewSetupAction(data)).toBe('/import/setup/proposal');
   expect(transitionSetupProposal).toHaveBeenCalledWith('proposal', 'confirm', 'Bearer editor', 4);
   expect(saveSetupDisplay).not.toHaveBeenCalled();
 });

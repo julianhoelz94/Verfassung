@@ -105,9 +105,9 @@ function downloadHref(documentId: string, revision: number, attachmentId?: strin
 }
 
 function usageHref(usage: DocumentLinkEvent): string | undefined {
-  if (usage.targetType === 'import_job') return `/editor?importJobId=${usage.targetId}`;
-  if (usage.targetType === 'setup_proposal') return `/admin/import/setup/${usage.targetId}`;
-  if (usage.targetType === 'migration_run') return `/admin/migrations/${usage.targetId}`;
+  if (usage.targetType === 'import_job') return `/import/jobs/${usage.targetId}`;
+  if (usage.targetType === 'setup_proposal') return `/import/setup/${usage.targetId}`;
+  if (usage.targetType === 'migration_run') return `/import/packages/${usage.targetId}`;
   if (['amendment','amendment_material','change_material'].includes(usage.targetType)) return `/editor/amendments/${encodeURIComponent(usage.targetId)}`;
   return undefined;
 }

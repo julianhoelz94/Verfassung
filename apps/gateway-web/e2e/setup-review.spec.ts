@@ -24,7 +24,7 @@ for (const { language, width } of [{ language: 'en', width: 1440 }, { language: 
     await signInAdmin(page);
     await request.put(`${mockOrigin}/api/identity/me/language`, { headers: { Authorization: 'Bearer e2e-session-token' }, data: { languagePreference: language } });
     await page.setExtraHTTPHeaders({ 'Accept-Language': language });
-    await page.goto(`/admin/import/setup/${proposalId}?lang=${language}`);
+    await page.goto(`/import/setup/${proposalId}?lang=${language}`);
     const de = language === 'de';
     const confirmName = de ? 'Struktur bestätigen und vollständigen Upload ermöglichen' : 'Confirm structure and enable full upload';
     await expect(page.getByText(de ? 'Ihre Bestätigung ist erforderlich' : 'Your confirmation is required', { exact: true }).filter({ visible: true })).toBeVisible();

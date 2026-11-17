@@ -208,7 +208,7 @@ for (const viewport of [
       await workspace.locator('[data-editor-unit="' + fixture.lastRootId + '"]').scrollIntoViewIfNeeded();
       await expect(toolbar).toBeInViewport();
       const top = (await toolbar.boundingBox())!.y;
-      const queue = page.locator('[data-editor-queue-frame]');
+      const queue = page.locator('[data-work-collection-menu]');
       await expect(queue).toBeInViewport();
       const chromeBottom = Math.max(await page.locator('.topbar').evaluate(element => element.getBoundingClientRect().bottom), await queue.evaluate(element => element.getBoundingClientRect().bottom));
       expect(top, 'the toolbar must remain below the header and queue bar near Article 20').toBeGreaterThanOrEqual(chromeBottom - 1);

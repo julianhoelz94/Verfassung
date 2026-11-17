@@ -11,6 +11,7 @@ import { NavigatingActionForm } from '../components/NavigatingActionForm';
 import { Button } from '../components/ui';
 import { manageWorkAction } from './work-actions';
 import styles from './editor-inbox.module.css';
+import collection from '../components/layout/WorkCollection.module.css';
 
 export function WorkActions({ row, archived, returnTo, label }: { row: InboxRow; archived: boolean; returnTo: string; label: string }) {
   const t = useTranslation();
@@ -20,7 +21,7 @@ export function WorkActions({ row, archived, returnTo, label }: { row: InboxRow;
   if (!management && !row.publicHref) return null;
   const actionMessage = management ? managementMessages[management].action : inboxUi.viewConstitution;
   return <>
-    <button type="button" ref={trigger} className={styles.iconButton} aria-label={`${t(inboxUi.more)}: ${label}`} aria-haspopup="menu" aria-expanded={Boolean(position)} onClick={() => {
+    <button type="button" ref={trigger} className={collection.iconButton} aria-label={`${t(inboxUi.more)}: ${label}`} aria-haspopup="menu" aria-expanded={Boolean(position)} onClick={() => {
       const bounds = trigger.current!.getBoundingClientRect();
       setPosition(position ? null : { x: bounds.right - 240, y: bounds.bottom + 5, origin: trigger.current! });
     }}><MoreHorizontal size={18} aria-hidden="true" /></button>

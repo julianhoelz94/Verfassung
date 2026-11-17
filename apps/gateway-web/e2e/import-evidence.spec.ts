@@ -11,7 +11,7 @@ const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 const run = "01900000-0000-4000-8000-000000008500";
 const job = "01900000-0000-4000-8000-000000008630";
 const proposal = "01900000-0000-4000-8000-000000000802";
-const href = `/admin/import/packages/${run}`;
+const href = `/import/packages/${run}`;
 
 test.beforeEach(async ({ request }) => {
   await request.post(`${mock}/__reset`);
@@ -155,7 +155,7 @@ for (const width of [390, 1440]) {
         await request.get(`${mock}/api/ingestion/migration-runs/${run}`)
       ).json(),
     ).toEqual(captured);
-    await page.goto(`/admin/import/setup/${proposal}`);
+    await page.goto(`/import/setup/${proposal}`);
     await page.getByRole("tab", { name: "Documents", exact: true }).click();
     const setupEvidence = page.getByRole("region", {
       name: "Supplementary evidence",

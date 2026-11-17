@@ -115,7 +115,7 @@ for (const width of [390, 1440]) test(`the structured canvas keeps its compact f
   await page.screenshot({ path: info.outputPath('structured-initial.png') });
   expect(firstLine, 'the first legal unit starts within the first 60% of the viewport').toBeLessThanOrEqual(height * .6);
   await editor.scrollIntoViewIfNeeded();
-  const toolbar = page.locator('[data-editor-tools]'), queue = page.locator('[data-editor-queue-frame]');
+  const toolbar = page.locator('[data-editor-tools]'), queue = page.locator('[data-work-collection-menu]');
   expect((await toolbar.boundingBox())!.y).toBeGreaterThanOrEqual((await queue.boundingBox())!.y + (await queue.boundingBox())!.height - 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

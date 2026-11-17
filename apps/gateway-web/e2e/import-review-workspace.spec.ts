@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 const run = "01900000-0000-4000-8000-000000008500";
-const href = `/admin/import/packages/${run}`;
+const href = `/import/packages/${run}`;
 test.beforeEach(async ({ request }) => {
   await request.post(`${mock}/__reset`);
   await request.post(`${mock}/__import_review`, { data: {} });
@@ -27,12 +27,12 @@ for (const width of [390, 820, 1440])
       await page.goto(href);
       const en = locale === "en";
       const primary = page.locator('.nav-primary');
-      const imports = primary.locator('a[href="/admin/import"]');
+      const imports = primary.locator('a[href="/import"]');
       await expect(imports).toHaveText(en ? 'Imports' : 'Importe');
       await expect(imports).toHaveAttribute('aria-current', 'page');
       await expect(primary.locator('[aria-current="page"]')).toHaveCount(1);
       const destinations = await primary.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')));
-      expect(destinations.slice(destinations.indexOf('/editor'), destinations.indexOf('/documents') + 1)).toEqual(['/editor', '/admin/import', '/documents']);
+      expect(destinations.slice(destinations.indexOf('/editor'), destinations.indexOf('/documents') + 1)).toEqual(['/editor', '/import', '/documents']);
       if (width === 390) {
         await page.getByRole('button', { name: en ? 'Account menu' : 'Kontomenü', exact: true }).click();
         const mobileImports = page.locator('.menu-panel').getByRole('link', { name: en ? 'Imports' : 'Importe', exact: true });
@@ -194,7 +194,7 @@ for (const width of [1024, 1152]) {
       headers: { Authorization: 'Bearer e2e-session-token' },
       data: { languagePreference: 'de' },
     });
-    await page.goto('/admin/import');
+    await page.goto('/import');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const primary = page.locator('.nav-primary');
     if (await primary.isVisible()) {
@@ -212,7 +212,7 @@ test("package preparation, source inspection, approval and publication share one
 }) => {
   await request.post(`${mock}/__import_review`, { data: { submitted: true } });
   await signInAdmin(page);
-  await page.goto("/admin/import");
+  await page.goto("/import");
   await page
     .getByRole("link", { name: "Constitution archive · 1946–1953" })
     .click();

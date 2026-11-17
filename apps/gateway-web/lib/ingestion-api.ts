@@ -68,10 +68,11 @@ export function listImportJobs(authorization: string, status?: string): Promise<
 }
 
 /** Queue inboxes must retain every page and distinguish an outage from an empty queue. */
-export async function listAllImportJobs(authorization: string, status: string): Promise<ImportJob[]> {
+export async function listAllImportJobs(authorization: string, status?: string): Promise<ImportJob[]> {
   const jobs: ImportJob[] = [];
   for (let offset = 0; ; offset += 100) {
-    const params = new URLSearchParams({ status, limit: '100', offset: String(offset) });
+    const params = new URLSearchParams({ limit: '100', offset: String(offset) });
+    if (status) params.set('status', status);
     const page = await readJson<ImportJob[]>(`${ingestionBaseUrl()}/import-jobs?${params}`, 'ingestion', authorization);
     if (!page) throw new Error('Imports unavailable');
     jobs.push(...page);

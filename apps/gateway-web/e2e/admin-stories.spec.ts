@@ -68,7 +68,7 @@ test('administrator creates, rotates and revokes a service token', async ({ page
 
 test('administrator stages constitution JSON for review without publishing it', async ({ page }, testInfo) => {
   await signInAdmin(page);
-  await page.goto('/admin/import');
+  await page.goto('/import?mode=existing');
   await page.getByText('Paste JSON instead', { exact: true }).click();
   await page.getByLabel('Import JSON').fill(JSON.stringify({
     isoCode: 'US',
@@ -86,7 +86,7 @@ test('administrator stages constitution JSON for review without publishing it', 
   await page.goto('/editor?status=reviewing');
   const item = page.locator('.editor-session-list li').filter({ hasText: '1789' });
   await item.getByRole('link', { name: 'Review', exact: true }).click();
-  await expect(page).toHaveURL(/\/editor\?importJobId=/);
+  await expect(page).toHaveURL(/\/import\/jobs\//);
   await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
   await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
   await page.getByRole('tab', { name: 'Review', exact: true }).click();
@@ -304,17 +304,16 @@ test('administrator can find both legal pages and switch their language', async 
 test('administrator previews a structure proposal uploaded as a JSON file', async ({ page, request }) => {
   expect((await request.post(`${mockOrigin}/__sprint59_content`)).ok()).toBeTruthy();
   await signInAdmin(page);
-  await page.goto('/admin/import');
-  await page.getByRole('link', { name: /Set up a new constitution/ }).click();
+  await page.goto('/import?mode=new');
   await expect(page.getByLabel('Setup proposal JSON')).toBeHidden();
-  await page.getByLabel('Structure proposal file (JSON)').setInputFiles({
+  await page.locator('#proposalFile').setInputFiles({
     name: 'structure.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({
       isoCode: 'DE', countryName: 'Germany', constitutionSlug: 'uploaded-proposal', constitutionTitle: 'Uploaded structure proposal',
       languageCode: 'en', sourceUrl: 'https://example.org/source', outline: { kinds: [] }, sampleRoots: [],
     })),
   });
   await page.getByRole('button', { name: 'Preview proposed structure' }).click();
-  await expect(page).toHaveURL(/\/admin\/import\/setup\/[^/?]+$/);
+  await expect(page).toHaveURL(/\/import\/setup\/[^/?]+$/);
   await page.getByRole('tab', { name: 'Details', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Identity and ownership' })).toBeVisible();
   await expect(page.locator('#structure-panel-identity dl').getByText('Germany (DE)', { exact: true })).toBeVisible();

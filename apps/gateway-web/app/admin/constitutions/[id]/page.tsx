@@ -130,7 +130,7 @@ export default async function AdminOutlinePage(props: AdminOutlinePageProps) {
           {(match.constitution.versions ?? []).length === 0 ? (
             <Alert tone="info">
               <T value={ui.admin.constitutions.id.page.theStructureIsReady} />{" "}
-              <Link href="/admin/import">
+              <Link href="/import">
                 <T
                   value={ui.admin.constitutions.id.page.importTheFirstVersion}
                 />

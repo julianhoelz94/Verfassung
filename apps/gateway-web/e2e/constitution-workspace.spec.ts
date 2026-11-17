@@ -12,7 +12,7 @@ const owners = [
   },
   {
     name: "proposal",
-    url: "/admin/import/setup/01900000-0000-4000-8000-000000000802",
+    url: "/import/setup/01900000-0000-4000-8000-000000000802",
   },
 ];
 

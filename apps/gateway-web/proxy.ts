@@ -1,3 +1,4 @@
+import { canonicalImportUrl } from './lib/import-routes';
 import { fetchWithTimeout } from './lib/fetch-with-timeout';
 import { NextResponse, type NextRequest } from 'next/server';
 import { requestAnonymousBrowsingPolicy } from './lib/anonymous-browsing-policy';
@@ -9,6 +10,13 @@ export async function proxy(request: NextRequest) {
   if (path !== '/api/setup-gate' && path !== '/api/edge-rate-limit') {
     const admission = await setupAdmission(request, path);
     if (admission) return admission;
+  }
+
+  // Read-only compatibility redirects. Legacy POST/server-action requests keep
+  // their original dispatch path, authorization and CSRF checks.
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const canonical = canonicalImportUrl(request.nextUrl);
+    if (canonical) return NextResponse.redirect(canonical, 308);
   }
 
   if (requiresBrowsingAdmission(path)) {

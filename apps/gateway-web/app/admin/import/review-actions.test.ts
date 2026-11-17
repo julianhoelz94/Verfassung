@@ -58,20 +58,20 @@ it("retains the package and selected item through fresh-authentication handoff",
   const destination = await transitionImportAction(form());
   expect(destination).toContain("/account/step-up?returnTo=");
   expect(decodeURIComponent(destination)).toContain(
-    "/admin/import/packages/run?view=review&item=item",
+    "/import/packages/run?view=review&item=item",
   );
   expect(api.transitionImportJob).not.toHaveBeenCalled();
 });
 it("resumes eligible package dependencies after publication by an editor/admin", async () => {
   expect(await transitionImportAction(form())).toBe(
-    "/admin/import/packages/run?view=review&item=item",
+    "/import/packages/run?view=review&item=item",
   );
   expect(api.prepareImportPackage).toHaveBeenCalledWith("run", "Bearer staff");
 });
 it("returns to the selected package review after an expired-session sign-in", async () => {
   api.transitionImportJob.mockRejectedValueOnce(new ImportTransitionError("session_expired"));
   expect(await transitionImportAction(form())).toBe(
-    `/login?next=${encodeURIComponent("/admin/import/packages/run?view=review&item=item")}`,
+    `/login?next=${encodeURIComponent("/import/packages/run?view=review&item=item")}`,
   );
   expect(api.prepareImportPackage).not.toHaveBeenCalled();
 });

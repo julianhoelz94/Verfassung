@@ -89,7 +89,7 @@ export function ImportReviewWorkspace({
             separator={false}
             title={t(ui.importReview.title)}
             breadcrumbs={[
-              { href: "/admin/import", label: t(copy.imports) },
+              { href: "/import", label: t(copy.imports) },
               { label: title },
             ]}
             meta={summary}

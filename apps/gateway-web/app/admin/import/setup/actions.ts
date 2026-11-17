@@ -13,7 +13,7 @@ import { displayKinds, setupKinds } from '../../../../lib/setup-review';
 
 export async function reviewSetupAction(formData: FormData): Promise<string> {
   const id = String(formData.get('proposalId') ?? '');
-  const destination = `/admin/import/setup/${encodeURIComponent(id)}`;
+  const destination = `/import/setup/${encodeURIComponent(id)}`;
   const user = await currentUser();
   if (!user?.roles.some((role) => role === 'editor' || role === 'admin'))
     return `${destination}?error=forbidden`;

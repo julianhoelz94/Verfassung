@@ -77,7 +77,7 @@ test('imports use shared disclosures and completed imports can be archived and r
   const job = await response.json();
   await request.post(`${mock}/api/ingestion/import-jobs/${job.id}/prepare`);
   await request.post(`${mock}/api/ingestion/import-jobs/${job.id}/publish`);
-  await page.goto(`/editor?importJobId=${job.id}`);
+  await page.goto(`/import/jobs/${job.id}`);
   const technical = page.locator('details.disclosure').filter({ has: page.locator('summary', { hasText: 'Technical details' }) });
   const submitted = page.locator('#import-structure.disclosure');
   await expect(technical).toHaveCount(1);

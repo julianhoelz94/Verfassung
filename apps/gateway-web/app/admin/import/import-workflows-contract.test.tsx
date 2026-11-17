@@ -11,7 +11,7 @@ import { SetupProposalReview } from './setup/SetupProposalReview';
 const clients = vi.hoisted(() => ({
   currentUser: vi.fn(),
   requireSessionBearer: vi.fn(),
-  listImportJobs: vi.fn(),
+  listAllImportJobs: vi.fn(),
   getImportJob: vi.fn(),
   getImportPayload: vi.fn(),
   getPreparedImportContent: vi.fn(),
@@ -42,7 +42,7 @@ vi.mock('../../../lib/ingestion-api', async (original) => ({
   ...(await original<typeof import('../../../lib/ingestion-api')>()),
   ...Object.fromEntries(
     [
-      'listImportJobs',
+      'listAllImportJobs',
       'getImportJob',
       'getImportPayload',
       'getPreparedImportContent',
@@ -136,7 +136,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   clients.currentUser.mockResolvedValue({ roles: ['editor', 'reviewer', 'publisher'] });
   clients.requireSessionBearer.mockResolvedValue('Bearer session');
-  clients.listImportJobs.mockResolvedValue([job]);
+  clients.listAllImportJobs.mockResolvedValue([job]);
   clients.getImportJob.mockResolvedValue(job);
   clients.getImportPayload.mockResolvedValue({
     constitutionTitle: 'Charter',
@@ -163,15 +163,15 @@ describe('import administration contracts', () => {
     await expect(ImportPackagePage({
       params: Promise.resolve({ id: 'package' }),
       searchParams: Promise.resolve({ item: 'snapshot', source: 'archive', view: 'review', display: 'source' }),
-    })).rejects.toThrow(`redirect:/login?next=${encodeURIComponent('/admin/import/packages/package?item=snapshot&source=archive&view=review&display=source')}`);
+    })).rejects.toThrow(`redirect:/login?next=${encodeURIComponent('/import/packages/package?item=snapshot&source=archive&view=review&display=source')}`);
     expect(clients.getMigrationRun).not.toHaveBeenCalled();
   });
   it('checks access before reading jobs and retains the login destination', async () => {
     clients.currentUser.mockResolvedValue(null);
     await expect(AdminImportPage({ searchParams: Promise.resolve({ mode: 'new' }) })).rejects.toThrow(
-      'redirect:/login?next=%2Fadmin%2Fimport%3Fmode%3Dnew',
+      'redirect:/login?next=%2Fimport%3Fmode%3Dnew',
     );
-    expect(clients.listImportJobs).not.toHaveBeenCalled();
+    expect(clients.listAllImportJobs).not.toHaveBeenCalled();
     clients.currentUser.mockResolvedValue({ roles: ['reader'] });
     expect(renderToStaticMarkup(await AdminImportPage({ searchParams: Promise.resolve({}) }))).toContain(
       'Administrator role required.',
@@ -184,19 +184,19 @@ describe('import administration contracts', () => {
         await AdminImportPage({ searchParams: Promise.resolve({ mode: 'new', error: 'json' }) }),
       ),
     );
-    expect(doc.querySelector('#structure #proposalFile')).not.toBeNull();
+    expect(doc.querySelector('#structure input[name="proposalFile"]')).not.toBeNull();
     expect(doc.querySelector('#structure textarea')?.getAttribute('name')).toBe('proposal');
-    expect(doc.querySelector('details')?.hasAttribute('open')).toBe(true);
-    expect(doc.querySelector('a[href="/editor?importJobId=job%2Fa"]')).not.toBeNull();
+    expect(doc.querySelector('#structure [role="alert"]')?.textContent).toContain('not valid JSON');
+    expect(doc.querySelector('a[href="/import/jobs/job%2Fa"]')).not.toBeNull();
     clients.currentUser.mockResolvedValue({ roles: ['reviewer'] });
     const reviewer = documentOf(
       renderToStaticMarkup(await AdminImportPage({ searchParams: Promise.resolve({}) })),
     );
     expect(reviewer.querySelector('input[type="file"]')).toBeNull();
-    expect(reviewer.querySelector('.task-list')).not.toBeNull();
+    expect(reviewer.querySelector('#imports-panel-queue li')).not.toBeNull();
   });
   it('keeps an unavailable job list distinct from an empty list', async () => {
-    clients.listImportJobs.mockRejectedValue(new Error('offline'));
+    clients.listAllImportJobs.mockRejectedValue(new Error('offline'));
     const doc = documentOf(
       renderToStaticMarkup(await AdminImportPage({ searchParams: Promise.resolve({}) })),
     );
@@ -303,7 +303,7 @@ describe('migration review selection and evidence contracts', () => {
     expect(clients.getReaderOutline).toHaveBeenCalledWith('draft', 'Bearer session');
     expect(doc.querySelector('pre')?.textContent).toHaveLength(30000);
     expect(
-      doc.querySelector('a[href="/admin/import/packages/run?source=source+a&sourceOffset=60000&display=source&item=target"]'),
+      doc.querySelector('a[href="/import/packages/run?source=source+a&sourceOffset=60000&display=source&item=target"]'),
     ).not.toBeNull();
     expect(doc.querySelector('a[href="/documents/doc?revision=2"]')).not.toBeNull();
     expect(doc.querySelector('[data-document-target="import_job"]')?.getAttribute('data-document-owner')).toBe('job/a');
@@ -339,5 +339,5 @@ describe('migration review selection and evidence contracts', () => {
 });
 
 it('redirects former migration review links into the unified package workspace', async () => {
- await expect(MigrationReviewPage({params: Promise.resolve({id:'run'}), searchParams: Promise.resolve({item:'target', source:'source a'})})).rejects.toThrow('redirect:/admin/import/packages/run?item=target&source=source+a');
+ await expect(MigrationReviewPage({params: Promise.resolve({id:'run'}), searchParams: Promise.resolve({item:'target', source:'source a'})})).rejects.toThrow('redirect:/import/packages/run?item=target&source=source+a');
 });

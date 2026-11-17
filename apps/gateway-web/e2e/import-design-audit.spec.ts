@@ -8,7 +8,7 @@ const run = "01900000-0000-4000-8000-000000008500";
 const version = "01900000-0000-4000-8000-000000000804";
 const session = "01900000-0000-4000-8000-000000000501";
 const pages = [
-  ["import", `/admin/import/packages/${run}`],
+  ["import", `/import/packages/${run}`],
   ["viewer", `/countries/DE/versions/${VERSION_2022}`],
   ["editor", `/editor?sessionId=${session}&versionId=${version}`],
   ["country", "/countries/DE"],

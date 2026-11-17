@@ -82,3 +82,16 @@ describe('Next request proxy security and routing', () => {
     expect(response.headers.get('x-middleware-request-x-history-route')).toBe('/countries/DE/timeline?events=amendments');
   });
 });
+
+it('redirects only legacy GET/HEAD reads while retaining POST action dispatch', async () => {
+  vi.mocked(setupStatus).mockResolvedValue({ completed: true } as Awaited<ReturnType<typeof setupStatus>>);
+  for (const method of ['GET', 'HEAD']) {
+    const response = await proxy(new NextRequest('https://atlas.example/admin/import/packages/run?item=selected&display=compare', { method }));
+    expect(response.status).toBe(308);
+    expect(response.headers.get('location')).toBe('https://atlas.example/import/packages/run?item=selected&display=compare');
+  }
+  const response = await proxy(new NextRequest('https://atlas.example/admin/import?mode=new', { method: 'POST', headers: { 'next-action': 'existing-action' } }));
+  expect(response.headers.get('location')).toBeNull();
+  expect(response.headers.get('x-middleware-next')).toBe('1');
+  expect(response.headers.get('content-security-policy')).toContain("form-action 'self'");
+});

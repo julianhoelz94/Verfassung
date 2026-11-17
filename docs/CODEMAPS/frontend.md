@@ -20,7 +20,8 @@ Scoped CSS Modules own page, header, surface, field and template styles. See
 | Context/documents/legal | `countries/[code]/` and `countries/[code]/constitutions/[constitutionId]/` context, `documents/`, `impressum/`, `datenschutz/`, `about/` |
 | Authentication/account | `login/`, `register/`, `reset/`, `invite/`, `account/`, `logout/` |
 | Editing/review/publication | `editor/`, `editor/amendments/`, `editor/documents/`, `editor/history/`, command routes |
-| Administration | `admin/` users, settings, browsing policy, legal pages, outlines, constitutions and imports |
+| Import intake/review | `import/` overview, upload and job/setup/package routes; `lib/import-routes.ts` owns read-only compatibility; `admin/import/` retains server commands |
+| Administration | `admin/` users, settings, browsing policy, legal pages, outlines, constitutions |
 | First deployment | `setup/`, `lib/deployment-setup.ts`, `app/api/setup-gate/route.ts` |
 
 List actual pages with `rg --files apps/gateway-web/app -g page.tsx`; route, query,

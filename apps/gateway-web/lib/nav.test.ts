@@ -44,14 +44,14 @@ describe('primaryNavLinks', () => {
 
   it('shows Editor, Imports, and Documents for editor, reviewer, and publisher', () => {
     for (const role of ['editor', 'reviewer', 'publisher']) {
-      expect(hrefs({ email: `${role}@example.local`, roles: [role] })).toEqual(['/', '/search', '/about', '/editor', '/admin/import', '/documents']);
+      expect(hrefs({ email: `${role}@example.local`, roles: [role] })).toEqual(['/', '/search', '/about', '/editor', '/import', '/documents']);
     }
   });
 
   it('shows editorial destinations, Admin, and optional API docs for admin', () => {
     const admin = { email: 'admin@example.local', roles: ['admin'] };
-    expect(hrefs(admin)).toEqual(['/', '/search', '/about', '/editor', '/admin/import', '/documents', '/admin']);
-    expect(hrefs(admin, true)).toEqual(['/', '/search', '/about', '/editor', '/admin/import', '/documents', '/admin', '/api-docs']);
+    expect(hrefs(admin)).toEqual(['/', '/search', '/about', '/editor', '/import', '/documents', '/admin']);
+    expect(hrefs(admin, true)).toEqual(['/', '/search', '/about', '/editor', '/import', '/documents', '/admin', '/api-docs']);
   });
 });
 
@@ -123,14 +123,17 @@ describe('menuSections', () => {
       '/admin/legal/impressum',
       '/api-docs',
     ]);
-    expect(sectionHrefs(admin, 'primary', true)).toEqual(['/', '/search', '/about', '/editor', '/admin/import', '/documents', '/admin']);
+    expect(sectionHrefs(admin, 'primary', true)).toEqual(['/', '/search', '/about', '/editor', '/import', '/documents', '/admin']);
   });
 });
 
 describe('isCurrentNavHref', () => {
   it('keeps Imports current throughout setup, package and individual review', () => {
     const destinations = [
-      ['/admin/import', ''],
+      ['/import', ''],
+      ['/import/setup/proposal', ''],
+      ['/import/packages/package', 'item=version'],
+      ['/import/jobs/job', ''],
       ['/admin/import/setup/proposal', ''],
       ['/admin/import/packages/package', 'item=version'],
       ['/admin/migrations/package', ''],
@@ -138,13 +141,13 @@ describe('isCurrentNavHref', () => {
     ];
     for (const [pathname, query] of destinations) {
       expect(isImportPage(pathname, query)).toBe(true);
-      expect(isCurrentNavHref(pathname, '/admin/import', query)).toBe(true);
+      expect(isCurrentNavHref(pathname, '/import', query)).toBe(true);
       expect(isCurrentNavHref(pathname, '/editor', query)).toBe(false);
       expect(isCurrentNavHref(pathname, '/admin', query)).toBe(false);
       expect(isCurrentNavHref(pathname, '/editor?status=reviewing', query)).toBe(false);
     }
     for (const [pathname, query] of [['/editor', 'sessionId=session'], ['/editor', 'importJobId='], ['/admin/constitutions', ''], ['/admin/imported', '']]) {
-      expect(isCurrentNavHref(pathname, '/admin/import', query)).toBe(false);
+      expect(isCurrentNavHref(pathname, '/import', query)).toBe(false);
     }
   });
 

@@ -57,7 +57,7 @@ export function orderedText(entries: OrderedEntry[]): string {
 }
 
 export function setupHandoff(proposal: { id: string; status: string; revision: number; changesRequested?: boolean }) {
-  const previewUrl = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import/setup/${proposal.id}`;
+  const previewUrl = `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/import/setup/${proposal.id}`;
   const nextAction = proposal.status === 'confirmed' ? 'upload_full_content' : proposal.status === 'withdrawn' ? 'stop' : proposal.changesRequested ? 'revise_proposal' : 'wait_for_confirmation';
   const instructions = nextAction === 'upload_full_content'
     ? 'The editor explicitly confirmed this revision on the website. Read the confirmed settings pin and upload the full content. Approval and publication remain separate website actions.'
@@ -288,7 +288,7 @@ export function createServer(authorization?: string): McpServer {
     requireConfirmedUpload(payload);
     const retryKey = idempotencyKey ?? `ca-mcp-${createHash('sha256').update(JSON.stringify(payload)).digest('hex')}`;
     const job = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', '/import-jobs', payload, authorization!, retryKey);
-    return { jobId: job.id, status: job.status, errors: job.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/editor?importJobId=${encodeURIComponent(job.id)}` };
+    return { jobId: job.id, status: job.status, errors: job.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/import/jobs/${encodeURIComponent(job.id)}` };
   }));
 
   server.registerTool('create_import_batch', {
@@ -300,7 +300,7 @@ export function createServer(authorization?: string): McpServer {
   }, () => run('create_import_batch', async () => {
     await requireImportKey();
     const batch = await postJson<{ id: string; status: string }>('ingestion', '/import-batches', {}, authorization!);
-    return { batchId: batch.id, status: batch.status, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/import?batch=${batch.id}` };
+    return { batchId: batch.id, status: batch.status, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/import?batch=${batch.id}` };
   }));
 
   server.registerTool('stage_batch_item', {
@@ -314,7 +314,7 @@ export function createServer(authorization?: string): McpServer {
     requireDirectUploadSize(payload);
     requireConfirmedUpload(payload);
     const item = await postJson<{ id: string; status: string; errors: unknown[] }>('ingestion', `/import-batches/${batchId}/items`, { idempotencyKey, payload, checksumSha256 }, authorization!);
-    return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/editor?importJobId=${encodeURIComponent(item.id)}` };
+    return { batchId, itemId: item.id, status: item.status, errors: item.errors, reviewUrl: `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/import/jobs/${encodeURIComponent(item.id)}` };
   }));
 
   server.registerTool('get_import_batch', {
@@ -381,7 +381,7 @@ export function createServer(authorization?: string): McpServer {
   }, ({ uploadId }) => run('complete_import_upload', async () => {
     await requireImportKey();
     const upload = await postJson<{ itemId?: string; status: string; migrationRunId?: string }>('ingestion', `/import-uploads/${uploadId}/complete`, {}, authorization!);
-    return { ...upload, reviewUrl: upload.migrationRunId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/admin/migrations/${upload.migrationRunId}` : upload.itemId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/editor?importJobId=${encodeURIComponent(upload.itemId)}` : null };
+    return { ...upload, reviewUrl: upload.migrationRunId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/import/packages/${upload.migrationRunId}` : upload.itemId ? `${(process.env.PUBLIC_BASE_URL ?? 'http://localhost').replace(/\/$/, '')}/import/jobs/${encodeURIComponent(upload.itemId)}` : null };
   }));
 
   server.registerTool('get_import_job', {

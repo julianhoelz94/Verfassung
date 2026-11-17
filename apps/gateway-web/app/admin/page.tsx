@@ -18,7 +18,7 @@ export default async function AdminIndexPage() {
     ] },
     { title: reviewUi.contentManagement, links: [
       { href: '/admin/constitutions', title: ui.admin.page.outlines, hint: ui.admin.page.createConstitutionsAndEditTheirSectionOutline },
-      { href: '/admin/import', title: ui.admin.page.import, hint: ui.admin.page.loadAJsonCorpusAndFollowThe },
+      { href: '/import', title: ui.admin.page.import, hint: ui.admin.page.loadAJsonCorpusAndFollowThe },
       { href: '/admin/legal/impressum', title: reviewUi.legalPages, hint: ui.attrs.adminLegalKeyPagePageHeaderMeta },
     ] },
   ];

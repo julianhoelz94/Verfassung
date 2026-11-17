@@ -46,6 +46,7 @@ import { Disclosure } from "../components/Disclosure";
 import { ConstitutionDocument } from "../components/ConstitutionDocument";
 import { OrderedContentTree } from "../components/ConstitutionText";
 import { NavigatingActionForm } from "../components/NavigatingActionForm";
+import { importJobHref } from "../../lib/import-routes";
 import { prepareImportPackageAction } from "../admin/import/actions";
 import { ImportPreview } from "../admin/import/ImportPreview";
 import {
@@ -128,7 +129,7 @@ export async function ImportReview({
           ...(source ? { source: source.sourceKey } : {}),
           ...extra,
         })
-      : `/editor?importJobId=${encodeURIComponent(jobId ?? "")}`;
+      : importJobHref(jobId ?? "", extra);
   const model = {
     ...data,
     actorId: user.id,

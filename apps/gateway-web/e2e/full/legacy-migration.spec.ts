@@ -172,7 +172,7 @@ test('offline archive package preserves evidence through review, publication and
     expect(records.find(record => record.path === notePath + '/annotation/sourceUrl')?.value).toBe('https://verfassungen.de/annotated.htm');
     expect(records.find(record => record.path === notePath + '/annotation/anchorLogicalIds/0')?.value).toBe(id('wording'));
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
-    await page.goto(`/admin/migrations/${run.id}?item=${snapshot.id}&source=annotated.htm`);
+    await page.goto(`/import/packages/${run.id}?item=${snapshot.id}&source=annotated.htm`);
     const originalSource = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Original source text and download' }) });
     await originalSource.locator('summary').click();
     await expect(originalSource.locator('pre')).toHaveText(new TextDecoder('windows-1252').decode(captured.find(source => source.file === 'annotated.htm').bytes));

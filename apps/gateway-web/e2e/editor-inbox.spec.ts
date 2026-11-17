@@ -115,7 +115,7 @@ for (const width of [390, 1440]) test(`the structured canvas keeps its compact f
   await page.screenshot({ path: info.outputPath('structured-initial.png') });
   expect(firstLine, 'the first legal unit starts within the first 60% of the viewport').toBeLessThanOrEqual(height * .6);
   await editor.scrollIntoViewIfNeeded();
-  const toolbar = page.locator('[data-editor-tools]'), queue = page.locator('[data-editor-queue-frame]');
+  const toolbar = page.locator('[data-editor-tools]'), queue = page.locator('[data-work-collection-menu]');
   expect((await toolbar.boundingBox())!.y).toBeGreaterThanOrEqual((await queue.boundingBox())!.y + (await queue.boundingBox())!.height - 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -176,3 +176,22 @@ for (const locale of ['en', 'de']) for (const width of [390, 850, 1440]) {
     }
   });
 }
+
+for (const locale of ['en', 'de']) test(`shared row actions preserve whole words with enlarged text on phones in ${locale}`, async ({ page, request }) => {
+  await request.post(`${mock}/__editor_sessions`, { data: { sessions: [seeded(9001)] } });
+  await signInEditor(page);
+  await request.put(`${mock}/api/identity/me/language`, { headers: { Authorization: 'Bearer e2e-session-token' }, data: { languagePreference: locale } });
+  await page.setViewportSize({ width: 390, height: 1000 }); await page.goto('/editor?mine=1');
+  await page.addStyleTag({ content: '.editor-session-list a[id$="-action"] { font-size:26px !important; }' });
+  const action = page.locator('.editor-session-list a[id$="-action"]');
+  const geometry = await action.evaluate(node => {
+    const span = node.querySelector('span')!, text = span.firstChild!, value = text.textContent!, box = node.getBoundingClientRect(), arrow = node.querySelector('svg')!.getBoundingClientRect();
+    const words = [...value.matchAll(/\S+/g)].map(word => {
+      const range = document.createRange(); range.setStart(text, word.index!); range.setEnd(text, word.index! + word[0].length);
+      return [...range.getClientRects()].filter(rect => rect.width > 0).length;
+    });
+    return { wholeWords: words.every(lines => lines === 1), fits: node.scrollWidth <= node.clientWidth + 1, aligned: Math.abs(arrow.top + arrow.height / 2 - box.top - box.height / 2) < 1 };
+  });
+  expect(geometry).toEqual({ wholeWords: true, fits: true, aligned: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});

@@ -20,7 +20,7 @@ beforeEach(() => {
 
 describe('embedded library loading', () => {
   it.each(['import_job', 'setup_proposal', 'migration_run'] as const)('keeps %s evidence scoped and restricts writes to editors/admins', async targetType => {
-    const props = { targetType, targetId: 'owner', returnTo: '/admin/import', canEdit: true };
+    const props = { targetType, targetId: 'owner', returnTo: '/import', canEdit: true };
     for (const role of ['reviewer', 'publisher', 'editor', 'admin']) {
       vi.mocked(currentUser).mockResolvedValue({ id: role, email: `${role}@example.test`, roles: [role] });
       const element = await DocumentLinks(props);

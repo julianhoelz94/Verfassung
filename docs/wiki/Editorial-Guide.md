@@ -120,6 +120,19 @@ A publisher explicitly publishes the approved correction after fresh MFA. Only t
 
 ### Imported constitutions
 
+Open **Imports** (`/import`) for the country-grouped overview. Search is always
+visible; **Filters** reveals status, type and country. Package versions appear
+once inside their package. **New import** offers an existing constitution or a
+new structure proposal. Selected files and pasted JSON remain mounted across
+these task views, both import modes and context toggles; a rejected upload
+retains the inputs for correction. Staging never publishes content. Reviewer
+and publisher accounts can inspect the overview without receiving upload rights.
+
+Jobs, setup proposals and packages use `/import/jobs/:id`, `/import/setup/:id`
+and `/import/packages/:id`. Older import and migration links, including editor
+links with `importJobId`, redirect to the same operation with their context.
+The review/publication queues still expose imports alongside editing sessions.
+
 MCP and file uploads appear in the editor's **Review queue**, alongside submitted editing sessions. Open the import to inspect its source, submitted structure and prepared reader preview. If needed, an Editor/Admin confirms the outline and prepares the unpublished draft first. A Reviewer/Admin then enters a reason and approves or rejects it. Approved imports appear under **Ready to publish**; a Publisher/Admin publishes the exact approved draft after fresh MFA.
 
 The same account can upload, review and publish when it holds the required roles. No second account is required. Approval and publication remain separate actions. Existing import links open this editor journey.

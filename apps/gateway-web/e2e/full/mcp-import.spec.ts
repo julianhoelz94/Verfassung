@@ -69,7 +69,7 @@ test('an admin reviews and publishes their MCP import in the editor journey', as
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice('Bearer '.length), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto('/editor?status=reviewing');
     await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Review', exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/editor\\?importJobId=${jobId}`));
+    await expect(page).toHaveURL(new RegExp(`/import/jobs/${jobId}`));
     await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
     await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
     await expect(page.getByText('A reviewed import is required.', { exact: true }).first()).toBeVisible();
@@ -125,7 +125,7 @@ test('MCP setup display controls persist and render the same source through revi
       return response.json();
     };
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
-    await page.goto(`/admin/import/setup/${proposalId}`);
+    await page.goto(`/import/setup/${proposalId}`);
     const controls = page.getByRole('region', { name: / Structure$/ });
     let levelName = 'Paragraph';
     const preview = page.locator('[data-preview-kind="paragraph"]:visible').first();
@@ -217,7 +217,7 @@ test('MCP setup display controls persist and render the same source through revi
     expect(staged.isError).toBeUndefined();
     expect(staged.structuredContent!.status).toBe('pending_review');
     const jobId = staged.structuredContent!.jobId;
-    await page.goto(`/editor?importJobId=${jobId}`);
+    await page.goto(`/import/jobs/${jobId}`);
     await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
     await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
     const assertRendered = async (view: typeof page) => {
@@ -272,7 +272,7 @@ test('MCP waits while an administrator requests and confirms an exact setup revi
     const path = `/api/ingestion/import-setup-proposals/${proposalId}`;
     expect((await request.post(`${path}/confirm`, { headers: { Authorization: `Bearer ${key.token}`, 'If-Match': '1' } })).status()).toBe(403);
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice(7), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
-    await page.goto(`/admin/import/setup/${proposalId}`);
+    await page.goto(`/import/setup/${proposalId}`);
     await expect(page.getByText('Your confirmation is required', { exact: true }).filter({ visible: true })).toBeVisible();
     await page.getByLabel('Reader-facing name', { exact: true }).fill('Art.');
     await page.getByRole('button', { name: 'Save display settings' }).click();

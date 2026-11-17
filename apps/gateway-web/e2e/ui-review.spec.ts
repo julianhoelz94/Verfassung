@@ -65,12 +65,12 @@ for (const locale of ['en', 'de']) test(`secondary controls work by keyboard wit
   await context.addInitScript(() => localStorage.setItem('ca_cookie_notice_v1', 'dismissed'));
   const page = await context.newPage();
   try {
-    for (const path of ['/admin/import?mode=new', '/account', '/admin/legal/datenschutz', '/countries/DE/timeline?on=2026-01-01']) {
+    for (const path of ['/import?mode=new', '/account', '/admin/legal/datenschutz', '/countries/DE/timeline?on=2026-01-01']) {
       await page.goto(path);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), path).toBeTruthy();
     }
-    await page.goto('/admin/import?mode=new');
-    const disclosure = page.locator('summary').filter({ hasText: locale === 'en' ? 'Paste JSON instead' : 'Stattdessen JSON einfügen' });
+    await page.goto('/import?mode=new');
+    const disclosure = page.locator('#structure summary').filter({ hasText: locale === 'en' ? 'Paste JSON instead' : 'Stattdessen JSON einfügen' });
     const editor = page.locator('#proposal');
     await expect(editor).toBeHidden();
     await disclosure.focus();
@@ -113,13 +113,13 @@ async function assertReviewPage(page: Page, route: ReviewRoute, locale: string) 
 
 /** Keep task-specific controls and setup safety assertions on their original route variants. */
 async function assertReviewControls(page: Page, route: ReviewRoute, locale: string) {
-  if (route.entry.startsWith('/admin/import') || route.entry.startsWith('/admin/migrations') || route.entry === 'import-review' || route.entry === 'import-new-structure') {
+  if (route.entry.startsWith('/import') || route.entry.startsWith('/admin/migrations') || route.entry === 'import-review' || route.entry === 'import-new-structure') {
     const primary = page.locator('.nav-primary');
     await expect(primary.locator('[aria-current="page"]')).toHaveCount(1);
-    await expect(primary.locator('a[href="/admin/import"]')).toHaveAttribute('aria-current', 'page');
+    await expect(primary.locator('a[href="/import"]')).toHaveAttribute('aria-current', 'page');
   }
   if (route.entry === '/admin/settings') await expect(page.locator('#smtpHost')).toBeVisible();
-  if (route.entry === '/admin/import/setup/[proposalId]') await expect(page.getByText(locale === 'en' ? 'Your confirmation is required' : 'Ihre Bestätigung ist erforderlich', { exact: true }).filter({ visible: true })).toBeVisible();
+  if (route.entry === '/import/setup/[proposalId]') await expect(page.getByText(locale === 'en' ? 'Your confirmation is required' : 'Ihre Bestätigung ist erforderlich', { exact: true }).filter({ visible: true })).toBeVisible();
   if (route.entry === '/editor/lifecycle/[constitutionId]') await expect(page.getByRole('radio', { name: locale === 'en' ? /Whole constitution/ : /Gesamte Verfassung/ })).toBeChecked();
   if (route.entry === '/setup') {
     await expect(page.getByRole('button', { name: locale === 'en' ? 'Finish setup and open the site' : 'Einrichtung abschließen und Website öffnen' })).toBeDisabled();

@@ -215,17 +215,17 @@ describe('contextual pages separate draft and publication', () => {
 
 describe('reviewed imports enforce the role and decision boundaries', () => {
   it('stages a valid import without approving or publishing it', async () => {
-    responseBody = { id: 'job/one' }; expect(await imports.createImportAction(form({ payload: JSON.stringify(payload) }))).toBe('/editor?importJobId=job%2Fone'); expect(requests).toHaveLength(1); expect(requests[0]).toMatchObject({ path: '/api/ingestion/import-jobs', body: payload });
+    responseBody = { id: 'job/one' }; expect(await imports.createImportAction(form({ payload: JSON.stringify(payload) }))).toBe('/import/jobs/job%2Fone'); expect(requests).toHaveLength(1); expect(requests[0]).toMatchObject({ path: '/api/ingestion/import-jobs', body: payload });
   });
   it.each([['{', 'json'], ['{}', 'invalid']])('rejects invalid import input before any write', async (raw, error) => {
-    expect(await imports.createImportAction(form({ payload: raw }))).toBe(`/admin/import?error=${error}`); expect(requests).toEqual([]);
+    expect(await imports.createImportAction(form({ payload: raw }))).toBe(`/import?mode=existing&error=${error}`); expect(requests).toEqual([]);
   });
   it('creates a setup proposal separately from a full import', async () => {
-    responseBody = { id: 'proposal' }; expect(await imports.createSetupProposalAction(form({ proposal: JSON.stringify({ sampleRoots: [] }) }))).toBe('/admin/import/setup/proposal'); expect(requests[0].path).toBe('/api/ingestion/import-setup-proposals');
+    responseBody = { id: 'proposal' }; expect(await imports.createSetupProposalAction(form({ proposal: JSON.stringify({ sampleRoots: [] }) }))).toBe('/import/setup/proposal'); expect(requests[0].path).toBe('/api/ingestion/import-setup-proposals');
   });
   it.each([['prepare', 'editor'], ['confirm-outline', 'editor'], ['approve', 'reviewer'], ['reject', 'reviewer'], ['publish', 'publisher']])('allows %s only for the documented %s role', async (action, role) => {
     const data = form({ jobId: 'job', action, reason: 'Checked against the official source.' });
-    vi.mocked(currentUser).mockResolvedValue({ id: role, email: 'staff@example.test', roles: [role], stepUpFresh: true }); expect(await imports.transitionImportAction(data)).toBe('/editor?importJobId=job'); expect(requests[0]).toMatchObject({ path: `/api/ingestion/import-jobs/job/${action}`, method: 'POST' });
+    vi.mocked(currentUser).mockResolvedValue({ id: role, email: 'staff@example.test', roles: [role], stepUpFresh: true }); expect(await imports.transitionImportAction(data)).toBe('/import/jobs/job'); expect(requests[0]).toMatchObject({ path: `/api/ingestion/import-jobs/job/${action}`, method: 'POST' });
     requests.length = 0; vi.mocked(currentUser).mockResolvedValue({ id: 'viewer', email: 'viewer@example.test', roles: ['viewer'] }); expect(await imports.transitionImportAction(data)).toContain('error=forbidden'); expect(requests).toEqual([]);
   });
   for (const [action, requiredRole] of [['prepare', 'editor'], ['confirm-outline', 'editor'], ['approve', 'reviewer'], ['reject', 'reviewer'], ['publish', 'publisher']]) {

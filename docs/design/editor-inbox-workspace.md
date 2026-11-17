@@ -1,6 +1,6 @@
 # Editorial inbox and focused work
 
-The `/editor` landing page follows the approved [interactive inbox design](https://constitution-editor-inbox.sillycurlew.chatgpt.site/). `EditorLanding` retains server-side loading and authorisation; `EditorInbox` owns search, progressive filters, list presentation and pagination. `EditorDeskFrame` and `EditorQueueBar` reuse `FullWidthPage`, `PageChromeSurface`, the measured sticky menu and shared tool styles. The same queue bar is present in text sessions, source-evidence workspaces and individual import review. The actual editing, review, source and publication components remain authoritative; the mock's simulated passages and writes are not part of the application.
+The `/editor` landing page follows the approved [interactive inbox design](https://constitution-editor-inbox.sillycurlew.chatgpt.site/). `EditorLanding` retains server-side loading and authorisation; `EditorInbox` owns search, progressive filters, list presentation and pagination. `EditorDeskFrame` and `EditorQueueBar` adapt the shared `layout/WorkCollection` frame/header/menu, grouped rows, progressive filters and context layout also used by Imports. The template composes `FullWidthPage`, `PageChromeSurface` and the measured sticky menu. The same queue bar is present in text sessions, source-evidence workspaces and individual import review. The actual editing, review, source and publication components remain authoritative; the mock's simulated passages and writes are not part of the application.
 
 ## Navigation and next actions
 

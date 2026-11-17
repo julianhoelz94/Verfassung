@@ -29,7 +29,7 @@ Navigation only. Rules stay in `AGENTS.md`. If a path here disagrees with code, 
 | Full-text search | backend | search-service `SearchController`, `search_documents` |
 | Existing MCP tools | backend | `services/mcp-server/src/server.ts`, `catalog.ts`, `import-schema.ts` |
 | Deployment setup | backend | `services/identity-service/src/main/kotlin/com/constitutionatlas/identity/setup/`, gateway `lib/deployment-setup.ts` |
-| JSON import | backend + frontend | ingestion-service, `app/admin/import` |
+| JSON import | backend + frontend | ingestion-service, `app/import/` (commands remain in `app/admin/import/`) |
 | Audit log | backend | audit-service `AuditController` (append-only) |
 | Caddy route / Compose / env | infra | `infra/caddy/Caddyfile`, `docker-compose.yml`, `env/` |
 | Local start/stop | infra | `./manageLocalStack.sh` |

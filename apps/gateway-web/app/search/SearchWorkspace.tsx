@@ -47,7 +47,7 @@ function SearchMenu({ model }: { model: SearchModel }) {
   const { search: searchRef, filterButton: filterButtonRef } = model;
   return <>
     <WorkCollectionMenu label={t(copy.tools)} className={styles.menu}>
-      <a className={[chrome.tool, styles.resultsTool].join(' ')} aria-label={t(copy.results)} href="#search-results" onClick={event => { event.preventDefault(); document.getElementById('search-results')?.focus(); }}><List size={17} aria-hidden="true" /><span>{t(copy.results)}</span></a>
+      <a className={[chrome.tool, styles.resultsTool].join(' ')} aria-label={t(copy.results)} href="#search-results" onClick={event => { event.preventDefault(); model.closePreview(); requestAnimationFrame(() => document.getElementById('search-results')?.focus()); }}><List size={17} aria-hidden="true" /><span>{t(copy.results)}</span></a>
       <form id={formId} className={['search-page-form', styles.form].join(' ')} action="/search" method="get"
         onSubmit={event => { event.preventDefault(); model.submit(); }}>
         <label className="visually-hidden" htmlFor="search-q">{t(copy.words)}</label>

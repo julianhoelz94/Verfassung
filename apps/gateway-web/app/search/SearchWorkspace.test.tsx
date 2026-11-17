@@ -105,6 +105,8 @@ it('opens the real authored renderer with emphasis, exact snapshot and language;
   await click(getByRole(host, 'button', { name: 'Hide preview' })); await settle();
   await click(getByRole(host, 'button', { name: 'Show preview' }));
   expect(queryByRole(host, 'dialog')).not.toBeNull();
+  await click(getByRole(host, 'link', { name: 'Results', exact: true })); await settle();
+  expect(queryByRole(host, 'dialog')).toBeNull(); expect(document.activeElement?.id).toBe('search-results');
 });
 
 it('reports an unavailable or mismatched preview honestly and supports retry without changing the search', async () => {

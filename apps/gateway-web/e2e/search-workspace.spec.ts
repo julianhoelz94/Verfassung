@@ -53,6 +53,10 @@ for (const locale of ['en', 'de']) for (const width of [320, 820, 1440]) {
       await page.getByRole('button', { name: english ? 'Close preview' : 'Vorschau schließen' }).click();
       await origin.click(); await page.keyboard.press('Escape'); await expect(origin).toBeFocused();
       await expect(page.locator('#search-preview')).toBeHidden();
+      await origin.click();
+      await page.getByRole('link', { name: english ? 'Results' : 'Ergebnisse', exact: true }).click();
+      await expect(page.locator('#search-preview')).toBeHidden();
+      await expect(page.locator('#search-results')).toBeFocused();
     } finally { await context.close(); }
   });
 }

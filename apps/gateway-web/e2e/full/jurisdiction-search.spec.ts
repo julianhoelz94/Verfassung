@@ -38,8 +38,14 @@ test('a country jurisdiction without a legacy country record has a working index
   expect(result.hits[0].countryCode).toBe('');
   expect(result.hits[0].jurisdictionId).toBe(jurisdiction.id);
   await page.goto(`/search?q=${keyword}`);
+  await page.getByRole('button', { name: 'Preview passage', exact: true }).click();
+  await expect(page.locator('#search-preview [data-constitution-document]')).toContainText('Exact authored wording ' + keyword + '.');
+  const previewHref = new URL(await page.locator('#search-preview a.btn-primary').getAttribute('href') ?? '', page.url());
+  expect(previewHref.pathname).toBe('/jurisdictions/' + jurisdiction.id + '/versions/' + published.versionId);
+  expect(previewHref.hash).toBe('#' + result.hits[0].articleId);
+  await page.getByRole('button', { name: 'Close preview', exact: true }).click();
   await page.locator('.search-hits h2 a').click();
-  await expect(page).toHaveURL(new RegExp(`/jurisdictions/${jurisdiction.id}/versions/${published.versionId}#`));
+  await expect(page).toHaveURL(url => url.pathname === '/jurisdictions/' + jurisdiction.id + '/versions/' + published.versionId && url.hash === '#' + result.hits[0].articleId && url.searchParams.get('fromSearch') === '/search?q=' + keyword);
   await expect(page.getByText(`Exact authored wording ${keyword}.`, { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText(`Exact authored wording ${keyword}.`, { exact: true })).toBeVisible();

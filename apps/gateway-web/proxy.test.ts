@@ -42,12 +42,14 @@ describe('Next request proxy security and routing', () => {
     expect(response.headers.get('location')).toBe('https://atlas.example/');
   });
 
-  it.each(['closed', 'unavailable'])('protects the reader comparison API when anonymous browsing is %s', async state => {
+  it.each(['closed', 'unavailable'])('protects reader JSON APIs when anonymous browsing is %s', async state => {
     if (state === 'closed') vi.mocked(requestAnonymousBrowsingPolicy).mockResolvedValue({ allowed: false });
     else vi.mocked(requestAnonymousBrowsingPolicy).mockRejectedValue(new Error('offline'));
-    const response = await proxy(request('/api/reader/compare?from=a&to=b'));
-    expect(response.status).toBe(403); expect(await response.json()).toEqual({ code: 'browsing_requires_sign_in' });
-    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    for (const path of ['/api/reader/compare?from=a&to=b', '/api/reader/search-preview?versionId=original&articleId=article']) {
+      const response = await proxy(request(path));
+      expect(response.status).toBe(403); expect(await response.json()).toEqual({ code: 'browsing_requires_sign_in' });
+      expect(response.headers.get('cache-control')).toBe('private, no-store');
+    }
   });
 
   it('allows an authenticated comparison when anonymous browsing is closed', async () => {

@@ -64,15 +64,17 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
       await expect(page.locator('.technical-identifiers code').first()).toBeHidden();
       await audit('import-review');
       await page.goto(`/search?q=dignity&country=DE&versionId=${VERSION_2022}`);
-      if (width < 1024) await page.locator('.filters-disclosure > summary').click();
+      await page.locator('button[aria-controls="search-filters"]').click();
       await page.locator('#filter-country').selectOption('FR');
       await expect(page.locator('#filter-versionId')).toHaveValue('');
-      await expect(page.getByRole('status')).toContainText(english ? 'cleared' : 'zurückgesetzt');
+      await expect(page.getByRole('status').filter({ hasText: english ? 'cleared' : 'zurückgesetzt' }).first()).toBeVisible();
       await page.locator('.searchable-filter input[type="search"]').fill('1959');
       await page.locator('#filter-versionId').selectOption('01900000-0000-4000-8000-000000001059');
       await page.locator('.search-page-form button[type="submit"]').last().click();
       await expect(page).toHaveURL(/country=FR.*versionId=01900000-0000-4000-8000-000000001059/);
       await expect(page.locator('#search-q')).toHaveValue('dignity');
+      await expect(page.locator('main [aria-busy="true"]')).toHaveCount(0);
+      await expect(page).toHaveTitle(/dignity/);
       await audit('search');
       await page.getByRole('link', { name: english ? 'Clear filters' : 'Filter zurücksetzen', exact: true }).click();
       await expect(page).toHaveURL(/search\?q=dignity$/);
@@ -105,21 +107,21 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
   });
 }
 
-test('pending filters survive responsive changes and applied links preserve the keyword', async ({ page }) => {
+test('immediate filters survive responsive changes and applied links preserve the keyword', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/search?q=dignity&offset=20');
+  await page.locator('button[aria-controls="search-filters"]').click();
   await page.locator('#filter-country').selectOption('FR');
   await page.locator('#filter-versionId').selectOption('01900000-0000-4000-8000-000000001059');
   await page.setViewportSize({ width: 390, height: 900 });
-  await page.locator('.filters-disclosure > summary').click();
   await expect(page.locator('#filter-country')).toHaveValue('FR');
   await expect(page.locator('#filter-versionId')).toHaveValue('01900000-0000-4000-8000-000000001059');
-  await page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+  await expect(page).toHaveURL(/country=FR.*versionId=01900000-0000-4000-8000-000000001059/);
   expect(new URL(page.url()).searchParams.has('offset')).toBe(false);
   await page.locator('.applied-filters a').nth(1).click();
   await expect(page).toHaveURL(/q=dignity&country=FR$/);
   await page.goto('/search?q=dignity&country=DE&versionId=01900000-0000-4000-8000-000000001059');
-  await page.locator('.filters-disclosure > summary').click();
+  await page.locator('button[aria-controls="search-filters"]').click();
   await expect(page.locator('#filter-versionId')).toHaveValue('');
   await expect(page.getByRole('status')).toContainText('cleared');
 });

@@ -22,7 +22,7 @@ vi.mock('../lib/document-api', () => ({ listDocumentLinks: vi.fn() }));
 vi.mock('../lib/session', () => ({ currentUser: vi.fn(), requireSessionBearer: async () => 'Bearer staff-session' }));
 vi.mock('../lib/server-locale', () => ({ currentLocale: async () => 'en' }));
 vi.mock('../lib/anonymous-browsing-policy', () => ({ requestAnonymousBrowsingPolicy: vi.fn() }));
-vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not-found'); }, useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not-found'); }, useRouter: () => ({ refresh: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
 // These async child boundaries have their own tests; React 18 static markup cannot await them.
 vi.mock('./components/ContentTranslationRegion', () => ({ ContentTranslationRegion: ({ children }: { children: ReactNode }) => children }));
 vi.mock('./components/history/ComparisonEvidence', () => ({ComparisonEvidence: () => null}));

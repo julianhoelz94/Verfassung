@@ -16,6 +16,7 @@ const click = (role: 'button' | 'tab', name: string) => act(async () => { fireEv
 async function render(props: Partial<Parameters<typeof ImportWorkspace>[0]> = {}, locale: 'en' | 'de' = 'en') { await act(async () => root.render(<TranslationProvider locale={locale}><ImportWorkspace rows={rows} canImport unavailable={false} membershipUnavailable={false} {...props} /></TranslationProvider>)); }
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  HTMLElement.prototype.scrollIntoView = vi.fn();
   vi.mocked(createImportAction).mockReset().mockResolvedValue('/import?mode=existing&error=json');
   vi.mocked(createSetupProposalAction).mockReset().mockResolvedValue('/import?mode=new&error=proposal');
   window.history.replaceState(null, '', '/import');

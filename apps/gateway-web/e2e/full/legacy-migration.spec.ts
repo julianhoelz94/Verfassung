@@ -295,7 +295,7 @@ test('offline archive package preserves evidence through review, publication and
       await searchHit.click(); await reader.reload();
       await expect(reader.getByText('jedes Bürgers ist unverletzlich.', { exact: false }).first()).toBeVisible();
       await reader.goto(`/search?q=Freyheit&country=XA&versionId=${national.targetVersionId}`);
-      if (locale === 'de') await reader.locator('.filters-disclosure > summary').click();
+      await reader.locator('button[aria-controls="search-filters"]').click();
       await reader.locator('#filter-jurisdictionId').selectOption(jurisdiction.id);
       await expect(reader.locator('#filter-country')).toHaveValue('');
       await expect(reader.locator('#filter-versionId')).toHaveValue('');

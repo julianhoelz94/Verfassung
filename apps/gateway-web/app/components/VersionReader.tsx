@@ -26,6 +26,7 @@ import { ReaderActions, ReaderDocument } from './ReaderActions';
 import { ReadingPreferenceControls } from "./DocumentViewOptions";
 import { readerActionIndex, type ReaderActionIndex } from '../../lib/reader-actions';
 import { historyHref } from '../../lib/constitution-viewer';
+import { SearchReturnLink } from './SearchReturnLink';
 
 export type ReaderContext = {
   constitutionId: string; title: string; jurisdictionName: string; versionLabel: string;
@@ -166,6 +167,7 @@ function ReaderSurface(props: Parameters<typeof useReaderSurface>[0]) {
 function renderReaderSurface(model: ReaderSurfaceModel) {
   const { historyLink, code, versionId, articles, outline, canEditTitles, language, changeByArticle, unchangedSinceLabel, context, breadcrumbs, editorial, notices, footer, notes, endnotes, backlinks, actionIndex, t, viewer, sticky, documentRef, searchInput, navigation, preferences, panel, setPanel, query, setQuery, matchCount, matchIndex, shownOutline, max, depth, expanded, setExpanded, current, setCurrent, unitsByLogicalId, articlesByNumber, flowing, readerHref, goMatch, renderNode } = model;
   return <ReaderActions index={actionIndex}><PageChromeSurface className={styles.viewer} ref={viewer} style={{ '--constitution-font-size': preferences.size + 'px' } as React.CSSProperties}>
+    <SearchReturnLink />
     {breadcrumbs ? <PageBreadcrumbs>{breadcrumbs}</PageBreadcrumbs> : null}
     <PageMenuFrame ref={sticky}>
       {readerToolbar(model)}

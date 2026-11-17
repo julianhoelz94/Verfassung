@@ -52,7 +52,8 @@ test('public and editor layouts at 390, 820 and 1440', async ({ page }, testInfo
     await snapshot(page, `reader-${viewport.suffix}.png`);
 
     await page.goto('/search?q=dignity');
-    await snapshot(page, `search-${viewport.suffix}.png`);
+    await snapshot(page, `search-${viewport.suffix}.png`, 0.005);
+    await page.screenshot({ path: testInfo.outputPath(`search-${viewport.suffix}.png`), fullPage: true, animations: 'disabled' });
 
     await page.goto('/countries/DE/timeline?on=2026-01-01');
     await snapshot(page, `timeline-${viewport.suffix}.png`);

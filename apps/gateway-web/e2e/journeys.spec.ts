@@ -36,8 +36,8 @@ test('browse from countries to an article', async ({ page }) => {
 
 test('search finds a published article', async ({ page }) => {
   await page.goto('/search');
-  await page.getByLabel('Keyword').fill('dignity');
-  await page.locator('main').getByRole('button', { name: 'Search' }).click();
+  await page.getByLabel('Search words or a passage').fill('dignity');
+  await page.locator('main').getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('link', { name: /Article 1 — Human dignity/ })).toBeVisible();
 });
 

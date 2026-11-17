@@ -24,7 +24,7 @@ import { SearchPreview } from './SearchPreview';
 const formId = 'search-workspace-form';
 
 export function SearchWorkspace({ data }: { data: SearchWorkspaceData }) {
-  const model = useSearchWorkspace(data), t = useTranslation();
+  const model = useSearchWorkspace(data), t = useTranslation(), selected = model.selected;
   return <WorkCollectionFrame id="main-content" className={styles.page} data-search-enhanced={model.enhanced}
     onKeyDown={event => { if (event.key === 'Escape' && model.filtersOpen && !event.defaultPrevented) { event.preventDefault(); model.closeFilters(); } }}
     header={<WorkCollectionHeader title={t(copy.title)} intro={t(copy.intro)} />}
@@ -32,12 +32,12 @@ export function SearchWorkspace({ data }: { data: SearchWorkspaceData }) {
     <AppliedFilters model={model} />
     {data.adjusted ? <p role="status">{t(usability.filtersAdjusted)}</p> : null}
     {data.facetsUnavailable ? <p role="status" className={styles.notice}>{t(copy.facetsUnavailable)}</p> : null}
-    <div className={styles.workspace} data-preview={Boolean(model.selected)} aria-busy={model.pending}>
+    <div className={styles.workspace} data-preview={Boolean(selected)} aria-busy={model.pending}>
       <section id="search-results" className={styles.results} aria-label={t(copy.results)} tabIndex={-1}>
         <SearchResults model={model} />
       </section>
-      {model.selected ? <SearchPreview key={searchHitKey(model.selected)} hit={model.selected} query={data.query} returnTo={model.href}
-        cache={model.cache} onClose={model.closePreview} onReader={() => model.savePosition('search-result-' + searchHitKey(model.selected!))} /> : <div id="search-preview" hidden />}
+      {selected ? <SearchPreview key={searchHitKey(selected)} hit={selected} query={data.query} returnTo={model.href}
+        cache={model.cache} onClose={model.closePreview} onReader={() => model.savePosition('search-result-' + searchHitKey(selected))} /> : <div id="search-preview" hidden />}
     </div>
   </WorkCollectionFrame>;
 }

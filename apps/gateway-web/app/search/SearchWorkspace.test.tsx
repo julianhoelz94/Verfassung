@@ -120,6 +120,27 @@ it('reports an unavailable or mismatched preview honestly and supports retry wit
   expect(nav.push).not.toHaveBeenCalled(); expect(nav.replace).not.toHaveBeenCalled();
 });
 
+it('shows canonical inline footnotes without closing the passage on Escape and retains the Search return in note navigation', async () => {
+  fetcher.mockResolvedValueOnce({ ok: true, json: async () => ({ ...passage,
+    article: { ...passage.article, content: [{ type: 'text', logicalId: 'text', text: 'Authored text.', references: [{ logicalId: 'citation', start: 0, end: 8, target: { type: 'footnote', footnoteId: 'note' } }] }] },
+    notes: [{ logicalId: 'note', label: 'a', text: 'Exact authored source note.', href: '/countries/XA/versions/original#fn-note' }],
+  }) });
+  await render();
+  await click(host.querySelector('button[id^="search-preview-trigger-"]')!); await settle();
+  const marker = getByRole(host, 'button', { name: 'Show footnote a' });
+  await click(marker);
+  expect(getByRole(document.body, 'dialog', { name: 'Footnote a' }).textContent).toContain('Exact authored source note.');
+  await act(async () => fireEvent.keyDown(document, { key: 'Escape' }));
+  expect(queryByRole(document.body, 'dialog', { name: 'Footnote a' })).toBeNull();
+  expect(queryByRole(host, 'dialog', { name: 'Charter' })).not.toBeNull(); expect(document.activeElement).toBe(marker);
+  await click(marker);
+  const jump = getByRole(document.body, 'link', { name: 'Go to footnote' }) as HTMLAnchorElement;
+  expect(new URL(jump.href).searchParams.get('fromSearch')).toBe('/search?q=Authored');
+  jump.addEventListener('click', event => event.preventDefault(), { once: true });
+  await click(jump);
+  expect(takeSearchPosition('/search?q=Authored')).toMatchObject({ preview: searchHitKey(first), focusId: 'search-result-' + searchHitKey(first) });
+});
+
 it('cancels stale preview requests when another passage is selected or the preview is closed', async () => {
   let resolveFirst: (value: unknown) => void = () => {};
   fetcher.mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve; }));

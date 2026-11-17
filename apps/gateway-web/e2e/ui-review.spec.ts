@@ -1,6 +1,7 @@
 import { test, expect, type Page, type APIRequestContext } from './fixtures/consent';
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
+import type { TestInfo } from '@playwright/test';
 import { uiRoutes, uiStates } from './fixtures/ui-routes';
 
 const mock = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
@@ -44,7 +45,7 @@ for (const locale of ['en', 'de']) for (const width of sizes) {
         await expect.poll(() => new URL(page.url()).pathname, { message: `Unexpected redirect for ${route.path}` }).toBe(expectedPath);
         const heading = await assertReviewPage(page, route, locale);
         await auditReviewAccessibility(page, route, locale, width);
-        await captureReviewSnapshot(page, route, locale, width);
+        await captureReviewSnapshot(page, route, locale, width, testInfo);
         evidence.push({ route: route.entry, status: response?.status(), heading });
         if ('setup' in route && route.setup) await request.post(`${mock}/__sprint59_setup`, { data: { completed: true } });
       });
@@ -142,9 +143,10 @@ async function auditReviewAccessibility(page: Page, route: ReviewRoute, locale: 
 }
 
 /** Keep opt-in Linux snapshots, filtering, soft assertions, names and timeouts unchanged. */
-async function captureReviewSnapshot(page: Page, route: ReviewRoute, locale: string, width: number) {
+async function captureReviewSnapshot(page: Page, route: ReviewRoute, locale: string, width: number, info: TestInfo) {
   if ('snapshot' in route && route.snapshot && process.platform === 'linux' && process.env.E2E_SKIP_VISUAL !== 'true' && (!snapshotEntries || snapshotEntries.includes(route.entry))) {
     const name = route.entry.replace(/\//g, '-').replace(/[\[\]]/g, '').replace(/^-/, '');
+    if (route.entry === 'editor-active-correction') await page.screenshot({ path: info.outputPath(`review-${name}-${locale}-${width}.png`), fullPage: true, animations: 'disabled' });
     await expect.soft(page).toHaveScreenshot(`review-${name}-${locale}-${width}.png`, { fullPage: true, timeout: 15_000 });
   }
 }

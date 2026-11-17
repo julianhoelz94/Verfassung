@@ -50,6 +50,9 @@ export type EditorSearchParams = {
   status?: string;
   workStatus?: string;
   archived?: string;
+  query?: string;
+  kind?: string;
+  inbox?: string;
 };
 export type EditorCapabilities = {
   canEdit: boolean;

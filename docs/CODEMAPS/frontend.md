@@ -91,6 +91,8 @@ Country and regional constitution overview routes share `ConstitutionOverview`; 
 source-evidence and publication handlers in that directory preserve native
 redirects, JSON modes and trusted-origin guards.
 
+`EditorLanding` loads the authorised inbox through `editor-inbox-data`, independently retaining available sessions/imports on service failures. `EditorInbox` owns the complete-list search/filter/pagination UI. `EditorDeskFrame` and `EditorQueueBar` share measured PageChrome navigation across inbox, text/source workspaces and individual imports. The context pane remains mounted while hidden; `lib/editor-inbox.ts` owns canonical queue/filter return URLs and display capability guards. See `docs/design/editor-inbox-workspace.md`.
+
 ## Outline editing and preview
 
 `admin/constitutions/StructureWorkspaceFrame.tsx` (re-exported by

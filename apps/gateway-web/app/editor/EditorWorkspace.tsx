@@ -15,7 +15,7 @@ export function EditorNavigationToggle() {
     aria-label={label} title={label} onClick={navigation.toggle}><PanelLeft size={18} aria-hidden="true" /></button>;
 }
 
-export function EditorWorkspace({ navigation, session, children, inlineControls = false }: { navigation: ReactNode; session: ReactNode; children: ReactNode; inlineControls?: boolean }) {
+export function EditorWorkspace({ navigation, session, children, inlineControls = false }: { navigation: ReactNode; session?: ReactNode; children: ReactNode; inlineControls?: boolean }) {
   const [shown, setShown] = useState(false), id = useId(), t = useTranslation();
   useEffect(() => {
     try {
@@ -27,7 +27,7 @@ export function EditorWorkspace({ navigation, session, children, inlineControls 
     const next = !shown; setShown(next);
     try { localStorage.setItem('atlas-editor-navigation', next ? 'shown' : 'hidden'); } catch { /* View preference is optional. */ }
   }
-  const sessionDetails = <details className={styles.session}><summary>{t({ en: 'Session and publication', de: 'Sitzung und Veröffentlichung' })}</summary>{session}</details>;
+  const sessionDetails = session ? <details className={styles.session}><summary>{t({ en: 'Session and publication', de: 'Sitzung und Veröffentlichung' })}</summary>{session}</details> : null;
   return <NavigationContext.Provider value={{ shown, id, toggle: toggleNavigation }}><div className={styles.workspace} data-navigation={shown ? 'shown' : 'hidden'}>
     {!inlineControls ? <div className={styles.controls}><EditorNavigationToggle />{sessionDetails}</div> : null}
     <div id={id} hidden={!shown} className={styles.navigation}>{navigation}</div>

@@ -271,6 +271,7 @@ const editorState = {
   session: null,
   seededSessions: [],
   sessionsUnavailable: false,
+  importsUnavailable: false,
 };
 
 /** Mutable replacements remain request-visible after every reset, login and write. */
@@ -349,6 +350,7 @@ function resetMockState() {
   editorState.session = null;
   editorState.seededSessions = [];
   editorState.sessionsUnavailable = false;
+  editorState.importsUnavailable = false;
   mockState.pendingMfaEmail = identityMe.email;
   mockState.currentUser = { ...identityMe };
   mockState.importJobs = new Map();

@@ -6,8 +6,10 @@ import { ARTICLE_1, VERSION_1949, VERSION_2022, signInEditor, signInPublisher, s
 const MOCK_ORIGIN = `http://127.0.0.1:${process.env.E2E_MOCK_PORT ?? 4010}`;
 
 async function sessionDetails(page: Page) {
+  const show = page.getByRole('button', { name: 'Show context', exact: true });
+  if (await show.count()) await show.click();
   const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+  if (await summary.count() && !(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
 }
 
 test.beforeEach(async ({ request }) => {
@@ -69,7 +71,9 @@ test('editor landing lists every owned open session and keeps creation on the vi
   }));
   await request.post(`${MOCK_ORIGIN}/__editor_sessions`, { data: { sessions } });
   await signInEditor(page);
-  await expect(page.getByRole('heading', { name: 'My work' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your editorial desk' })).toBeVisible();
+  await expect(page.locator('.editor-session-list li')).toHaveCount(20);
+  for (let i = 0; i < 5; i++) await page.getByRole('button', { name: 'Show 20 more', exact: true }).click();
   await expect(page.locator('.editor-session-list li')).toHaveCount(101);
   await expect(page.getByRole('heading', { name: 'Germany', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Basic Law for the Federal Republic of Germany' })).toBeVisible();
@@ -140,7 +144,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await signOut(page);
   await signInReviewer(page);
   await page.goto('/editor?status=reviewing');
-  await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Work queues', exact: true }).getByRole('link', { name: 'Review', exact: true })).toBeVisible();
   await page.locator('.editor-session-list').getByRole('link').first().click();
   await expect(page).toHaveURL(/sessionId=/);
   await sessionDetails(page);
@@ -160,7 +164,7 @@ test('edit, review, and publish a draft', async ({ page }) => {
   await signOut(page);
   await signInPublisher(page);
   await page.goto('/editor?status=approved');
-  await expect(page.getByRole('heading', { name: 'Ready to publish' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Work queues', exact: true }).getByRole('link', { name: 'Ready to publish', exact: true })).toBeVisible();
   await page.locator('.editor-session-list').getByRole('link').first().click();
   await expect(page).toHaveURL(/sessionId=/);
   await sessionDetails(page);

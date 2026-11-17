@@ -259,6 +259,7 @@ async function handleSeedEditorSessionsResponse(context) {
   const body = await readBody(req);
   editorState.seededSessions = body.sessions ?? [];
   editorState.sessionsUnavailable = body.unavailable ?? false;
+  editorState.importsUnavailable = body.importsUnavailable ?? false;
   empty(res, 204);
   return true;
 }

@@ -4,8 +4,10 @@ import { adminHeaders, createIsolatedConstitution } from './api-fixtures';
 import { authenticatorCode, signIn, signOut, startFromViewer } from './auth';
 
 async function sessionDetails(page: Page) {
+  const show = page.getByRole('button', { name: 'Show context', exact: true });
+  if (await show.count()) await show.click();
   const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+  if (await summary.count() && !(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
 }
 
 test.use({ locale: 'en-US', extraHTTPHeaders: { 'Accept-Language': 'en' }, screenshot: 'only-on-failure', actionTimeout: 20_000 });
@@ -65,8 +67,8 @@ async function readPublishedText(page: Page, href: string, text: string) {
 
 test('reviewer sign-in returns to the protected queue with its filter', async ({ page }) => {
   await signInToProtectedPage(page, 'reviewer', '/editor?status=reviewing');
-  await expect(page.getByRole('heading', { name: 'Review queue', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Review queue', exact: true }).first()).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('heading', { name: 'Your editorial desk', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Review', exact: true }).first()).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: 'My work', exact: true })).toHaveCount(0);
 });
 
@@ -85,7 +87,7 @@ test('owned work survives role handoffs and published corrections remain readabl
 
   for (const [index, correctedText] of corrections.entries()) {
     await signInAsEditor(page, editor);
-    await expect(page.getByRole('link', { name: 'Review queue', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Review', exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Ready to publish', exact: true })).toHaveCount(0);
     await startFromViewer(page, fixture.countryIso, sourceVersionId, 'editorial_correction');
     const sessionId = new URL(page.url()).searchParams.get('sessionId');

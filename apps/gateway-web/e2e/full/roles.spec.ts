@@ -2,8 +2,10 @@ import { expect, test, type APIRequestContext, type Page } from '../fixtures/con
 import { signIn, signOut, startFromViewer } from './auth';
 
 async function sessionDetails(page: Page) {
+  const show = page.getByRole('button', { name: 'Show context', exact: true });
+  if (await show.count()) await show.click();
   const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+  if (await summary.count() && !(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
 }
 
 async function publishedVersion(request: APIRequestContext, requirePlainArticle = false): Promise<{ countryIso: string; versionId: string }> {
@@ -39,7 +41,7 @@ for (const story of roles) {
     await expect(page.getByText(email, { exact: true })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Admin', exact: true })).toHaveCount(story.admin ? 1 : 0);
     await page.goto('/editor');
-    await expect(page.getByRole('heading', { name: 'Editor', exact: true, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your editorial desk', exact: true, level: 1 })).toBeVisible();
     const source = await publishedVersion(request);
     await page.goto(`/countries/${source.countryIso}/versions/${source.versionId}`);
     await expect(page.getByRole('button', { name: 'Edit this constitution' })).toHaveCount(story.canEdit ? 1 : 0);

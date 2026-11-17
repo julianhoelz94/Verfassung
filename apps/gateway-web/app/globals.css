@@ -1302,48 +1302,6 @@ button.article-toggle:disabled::after {
   margin-top: var(--space-3);
 }
 
-.editor-session-country {
-  margin-top: var(--space-6);
-}
-
-.editor-session-country h2,
-.editor-session-constitution h3 {
-  margin: 0 0 var(--space-4);
-}
-
-.editor-session-constitution + .editor-session-constitution {
-  margin-top: var(--space-5);
-}
-
-.editor-session-list {
-  list-style: none;
-  display: grid;
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-}
-
-.editor-session-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3) var(--space-5);
-  padding: var(--space-4);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.editor-session-list li > .editor-session-summary {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.editor-session-list .badge {
-  justify-self: start;
-}
-
 .article-list .badge {
   flex-shrink: 0;
   white-space: nowrap;
@@ -2097,7 +2055,3 @@ form[aria-busy='true'] :where(button, .btn) { cursor: progress; }
 .history-event-filter .field { display: grid; gap: var(--space-2); margin: 0; }
 .history-kind { display: block; font: 600 var(--text-xs)/var(--leading-normal) var(--font-ui); color: var(--color-ink-2); margin-bottom: var(--space-2); }
 }
-
-.editor-work-actions { max-width: 100%; }
-.editor-work-actions .disclosure { margin: 0; }
-.editor-work-actions .disclosure[open] { flex-basis: 100%; max-width: 32rem; }

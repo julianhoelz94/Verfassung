@@ -77,6 +77,8 @@ Wiki translation uses `ContentTranslationRegion compact`: a labelled Languages i
 
 ## Amendment workspace and evidence
 
+The editorial inbox and its focused session/source views use `editor/EditorDeskFrame` with the shared PageChrome collection/workspace shell. `EditorQueueBar` is reused by individual imports inside their existing measured toolbar frame. Queue navigation remains visible after opening work, and the context toggle hides its retained pane without unmounting fields. Search and progressive filters belong to the inbox; library/history links keep their global or constitution context. See [the inbox workspace contract](editor-inbox-workspace.md).
+
 The central `/documents` library uses `FullWidthPage`, `PageChromeSurface`, the
 shared sticky `PageMenuFrame`/`PageMenuBar`, and measured header/menu offsets.
 Library actions and the project-folder toggle live in that toolbar. Selecting a

@@ -54,6 +54,7 @@ export default async function EditorPage(props: EditorPageProps) {
       <ImportReview
         jobId={searchParams.importJobId}
         error={searchParams.error}
+        inboxReturnTo={searchParams.inbox}
       />
     );
   }
@@ -71,6 +72,9 @@ export default async function EditorPage(props: EditorPageProps) {
         workStatus={searchParams.workStatus}
         archived={searchParams.archived === 'true'}
         error={searchParams.error}
+        query={searchParams.query}
+        country={searchParams.country}
+        kind={searchParams.kind}
       />
     );
   }
@@ -103,6 +107,7 @@ export default async function EditorPage(props: EditorPageProps) {
           preview.newVersionId ? href(preview.newVersionId) : undefined
         }
         error={editorErrorMessage(searchParams.error, locale)}
+        inboxReturnTo={searchParams.inbox}
       />
     );
   }

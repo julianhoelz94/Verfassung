@@ -3,8 +3,10 @@ import { authenticatorCode, signIn, signOut, startFromViewer } from './auth';
 import { createIsolatedConstitution } from './api-fixtures';
 
 async function sessionDetails(page: Page) {
+  const show = page.getByRole('button', { name: 'Show context', exact: true });
+  if (await show.count()) await show.click();
   const summary = page.locator('summary').filter({ hasText: 'Session and publication' });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+  if (await summary.count() && !(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
 }
 
 test('editor, reviewer, and publisher release a real legal successor with its source document', async ({ page, request }) => {

@@ -41,9 +41,8 @@ import { reviewUi } from "../../lib/ui-review-messages";
 import { T } from "../components/TranslationProvider";
 import { LocalizedRegion } from "../components/LocalizedRegion";
 import { AdminForbidden } from "../components/AdminForbidden";
-import { Alert, Badge, Button, PageHeader, Select } from "../components/ui";
+import { Alert, Badge, Button, Select } from "../components/ui";
 import { Disclosure } from "../components/Disclosure";
-import { WorkspacePage } from "../components/layout/templates";
 import { ConstitutionDocument } from "../components/ConstitutionDocument";
 import { OrderedContentTree } from "../components/ConstitutionText";
 import { NavigatingActionForm } from "../components/NavigatingActionForm";
@@ -61,17 +60,20 @@ import {
   reviewSource,
 } from "./ImportReviewSections";
 import styles from "./ImportReviewWorkspace.module.css";
+import { EditorDeskFrame, EditorWorkQueueBar } from './EditorDeskFrame';
 
 export async function ImportReview({
   jobId,
   runId,
   error,
   query = {},
+  inboxReturnTo,
 }: {
   jobId?: string;
   runId?: string;
   error?: string;
   query?: ImportReviewQuery;
+  inboxReturnTo?: string;
 }) {
   const user = await currentUser();
   if (
@@ -89,13 +91,11 @@ export async function ImportReview({
   ).catch(() => null);
   if (!selection) {
     return (
-      <WorkspacePage
-        header={<PageHeader title={<T value={ui.importReview.title} />} />}
-      >
+      <EditorDeskFrame userId={user.id} roles={user.roles} workKey={`import:${jobId ?? runId ?? ''}`} returnTo={inboxReturnTo} title={<T value={ui.importReview.title} />}>
         <Alert tone="error">
           <T value={ui.admin.import.jobid.page.theImportServiceIsUnavailable} />
         </Alert>
-      </WorkspacePage>
+      </EditorDeskFrame>
     );
   }
   const { run, job } = selection;
@@ -155,6 +155,7 @@ export async function ImportReview({
     <ImportReviewWorkspace
       key={selected?.id ?? job?.id ?? run?.id}
       title={title}
+      editorialNavigation={job && !run ? <EditorWorkQueueBar userId={user.id} roles={user.roles} workKey={`import:${job.id}`} returnTo={inboxReturnTo} /> : undefined}
       summary={
         run ? (
           <>

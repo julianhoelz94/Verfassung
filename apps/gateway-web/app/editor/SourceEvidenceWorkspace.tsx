@@ -8,9 +8,9 @@ import { sourceEvidenceUi as copy, sourceDecisionUi } from '../../lib/source-evi
 import { ui } from '../../lib/messages';
 import { sourceDescriptionText } from '../../lib/source-evidence';
 import { SourceDescription } from '../components/SourceDescription';
-import { WorkspacePage } from '../components/layout/templates';
+import { EditorDeskFrame } from './EditorDeskFrame';
 import { Stack, Inline, Grid } from '../components/layout/Layout';
-import { Alert, Button, PageHeader, WorkflowSteps } from '../components/ui';
+import { Alert, Button, WorkflowSteps } from '../components/ui';
 import { T, useLocale, useTranslation } from '../components/TranslationProvider';
 
 function EvidenceComparison({ before, after }: { before: SourceEvidence | null; after: SourceEvidence }) {
@@ -29,9 +29,10 @@ type Props = {
   publishedHref?: string;
   error?: string | null;
   documentsPanel?: ReactNode;
+  inboxReturnTo?: string;
 };
 
-export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, roles, sourceHref, publishedHref, error, documentsPanel }: Props) {
+export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, roles, sourceHref, publishedHref, error, documentsPanel, inboxReturnTo }: Props) {
   const router = useRouter();
   const t = useTranslation();
   const locale = useLocale();
@@ -84,12 +85,12 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
       setSaving(false);
     }
   }
-  return <WorkspacePage width="content" header={<PageHeader
+  return <EditorDeskFrame userId={userId} roles={roles} workKey={`session:${session.id}`} returnTo={inboxReturnTo}
     title={<T value={copy.edit} />}
-    breadcrumbs={[{ href: '/editor', label: <T value={ui.nav.editor} /> }, { label: session.id.slice(0, 8) }]}
     meta={<WorkflowSteps status={session.status} />}
-    actions={(publishedHref || sourceHref) ? <a className="btn" href={publishedHref ?? sourceHref}><T value={publishedHref ? copy.published : copy.source} /></a> : null}
-  />}>
+    context={documentsPanel}
+  >
+    {(publishedHref || sourceHref) ? <p><a className="btn" href={publishedHref ?? sourceHref}><T value={publishedHref ? copy.published : copy.source} /></a></p> : null}
     {error || saveError ? <Alert tone="error">{saveError ?? error}</Alert> : null}
     {saved ? <Alert tone="success"><T value={copy.saved} /></Alert> : null}
     <p><T value={copy.explanation} /></p>
@@ -118,7 +119,6 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
         <Button form="source-evidence-form" disabled={saving || !dirty}><T value={copy.save} /></Button>
       </> : <p>{latest?.reason ?? t(copy.noDraft)}</p>}
     </Stack>
-    {documentsPanel}
     <p><T value={copy.textReminder} /> <a href={`/editor?sessionId=${encodeURIComponent(session.id)}&scope=text`}><T value={copy.inspectText} /></a></p>
     <Inline>
       {canEdit && latest ? <form action="/editor/command" method="post" onSubmit={() => { leaving.current = true; }}>
@@ -150,5 +150,5 @@ export function SourceEvidenceWorkspace({ preview, publishedEvidence, userId, ro
         <p><T value={copy.author} />: {decision.actorEmail ?? decision.actorId}</p>{decision.reason ? <p>{decision.reason}</p> : null}
       </li>)}</ol>
     </section>
-  </WorkspacePage>;
+  </EditorDeskFrame>;
 }

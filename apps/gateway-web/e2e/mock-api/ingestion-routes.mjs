@@ -1,11 +1,15 @@
 import { exactRoute } from "./route.mjs";
-import { json, mockState, readBody } from "./state.mjs";
+import { editorState, json, mockState, readBody } from "./state.mjs";
 
 /** Retain status, owner, archive and pagination filtering order. */
 export function handleImportJobs(context) {
   const { pathname, method, req, res, searchParams } = context;
   if (!(method === "GET" && pathname === "/api/ingestion/import-jobs"))
     return false;
+  if (editorState.importsUnavailable) {
+    json(res, 503, { error: 'Imports unavailable' });
+    return true;
+  }
   const status = new URL(req.url, "http://mock").searchParams.get("status");
   const mine = searchParams.get("mine") === "true";
   const archived = searchParams.get("archived") === "true";

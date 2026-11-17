@@ -40,8 +40,8 @@ async function setScope(page: Page, scope: string) {
   await expect(page.locator('#draft-form input[name="scope"]')).toHaveValue(scope);
 }
 async function sessionDetails(page: Page) {
-  const summary = page.getByText('Session and publication', { exact: true });
-  if (!(await summary.evaluate(element => element.parentElement!.hasAttribute('open')))) await summary.click();
+  const show = page.getByRole('button', { name: 'Show context', exact: true });
+  if (await show.count()) await show.click();
 }
 async function properties(page: Page, canvas: Locator, unitId: string) {
   await canvas.locator(`[data-unit="${unitId}"]`).click();

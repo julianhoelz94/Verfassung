@@ -69,7 +69,7 @@ test('administrator creates, rotates and revokes a service token', async ({ page
 test('administrator stages constitution JSON for review without publishing it', async ({ page }, testInfo) => {
   await signInAdmin(page);
   await page.goto('/import?mode=existing');
-  await page.getByText('Paste JSON instead', { exact: true }).click();
+  await page.locator('#upload summary').click();
   await page.getByLabel('Import JSON').fill(JSON.stringify({
     isoCode: 'US',
     countryName: 'United States',

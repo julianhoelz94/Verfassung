@@ -52,5 +52,5 @@ export const importWorkspaceUi = {
   approve: { en: 'Approve explicitly', de: 'Gezielt freigeben' },
   noPublish: { en: 'Uploading alone does not publish any text.', de: 'Hochladen allein veröffentlicht keinen Text.' },
   retained: { en: 'Your file stays in this form until you submit. You can switch tabs without losing your selection.', de: 'Die Datei bleibt bis zum Absenden in diesem Formular. Sie können zwischen den Reitern wechseln, ohne die Auswahl zu verlieren.' },
-  private: { en: 'Stays private until approved.', de: 'Bleibt bis zur Freigabe privat.' },
+  private: { en: 'Stays private until publication.', de: 'Bleibt bis zur Veröffentlichung privat.' },
 } satisfies Record<string, UiMessage>;

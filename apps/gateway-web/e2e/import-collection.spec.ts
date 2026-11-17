@@ -37,7 +37,7 @@ for (const locale of ['en', 'de']) for (const width of [390, 820, 1440]) {
     expect(await page.locator('#file').evaluate((node: HTMLInputElement) => node.files?.[0]?.name)).toBe('retained.json');
     await expect(page.locator('#payload')).toHaveValue('{unfinished');
     await page.getByRole('button', { name: en ? 'Stage for review' : 'Zur Prüfung vorbereiten', exact: true }).click();
-    await expect(page.getByRole('alert')).toBeVisible(); await expect(page.locator('#payload')).toHaveValue('{unfinished');
+    await expect(page.locator('#upload').getByRole('alert')).toBeVisible(); await expect(page.locator('#payload')).toHaveValue('{unfinished');
     expect(await page.locator('#file').evaluate((node: HTMLInputElement) => node.files?.[0]?.name)).toBe('retained.json');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await page.screenshot({ path: info.outputPath(`import-upload-${locale}-${width}.png`), fullPage: true });

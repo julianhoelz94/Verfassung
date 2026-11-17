@@ -58,13 +58,13 @@ function ImportsQueue({ rows, incomplete }: { rows: ImportCollectionRow[]; incom
   const t = useTranslation(), locale = useLocale();
   const [filters, setFilters] = useState(emptyImportFilters), [expanded, setExpanded] = useState(false), [limit, setLimit] = useState(20);
   const visible = filterImportCollection(rows, filters, locale), shown = visible.slice(0, limit);
-  const countries = [...new Set(rows.map(row => row.country))].sort((a, b) => a.localeCompare(b, locale));
+  const countries = [...new Map(rows.map(row => [row.countryKey, row.country])).entries()].sort((a, b) => a[1].localeCompare(b[1], locale));
   const statuses = [...new Set(rows.map(row => row.status))];
   function patch(next: Partial<typeof filters>) { setFilters({ ...filters, ...next }); setLimit(20); }
   const label = (value: string) => t(value === 'preparing' ? m.preparing : statusMessage(value));
   const active = [
     ...(filters.status ? [{ field: 'status', label: label(filters.status) }] : []),
-    ...(filters.country ? [{ field: 'country', label: filters.country }] : []),
+    ...(filters.country ? [{ field: 'country', label: countries.find(([key]) => key === filters.country)?.[1] ?? filters.country }] : []),
     ...(filters.kind ? [{ field: 'kind', label: t(filters.kind === 'package' ? m.packages : m.single) }] : []),
   ];
   return <>
@@ -73,12 +73,12 @@ function ImportsQueue({ rows, incomplete }: { rows: ImportCollectionRow[]; incom
       <div className={collection.filterFields}>
         <label>{t(workflowUi.filterStatus)}<select value={filters.status} onChange={event => patch({ status: event.target.value })}><option value="">{t(workflowUi.allStatuses)}</option>{statuses.map(status => <option value={status} key={status}>{label(status)}</option>)}</select></label>
         <label>{t(m.type)}<select value={filters.kind} onChange={event => patch({ kind: event.target.value })}><option value="">{t(m.all)}</option><option value="job">{t(m.single)}</option><option value="package">{t(m.packages)}</option></select></label>
-        <label>{t(inboxUi.country)}<select value={filters.country} onChange={event => patch({ country: event.target.value })}><option value="">{t(inboxUi.allCountries)}</option>{countries.map(country => <option key={country} value={country}>{country}</option>)}</select></label>
+        <label>{t(inboxUi.country)}<select value={filters.country} onChange={event => patch({ country: event.target.value })}><option value="">{t(inboxUi.allCountries)}</option>{countries.map(([key, country]) => <option key={key} value={key}>{country}</option>)}</select></label>
       </div>
     </WorkCollectionFilters>
     <WorkCollectionMeta summary={incomplete ? <>{visible.length} {t(m.available)}</> : <>{visible.length} {t(m.of)} {rows.length} {t(m.items)}</>} grouping={t(m.grouped)} />
-    <div className={collection.countries}>{countries.filter(country => shown.some(row => row.country === country)).map(country => <WorkCollectionGroup key={country} title={country}>
-      <WorkCollectionSection>{shown.filter(row => row.country === country).map(row => <ImportQueueRow key={row.kind + row.id} row={row} />)}</WorkCollectionSection>
+    <div className={collection.countries}>{countries.filter(([key]) => shown.some(row => row.countryKey === key)).map(([key, country]) => <WorkCollectionGroup key={key} title={country}>
+      <WorkCollectionSection>{shown.filter(row => row.countryKey === key).map(row => <ImportQueueRow key={row.kind + row.id} row={row} />)}</WorkCollectionSection>
     </WorkCollectionGroup>)}</div>
     {!visible.length ? <div className={styles.empty}><BookOpen size={25} aria-hidden="true" /><h2>{t(incomplete ? inboxUi.incompleteTitle : rows.length ? m.noMatches : ui.admin.import.page.noImportsYet)}</h2>{rows.length ? <><p>{t(m.noMatchesHint)}</p><button type="button" className="btn" onClick={() => setFilters(emptyImportFilters)}>{t(inboxUi.clearAll)}</button></> : null}</div> : null}
     {shown.length < visible.length ? <div className={styles.loadMore}><button type="button" className="btn" onClick={() => setLimit(limit + 20)}>{t(inboxUi.showMore)}</button></div> : null}
@@ -90,6 +90,6 @@ function ImportQueueRow({ row }: { row: ImportCollectionRow }) {
   const tone = row.status === 'approved' ? 'added' : row.status === 'pending_review' ? 'info' : ['failed', 'rejected'].includes(row.status) ? 'changed' : 'neutral';
   return <WorkCollectionRow icon={row.kind === 'package' ? <PanelLeft size={17} aria-hidden="true" /> : <BookOpen size={17} aria-hidden="true" />}
     title={<WorkRowLink href={row.href}>{row.title}</WorkRowLink>} details={<>{row.period ? <>{row.period} · </> : null}{t(row.kind === 'package' ? m.package : m.single)}</>}
-    status={<><Badge tone={tone}>{t(row.status === 'preparing' ? m.preparing : statusMessage(row.status))}</Badge>{row.kind === 'package' && row.total !== undefined ? <span className={styles.progress}>{row.prepared} {t(m.of)} {row.total} {t(m.versionsReady)}</span> : null}</>}
+    status={<><Badge tone={tone}>{t(row.status === 'preparing' ? m.preparing : statusMessage(row.status))}</Badge>{row.kind === 'package' && Boolean(row.total) ? <span className={styles.progress}>{row.prepared} {t(m.of)} {row.total} {t(m.versionsReady)}</span> : null}</>}
     actions={<WorkRowAction href={row.href}>{t(row.kind === 'package' ? m.continue : row.status === 'pending_review' ? m.review : m.view)}</WorkRowAction>} />;
 }

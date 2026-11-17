@@ -91,9 +91,9 @@ function InboxWorkRow({ row, model: m }: { row: InboxRow; model: Model }) {
   const action = t(m.queue === 'reviewing' ? inboxUi.review : m.queue === 'approved' ? inboxUi.publicationReview : row.kind !== 'import' && row.owned && row.status === 'open' ? ui.editorDynamic.continueEditing : workflowUi.viewWork);
   const date = row.updatedAt && Number.isFinite(new Date(row.updatedAt).valueOf()) ? `${t(inboxUi.updated)} ${new Intl.DateTimeFormat(m.locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(row.updatedAt))}` : t(inboxUi.noDate);
   const record = (focusId: string) => rememberInbox(m.userId, m.currentHref, m.queue, focusId, rowKey(row), m.limit);
-  return <WorkCollectionRow data-work-id={row.id} kind={row.kind} icon={<Icon size={18} aria-hidden="true" />}
+  return <WorkCollectionRow data-work-id={row.id} iconTone={row.kind === 'legal' ? 'changed' : row.kind === 'import' ? 'info' : 'accent'} icon={<Icon size={18} aria-hidden="true" />}
     title={<WorkRowLink id={`${id}-title`} href={href} onClick={() => record(`${id}-title`)}>{title}</WorkRowLink>}
-    details={<>{row.version}<div className={collection.updated}>{date}</div></>}
+    details={<><span>{row.version}</span><div className={collection.updated}>{date}</div></>}
     status={<Badge tone={statusTone(normalizedWorkStatus(row.status))}>{t(statusMessage(row.status))}</Badge>}
     actions={<><WorkRowAction id={`${id}-action`} href={href} onClick={() => record(`${id}-action`)}>{action}</WorkRowAction><WorkActions row={{ ...row, owned: m.queue === 'mine' && row.owned }} archived={m.filters.archived} returnTo={m.currentHref} label={`${title} · ${row.constitution} · ${row.version}`} /></>} />;
 }

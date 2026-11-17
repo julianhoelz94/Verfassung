@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useHydrated } from '../../lib/use-hydrated';
 import { Info, Upload } from 'lucide-react';
-import { Button, TextArea } from '../components/ui';
+import { Alert, Button, TextArea } from '../components/ui';
 import { WorkContextLayout } from '../components/layout/WorkCollection';
 import { useTranslation } from '../components/TranslationProvider';
 import { ui } from '../../lib/messages';
@@ -64,7 +64,7 @@ function ImportUploadForm({ mode, initialError }: { mode: string; initialError?:
       </div>
       {file ? <div className={styles.selectedFile} role="status"><span>{file.name}</span><Button type="button" size="sm" variant="ghost" onClick={() => { setFile(null); if (input.current) input.current.value = ''; }}>{t(m.remove)}</Button></div> : null}
       <details className={styles.jsonDetails} open={expanded} onToggle={event => setExpanded(event.currentTarget.open)}><summary>{t(reviewUi.pasteJson)}</summary><TextArea id={jsonField} label={t(proposal ? ui.attrs.adminImportPageTextAreaLabelSetup : ui.attrs.adminImportPageTextAreaLabelImport)} name={jsonField} rows={10} spellCheck={false} value={json} onChange={event => { setJson(event.target.value); setError(''); }} />{file ? <p>{t(m.fileWins)}</p> : null}</details>
-      {error ? <p role="alert">{t(stagingError(error))}</p> : null}
+      {error ? <Alert tone="error">{t(stagingError(error))}</Alert> : null}
       <div className={styles.formFooter}><Button variant="primary">{t(proposal ? reviewUi.prepareStructure : ui.admin.import.page.stageForReview)}</Button><p>{t(m.private)}</p></div>
     </fieldset>
   </form>;

@@ -69,7 +69,7 @@ test('an admin reviews and publishes their MCP import in the editor journey', as
     await page.context().addCookies([{ name: 'ca_session', value: admin.Authorization.slice('Bearer '.length), url: String(testInfo.project.use.baseURL), httpOnly: true, sameSite: 'Lax' }]);
     await page.goto('/editor?status=reviewing');
     await page.locator('.editor-session-list li').filter({ hasText: versionLabel }).getByRole('link', { name: 'Review', exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/editor\\?importJobId=${jobId}`));
+    await expect(page).toHaveURL(new RegExp(`/import/jobs/${jobId}`));
     await page.getByRole('button', { name: 'Prepare unpublished draft' }).click();
     await expect(page.getByRole('heading', { name: 'Prepared draft as readers will see it' })).toBeVisible();
     await expect(page.getByText('A reviewed import is required.', { exact: true }).first()).toBeVisible();

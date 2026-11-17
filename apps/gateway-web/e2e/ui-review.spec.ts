@@ -70,7 +70,7 @@ for (const locale of ['en', 'de']) test(`secondary controls work by keyboard wit
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), path).toBeTruthy();
     }
     await page.goto('/import?mode=new');
-    const disclosure = page.locator('summary').filter({ hasText: locale === 'en' ? 'Paste JSON instead' : 'Stattdessen JSON einfügen' });
+    const disclosure = page.locator('#structure summary').filter({ hasText: locale === 'en' ? 'Paste JSON instead' : 'Stattdessen JSON einfügen' });
     const editor = page.locator('#proposal');
     await expect(editor).toBeHidden();
     await disclosure.focus();

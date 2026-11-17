@@ -34,7 +34,7 @@ export function WorkCollectionHeader({ title, intro, meta, eyebrow, actions, com
   </header>;
   return <header className={styles.heading}><div>{eyebrow ? <div className={styles.eyebrow}>{eyebrow}</div> : null}<h1>{title}</h1>{intro ? <p>{intro}</p> : null}{meta ? <div className={styles.headingMeta}>{meta}</div> : null}</div>{actions}</header>;
 }
-export function WorkCollectionMenu({ className, ...props }: ComponentPropsWithoutRef<typeof PageMenuBar>) {
+export function WorkCollectionMenu({ className, ...props }: Omit<ComponentPropsWithoutRef<typeof PageMenuBar>, 'compact'>) {
   return <PageMenuBar {...props} compact={false} className={[styles.menu, className].filter(Boolean).join(' ')} />;
 }
 export function WorkContextToggle({ shown, onToggle, contextId, labels }: { shown: boolean; onToggle: () => void; contextId: string; labels: ContextLabels }) {
@@ -54,12 +54,12 @@ export function WorkCollectionFilters({ searchLabel, placeholder, query, onQuery
 }) {
   const id = useId(), button = useRef<HTMLButtonElement>(null);
   function close() { onExpanded(false); button.current?.focus(); }
-  return <div onKeyDown={event => { if (event.key === 'Escape' && expanded) { event.stopPropagation(); close(); } }}>
+  return <div onKeyDown={event => { if (event.key === 'Escape' && expanded) { event.preventDefault(); event.stopPropagation(); close(); } }}>
     <div className={styles.searchToolbar}>
       <div className={styles.search}><Search size={18} aria-hidden="true" /><input type="search" maxLength={200} aria-label={searchLabel} placeholder={placeholder} value={query} onChange={event => onQuery(event.target.value)} />{query ? <button type="button" className={styles.iconButton} aria-label={clearLabel} onClick={() => onQuery('')}><X size={16} aria-hidden="true" /></button> : null}</div>
       <button ref={button} type="button" className={['btn', styles.filterButton].join(' ')} aria-label={filterLabel} aria-expanded={expanded} aria-controls={id} onClick={() => onExpanded(!expanded)}><Filter size={17} aria-hidden="true" />{filterLabel}{activeCount ? <span className={styles.count}>{activeCount}</span> : null}<ChevronDown size={14} aria-hidden="true" /></button>
     </div>
-    <section className={styles.filters} id={id} hidden={!expanded} aria-label={filterLabel}>{children}{footer ? <div className={styles.filterFooter}>{footer}{doneLabel ? <button type="button" className={styles.textButton} onClick={close}>{doneLabel}<Check size={14} aria-hidden="true" /></button> : null}</div> : null}</section>
+    <section className={styles.filters} id={id} hidden={!expanded} aria-label={filterLabel}>{children}{footer || doneLabel ? <div className={styles.filterFooter}>{footer}{doneLabel ? <button type="button" className={styles.textButton} onClick={close}>{doneLabel}<Check size={14} aria-hidden="true" /></button> : null}</div> : null}</section>
     {chips ? <div className={styles.chips} aria-label={chipsLabel}>{chips}</div> : null}
   </div>;
 }
@@ -72,8 +72,8 @@ export function WorkCollectionGroup({ title, icon, className, children }: { titl
 export function WorkCollectionSection({ title, meta, className, listClassName, children }: { title?: ReactNode; meta?: ReactNode; className?: string; listClassName?: string; children: ReactNode }) {
   return <section className={[styles.constitution, className].filter(Boolean).join(' ')}>{title ? <div className={styles.constitutionHeading}><h3>{title}</h3>{meta ? <span>{meta}</span> : null}</div> : null}<ul className={[styles.rows, listClassName].filter(Boolean).join(' ')}>{children}</ul></section>;
 }
-export function WorkCollectionRow({ icon, kind, title, details, status, actions, className, ...props }: Omit<ComponentPropsWithoutRef<'li'>, 'title'> & { icon: ReactNode; kind?: string; title: ReactNode; details: ReactNode; status: ReactNode; actions: ReactNode }) {
-  return <li {...props} className={[styles.row, className].filter(Boolean).join(' ')}><span className={styles.workIcon} data-kind={kind}>{icon}</span><div className={styles.rowInfo}>{title}<div className={styles.rowDetails}>{details}</div></div><div className={styles.rowTail}><div className={styles.rowStatus}>{status}</div><div className={styles.rowActions}>{actions}</div></div></li>;
+export function WorkCollectionRow({ icon, iconTone, title, details, status, actions, className, ...props }: Omit<ComponentPropsWithoutRef<'li'>, 'title'> & { icon: ReactNode; iconTone?: 'accent' | 'changed' | 'info'; title: ReactNode; details: ReactNode; status: ReactNode; actions: ReactNode }) {
+  return <li {...props} className={[styles.row, className].filter(Boolean).join(' ')}><span className={styles.workIcon} data-tone={iconTone}>{icon}</span><div className={styles.rowInfo}>{title}<div className={styles.rowDetails}>{details}</div></div><div className={styles.rowTail}><div className={styles.rowStatus}>{status}</div><div className={styles.rowActions}>{actions}</div></div></li>;
 }
 export function WorkRowLink({ className, ...props }: ComponentPropsWithoutRef<'a'>) {
   return <a {...props} className={[styles.rowTitle, className].filter(Boolean).join(' ')} />;

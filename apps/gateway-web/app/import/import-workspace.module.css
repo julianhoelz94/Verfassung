@@ -9,8 +9,6 @@
 .formFields { display:grid; gap:20px; border:0; padding:0; margin:0; min-width:0; }
 .fileDrop { border: 1px dashed var(--color-line-strong); border-radius: var(--radius-sm); padding: 26px; text-align: center; min-width: 0; }
 .fileDrop[data-dragging="true"] { background: var(--color-accent-soft); border-color: var(--color-accent); }
-.uploadIcon { display: flex; justify-content: center; margin: 0 0 12px; color: var(--color-accent); }
-.uploadIcon svg { height: 22px; width: 22px; }
 .fileDrop h3 { font: 400 var(--text-lg)/1.5 var(--font-heading); margin: 0; }
 .fileDrop p { color: var(--color-ink-2); font-size: var(--text-sm); margin: 8px 0 18px; line-height: 1.65; }
 .fileDrop input { display: block; max-width: 100%; width: 100%; padding: 7px; font-size: var(--text-sm); min-width: 0; text-align: left; }
@@ -23,8 +21,6 @@
 .jsonDetails { border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); padding: 12px 0; margin: 0; }
 .jsonDetails summary { font-size: var(--text-sm); color: var(--color-accent); min-height: 28px; cursor: pointer; }
 .jsonDetails textarea { font-family: var(--font-mono); font-size: 13px; margin-top: 5px; resize: vertical; }
-.fieldHint { font-size: var(--text-xs); color: var(--color-ink-2); margin: 10px 0 0; line-height: 1.6; }
-.jsonReady { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); color: var(--color-accent); margin: 0; }
 .formFooter { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 .formFooter > p { margin: 0; font-size: var(--text-xs); color: var(--color-ink-2); }
 .guidance { border-left: 1px solid var(--color-line); padding-left: 32px; }

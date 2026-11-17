@@ -129,9 +129,9 @@ for (const locale of ['en', 'de'] as const) {
         await page.goto('/admin');
         await expect(page.getByRole('heading', { level:1 })).toBeVisible();
         await shot(page, 'admin-overview');
-        await page.goto('/import');
+        await page.goto('/import?mode=existing');
         await expect(page.getByRole('heading', { level:1 })).toBeVisible();
-        await expect(page.locator('input[type=file]')).toBeVisible();
+        await expect(page.locator('#upload input[type=file]')).toBeVisible();
         await shot(page, 'admin-import');
       } finally { await admin.close(); }
 

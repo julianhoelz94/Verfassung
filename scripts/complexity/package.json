@@ -10,7 +10,7 @@
   "devDependencies": {
     "@typescript-eslint/parser": "8.72.1",
     "eslint": "9.39.5",
-    "eslint-plugin-sonarjs": "2.0.4",
+    "eslint-plugin-sonarjs": "4.2.2",
     "typescript": "5.9.3"
   }
 }

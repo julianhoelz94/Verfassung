@@ -24,7 +24,7 @@ repositories {
 
 dependencyManagement {
   imports {
-    mavenBom("org.springframework.boot:spring-boot-dependencies:4.1.2") {
+    mavenBom("org.springframework.boot:spring-boot-dependencies:4.2.0") {
       bomProperty("kotlin.version", kotlin.coreLibrariesVersion)
     }
   }
